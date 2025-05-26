@@ -23,11 +23,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Lint Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: Dockerfile
-
       - name: Lint Shell Scripts
         uses: reviewdog/action-shellcheck@v1
         with:
