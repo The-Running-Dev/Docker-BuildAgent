@@ -17,6 +17,7 @@
     - [Build and Push to GitHub Container Registry](#build-and-push-to-github-container-registry)
     - [GitHub Actions CI/CD](#github-actions-cicd)
       - [Workflow Steps](#workflow-steps)
+      - [Tagging Support](#tagging-support)
   - [Environment Variables](#environment-variables)
   - [Customization](#customization)
   - [Troubleshooting](#troubleshooting)
@@ -61,18 +62,18 @@ Docker-BuildAgent is a pre-configured Docker image designed to serve as a build 
 2. **Build the Docker image:**
 
    ```sh
-   docker build -t build-agent .
+   docker build -t build-agent:latest .
    ```
 
 3. **Run the container:**
 
    ```sh
-   docker run -it build-agent
+   docker run -it build-agent:latest
    ```
 
 ### Build and Push to GitHub Container Registry
 
-You can use the provided `build.sh` script to build and push the image to GHCR.
+You can use the provided `build.sh` script to build and push the image to GHCR. The script now supports custom tags (e.g., version numbers) as well as the default `latest` tag.
 
 1. **Set the required environment variable:**
    - `gitHubPackagesToken`: Your GitHub Packages token (with write:packages scope)
@@ -80,21 +81,34 @@ You can use the provided `build.sh` script to build and push the image to GHCR.
 2. **Run the build script:**
 
    ```sh
+   # For the latest tag (default)
    export gitHubPackagesToken=YOUR_TOKEN
    chmod +x build.sh
    ./build.sh
+
+   # For a custom tag (e.g., v1.2.3)
+   ./build.sh v1.2.3
    ```
 
 ### GitHub Actions CI/CD
 
-The `.github/workflows/build-and-push.yml` workflow automates building and pushing the Docker image on every push to the `main` branch or via manual dispatch. It requires the `GITHUBPACKAGESTOKEN` secret to be set in your repository.
+The `.github/workflows/build-and-push.yml` workflow automates building, linting, scanning, and pushing the Docker image on every push to the `main` branch, or when a new tag is pushed, or via manual dispatch. It requires the `GITHUBPACKAGESTOKEN` secret to be set in your repository.
 
 #### Workflow Steps
 
 - Checks out the repository
 - Sets up Docker Buildx
+- Lints the Dockerfile with [hadolint](https://github.com/hadolint/hadolint)
+- Lints shell scripts with [shellcheck](https://github.com/koalaman/shellcheck)
 - Grants execute permission to `build.sh`
-- Runs `build.sh` to build and push the image to GHCR
+- Builds and pushes the image with the `latest` tag on branch pushes
+- Builds and pushes the image with the tag name on tag pushes
+- Runs a [Trivy](https://github.com/aquasecurity/trivy) security scan on the built image
+
+#### Tagging Support
+
+- On branch pushes, the image is tagged as `latest`.
+- On tag pushes (e.g., `v1.2.3`), the image is tagged accordingly (e.g., `ghcr.io/the-running-dev/build-agent:v1.2.3`).
 
 ## Environment Variables
 
@@ -106,6 +120,7 @@ The `.github/workflows/build-and-push.yml` workflow automates building and pushi
 - Update `build.sh` for custom tagging or registry targets.
 - To change the base image, edit the `FROM` line in the `Dockerfile`.
 - To install additional global npm packages, add them to the `npm install -g` command in the `Dockerfile`.
+- The `build.sh` script now supports custom tags as an argument.
 
 ## Troubleshooting
 
@@ -116,6 +131,8 @@ The `.github/workflows/build-and-push.yml` workflow automates building and pushi
   - Run `chmod +x build.sh` before executing the script.
 - **Image push fails:**
   - Check your network connection and GHCR access rights.
+- **Lint or security scan failures:**
+  - Review the output from hadolint, shellcheck, or Trivy for actionable issues.
 
 ## Image Details
 
@@ -125,6 +142,7 @@ The `.github/workflows/build-and-push.yml` workflow automates building and pushi
 - **Default Shell:** PowerShell (`pwsh`)
 - **Default Working Directory:** `/workspace`
 - **How to update tool versions:** Edit the `Dockerfile` to specify desired versions.
+- **Health and Security:** The workflow includes linting and vulnerability scanning for best practices.
 
 ## Security Notes
 

@@ -23,10 +23,36 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+      - name: Lint Shell Scripts
+        uses: ludeeus/action-shellcheck@v2
+        with:
+          ignore_paths: ''
+
       - name: Set Execute Permission
         run: chmod +x build.sh
       
-      - name: Build and Push
+      - name: Build and Push (Latest)
         run: ./build.sh
         env:
           gitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+
+      - name: Build and Push (Version Tag)
+        if: github.ref_type == 'tag'
+        run: |
+          export IMAGE_TAG=${GITHUB_REF#refs/tags/}
+          ./build.sh $IMAGE_TAG
+        env:
+          gitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+
+      - name: Trivy Security Scan
+        uses: aquasecurity/trivy-action@v0.16.0
+        with:
+          image-ref: 'ghcr.io/the-running-dev/build-agent:latest'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
