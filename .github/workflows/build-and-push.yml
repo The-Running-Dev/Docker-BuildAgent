@@ -29,9 +29,11 @@ jobs:
           dockerfile: Dockerfile
 
       - name: Lint Shell Scripts
-        uses: ludeeus/action-shellcheck@v2
+        uses: reviewdog/action-shellcheck@v1
         with:
-          ignore_paths: ''
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-check
+          pattern: "*.sh"
 
       - name: Set Execute Permission
         run: chmod +x build.sh
