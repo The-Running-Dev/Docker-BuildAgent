@@ -52,7 +52,7 @@ jobs:
           gitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
 
       - name: Trivy Security Scan
-        uses: aquasecurity/trivy-action@v0.19.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: 'ghcr.io/the-running-dev/build-agent:latest'
           format: 'table'
