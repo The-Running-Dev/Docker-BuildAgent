@@ -1,0 +1,32 @@
+name: Build and Push Agent
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - Agent/**
+      - .github/workflows/build-and-push.yml
+
+permissions:
+  packages: write
+
+jobs:
+  Build-and-Push-Agent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Set Execute Permission
+        run: chmod +x build.sh
+      
+      - name: Build and Push
+        run: ./build.sh
+        env:
+          gitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
