@@ -6,8 +6,7 @@ on:
     branches:
       - main
     paths:
-      - Agent/**
-      - .github/workflows/build-and-push.yml
+      - '**'
 
 permissions:
   packages: write
