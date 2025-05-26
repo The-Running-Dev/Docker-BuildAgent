@@ -15,7 +15,7 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Angular CLI, TypeScript, Docker and PowerShell
-RUN npm install -g @angular/cli typescript angular-cli-ghpages powershell
+RUN npm install -g @angular/cli typescript angular-cli-ghpages@latest powershell
     
 # Verify installations
 RUN node -v && npm -v && ng version && pwsh --version && docker --version
