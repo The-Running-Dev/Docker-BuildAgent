@@ -98,12 +98,10 @@ The `.github/workflows/build-and-push.yml` workflow automates building, linting,
 
 - Checks out the repository
 - Sets up Docker Buildx
-- Lints the Dockerfile with [hadolint](https://github.com/hadolint/hadolint)
 - Lints shell scripts with [shellcheck](https://github.com/koalaman/shellcheck)
 - Grants execute permission to `build.sh`
 - Builds and pushes the image with the `latest` tag on branch pushes
 - Builds and pushes the image with the tag name on tag pushes
-- Runs a [Trivy](https://github.com/aquasecurity/trivy) security scan on the built image
 
 #### Tagging Support
 
@@ -169,4 +167,4 @@ Contributions are welcome! Please open issues or submit pull requests for improv
 
 ## Contact
 
-For questions, issues, or support, please open an [issue](https://github.com/the-running-dev/Docker-BuildAgent/issues) or contact the maintainer at [ben@subzerodev.com](mailto:ben@subzerodev.com).
+For questions, issues, or support, please open an [issue](https://github.com/the-running-dev/Docker-BuildAgent/issues).
