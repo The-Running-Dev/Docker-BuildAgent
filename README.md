@@ -32,7 +32,7 @@
 
 ## Overview
 
-Docker-BuildAgent is a pre-configured Docker image designed to serve as a build agent for CI/CD pipelines. It comes with Node.js, Angular CLI, TypeScript, Docker, and PowerShell pre-installed, making it ideal for building, testing, and deploying JavaScript/TypeScript and Angular applications in automated environments.
+Docker-BuildAgent is a pre-configured Docker image designed to serve as a build agent for CI/CD pipelines. It comes with Node.js, Angular CLI, TypeScript, Docker, PowerShell, .NET 8 SDK, Git, and GitVersion pre-installed, making it ideal for building, testing, and deploying JavaScript/TypeScript, Angular, and .NET applications in automated environments.
 
 ## Features
 
@@ -40,7 +40,10 @@ Docker-BuildAgent is a pre-configured Docker image designed to serve as a build 
 - **Angular CLI** and **TypeScript** for Angular projects
 - **Docker** for containerized builds and deployments
 - **PowerShell** for advanced scripting
-- Ready-to-use in CI/CD pipelines (e.g., GitHub Actions)
+- **.NET 8 SDK** for .NET builds and tools
+- **Git** for source control
+- **GitVersion** for semantic versioning in CI/CD
+- **Ready-to-use in CI/CD pipelines** (e.g., GitHub Actions)
 
 ## Prerequisites
 
@@ -73,7 +76,7 @@ Docker-BuildAgent is a pre-configured Docker image designed to serve as a build 
 
 ### Build and Push to GitHub Container Registry
 
-You can use the provided `build.sh` script to build and push the image to GHCR. The script now supports custom tags (e.g., version numbers) as well as the default `latest` tag.
+You can use the provided `build.sh` script to build and push the image to GHCR. The script supports custom tags (e.g., version numbers) as well as the default `latest` tag.
 
 1. **Set the required environment variable:**
    - `gitHubPackagesToken`: Your GitHub Packages token (with write:packages scope)
@@ -98,10 +101,11 @@ The `.github/workflows/build-and-push.yml` workflow automates building, linting,
 
 - Checks out the repository
 - Sets up Docker Buildx
-- Lints shell scripts with [shellcheck](https://github.com/koalaman/shellcheck)
+- Lints shell scripts with [shellcheck](https://github.com/koalaman/shellcheck) via reviewdog
 - Grants execute permission to `build.sh`
 - Builds and pushes the image with the `latest` tag on branch pushes
 - Builds and pushes the image with the tag name on tag pushes
+- Runs a [Trivy](https://github.com/aquasecurity/trivy) security scan on the built image
 
 #### Tagging Support
 
@@ -118,7 +122,8 @@ The `.github/workflows/build-and-push.yml` workflow automates building, linting,
 - Update `build.sh` for custom tagging or registry targets.
 - To change the base image, edit the `FROM` line in the `Dockerfile`.
 - To install additional global npm packages, add them to the `npm install -g` command in the `Dockerfile`.
-- The `build.sh` script now supports custom tags as an argument.
+- The `build.sh` script supports custom tags as an argument.
+- Add or update PowerShell/.NET tools as needed using `dotnet tool install --global <tool>`.
 
 ## Troubleshooting
 
@@ -130,23 +135,26 @@ The `.github/workflows/build-and-push.yml` workflow automates building, linting,
 - **Image push fails:**
   - Check your network connection and GHCR access rights.
 - **Lint or security scan failures:**
-  - Review the output from hadolint, shellcheck, or Trivy for actionable issues.
+  - Review the output from shellcheck or Trivy for actionable issues.
+- **Trivy finds secrets in npm cache:**
+  - The Dockerfile now cleans npm cache after global installs to prevent this issue.
 
 ## Image Details
 
 - **Base Image:** `mcr.microsoft.com/devcontainers/javascript-node:latest`
 - **Installed Tools:**
-  - Node.js, npm, Angular CLI, TypeScript, Docker, PowerShell
+  - Node.js, npm, Angular CLI, TypeScript, Docker, PowerShell, .NET 8 SDK, Git, GitVersion
 - **Default Shell:** PowerShell (`pwsh`)
 - **Default Working Directory:** `/workspace`
 - **How to update tool versions:** Edit the `Dockerfile` to specify desired versions.
-- **Health and Security:** The workflow includes linting and vulnerability scanning for best practices.
+- **Health and Security:** The workflow includes linting and vulnerability scanning for best practices. Npm cache is cleaned to avoid leaking secrets.
 
 ## Security Notes
 
 - **Never expose your GitHub token in logs or public repositories.**
 - Always use GitHub Actions secrets or environment variables for sensitive data.
 - Review Dockerfile and scripts for any hardcoded credentials before sharing.
+- The build process removes npm cache to prevent accidental exposure of secrets or private keys.
 
 ## Related Resources
 
@@ -156,6 +164,8 @@ The `.github/workflows/build-and-push.yml` workflow automates building, linting,
 - [Node.js](https://nodejs.org/)
 - [Angular CLI](https://angular.io/cli)
 - [PowerShell](https://docs.microsoft.com/powershell/)
+- [.NET](https://dotnet.microsoft.com/)
+- [GitVersion](https://gitversion.net/)
 
 ## Contributing
 
