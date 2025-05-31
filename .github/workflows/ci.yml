@@ -39,6 +39,5 @@ jobs:
         env:
           GitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
         run: |
-          nuke plan
           nuke --log-level verbose --target GetVersion
           nuke --log-level verbose --target BuildAndPush
