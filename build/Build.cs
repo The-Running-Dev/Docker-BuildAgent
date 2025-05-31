@@ -47,6 +47,7 @@ class Build : NukeBuild
         if (File.Exists(configFile))
         {
             Env.Load(configFile);
+
             Log.Information("✅ Loaded Configuration from .nuke/config");
         }
         else
@@ -57,6 +58,7 @@ class Build : NukeBuild
         if (File.Exists(envFile))
         {
             Env.Load(envFile);
+
             Log.Information("✅ Loaded Secrets from .env");
         }
         else

@@ -37,5 +37,5 @@ jobs:
 
       - name: Run NUKE BuildAndPush
         env:
-          GitHubPackagesToken: ${{   secrets.GITHUBPACKAGESTOKEN }}
+          GitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
         run: nuke --target BuildAndPush
