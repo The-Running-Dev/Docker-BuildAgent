@@ -159,7 +159,9 @@ class Build : NukeBuild
             GitVersion = JsonSerializer.Deserialize<GitVersionInfo>(output);
 
             if (string.IsNullOrWhiteSpace(GitVersion?.SemVer))
-                Assert.Fail("❌ Failed to extract SemVer from GitVersion.");
+            {
+                Assert.Fail("❌ Failed to Extract SemVer from GitVersion.");
+            }
 
             VersionFile.WriteAllText(GitVersion.SemVer);
 
@@ -180,10 +182,14 @@ class Build : NukeBuild
         .Executes(() =>
         {
             if (string.IsNullOrWhiteSpace(ImageTag))
+            {
                 Assert.Fail("❌ ImageTag is Required.");
+            }
 
             if (string.IsNullOrWhiteSpace(ResolvedVersion))
+            {
                 Assert.Fail("❌ .resolved-version is Missing. Run GetVersion First.");
+            }
         });
 
     Target PrintInfo => _ => _
