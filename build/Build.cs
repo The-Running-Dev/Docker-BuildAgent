@@ -100,6 +100,7 @@ class Build : NukeBuild
                 Assert.Fail("❌ Failed to Extract SemVer from GitVersion.");
 
             VersionFile.WriteAllText(GitVersion.SemVer);
+
             Log.Information($"🔖 GitVersion Resolved: {GitVersion.SemVer}");
         });
 

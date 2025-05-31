@@ -41,5 +41,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
         run: |
-          nuke --target GitVersion
+          nuke --target GetVersion
           nuke --target DockerPipeline
