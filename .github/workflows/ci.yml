@@ -37,8 +37,11 @@ jobs:
           ln -sf "$TOOL_PATH/dotnet-gitversion" "$TOOL_PATH/gitversion"
 
           dotnet tool install --global Nuke.GlobalTool
-          
+
           echo "$TOOL_PATH" >> $GITHUB_PATH
+
+          echo "Tools installed at: $HOME/.dotnet/tools"
+          ls -la "$HOME/.dotnet/tools"
         shell: bash
 
       - name: Run NUKE BuildAndPush
