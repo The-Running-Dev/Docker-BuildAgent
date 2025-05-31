@@ -80,7 +80,7 @@ class Build : NukeBuild
     }
 
     Target DockerPipeline => _ => _
-        .DependsOn(GetVersion, PrintInfo, BuildContainer, Publish)
+        .DependsOn(GetVersion, PrintInfo, BuildContainer)
         .Executes(() =>
         {
             Log.Information("✅ Build Step Complete");
