@@ -32,10 +32,14 @@ jobs:
       - name: Install GitVersion
         run: dotnet tool install --global GitVersion.Tool
 
+      - name: Symlink GitVersion
+        run: ln -s /root/.dotnet/tools/dotnet-gitversion /usr/bin/gitversion
+        shell: bash
+
       - name: Install NUKE
         run: dotnet tool install --global Nuke.GlobalTool
 
       - name: Run NUKE BuildAndPush
         env:
-          GitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+          GitHubPackagesToken: ${{   secrets.GITHUBPACKAGESTOKEN }}
         run: nuke --target BuildAndPush
