@@ -10,6 +10,7 @@ on:
 
 permissions:
   packages: write
+  contents: write
 
 jobs:
   Build:
@@ -37,5 +38,6 @@ jobs:
 
       - name: Run NUKE BuildAndPush
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
         run: nuke --target BuildAndPush
