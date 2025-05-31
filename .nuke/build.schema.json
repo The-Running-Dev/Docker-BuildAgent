@@ -24,11 +24,12 @@
     "ExecutableTarget": {
       "type": "string",
       "enum": [
-        "BuildAndPush",
         "BuildContainer",
         "Clean",
+        "DockerPipeline",
         "GetVersion",
         "PrintInfo",
+        "Publish",
         "Push",
         "Tag",
         "ValidateInputs"
@@ -112,6 +113,10 @@
         "DryRun": {
           "type": "boolean",
           "description": "Enable Dry Run (Skip Push and Tag)"
+        },
+        "ForceCiBehavior": {
+          "type": "boolean",
+          "description": "Force Push/Tag Even During Local Builds"
         },
         "GitHubPackagesToken": {
           "type": "string",
