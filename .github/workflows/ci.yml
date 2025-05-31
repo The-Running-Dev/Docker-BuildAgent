@@ -38,6 +38,4 @@ jobs:
       - name: Run NUKE BuildAndPush
         env:
           GitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
-        run: |
-          nuke --log-level verbose --target GetVersion
-          nuke --log-level verbose --target BuildAndPush
+        run: nuke --target BuildAndPush

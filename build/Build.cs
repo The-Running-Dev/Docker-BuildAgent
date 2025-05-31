@@ -7,8 +7,8 @@ using DotNetEnv;
 using Nuke.Common;
 using Nuke.Common.IO;
 using Nuke.Common.Tooling;
-using Nuke.Common.Tools.Docker;
 using Nuke.Common.Tools.Git;
+using Nuke.Common.Tools.Docker;
 
 using Serilog;
 
@@ -37,7 +37,19 @@ class Build : NukeBuild
 
     AbsolutePath VersionFile => RootDirectory / ".resolved-version";
 
-    string ResolvedVersion => VersionFile.Exists() ? VersionFile.ReadAllText().Trim() : null;
+    [Parameter("Force Push/Tag Even During Local Builds")]
+    readonly bool ForceCiBehavior;
+    
+
+    string GetResolvedVersion()
+    {
+        if (!VersionFile.Exists())
+        {
+            Assert.Fail("❌ .resolved-version is Missing. Run GetVersion First.");
+        }
+
+        return VersionFile.ReadAllText().Trim();
+    }
 
     public static int Main()
     {
@@ -47,8 +59,7 @@ class Build : NukeBuild
         if (File.Exists(configFile))
         {
             Env.Load(configFile);
-
-            Log.Information("✅ Loaded Configuration from .nuke/config");
+            Log.Information("✅ Loaded Config from .nuke/config");
         }
         else
         {
@@ -58,26 +69,25 @@ class Build : NukeBuild
         if (File.Exists(envFile))
         {
             Env.Load(envFile);
-
             Log.Information("✅ Loaded Secrets from .env");
         }
         else
         {
-            Log.Information("ℹ️ No .env File Found");
+            Log.Information("ℹ️ No .env Found");
         }
 
         return Execute<Build>(x => x.BuildAndPush);
     }
 
     Target BuildAndPush => _ => _
-        .DependsOn(PrintInfo, BuildContainer)
+        .DependsOn(GetVersion, PrintInfo, BuildContainer, Push, Tag)
         .Executes(() =>
         {
             Log.Information("✅ Build Step Complete");
 
             if (!IsLocalBuild && !DryRun)
             {
-                Log.Information("🚀 CI Build Detected — Continuing to Push and Tag...");
+                Log.Information("🚀 CI Build Detected — Pushing and Tagging...");
                 
                 Push.Invoke(null);
                 
@@ -87,65 +97,6 @@ class Build : NukeBuild
             {
                 Log.Information($"🏃 Skipping Push/Tag (IsLocalBuild: {IsLocalBuild}, DryRun: {DryRun})");
             }
-        });
-
-    Target Tag => _ => _
-        .OnlyWhenStatic(() => !IsLocalBuild && !DryRun)
-        .Executes(() =>
-        {
-            if (string.IsNullOrWhiteSpace(ResolvedVersion))
-                Assert.Fail(".resolved-version is Missing.");
-
-            var existingTags = GitTasks.Git("tag");
-
-            if (existingTags.All(l => l.Text != ResolvedVersion))
-            {
-                GitTasks.Git($"tag {ResolvedVersion}");
-                GitTasks.Git($"push origin {ResolvedVersion}");
-
-                Log.Information($"🏷️ Created and Pushed Tag: {ResolvedVersion}");
-            }
-            else
-            {
-                Log.Information($"✅ Tag {ResolvedVersion} Already Exists");
-            }
-        });
-
-    Target Push => _ => _
-        .OnlyWhenStatic(() => !IsLocalBuild && !DryRun)
-        .Executes(() =>
-        {
-            if (string.IsNullOrWhiteSpace(GitHubPackagesToken))
-                Assert.Fail("❌ GitHubPackagesToken is Not Set.");
-
-            DockerTasks.DockerLogin(s => s
-                .SetServer("ghcr.io")
-                .SetUsername(GitHubUsername)
-                .SetPassword(GitHubPackagesToken));
-
-            DockerTasks.DockerPush(s => s
-                .SetName($"{Repository}/{ImageTag}:{ResolvedVersion}"));
-
-            DockerTasks.DockerPush(s => s
-                .SetName($"{Repository}/{ImageTag}:latest"));
-
-            Log.Information($"📤 Pushed Docker Images: {ResolvedVersion}, latest");
-        });
-
-    Target BuildContainer => _ => _
-        .DependsOn(GetVersion, ValidateInputs)
-        .Executes(() =>
-        {
-            DockerTasks.DockerBuild(s => s
-                .SetPath(RootDirectory)
-                .SetFile(RootDirectory / Dockerfile)
-                .SetTag($"{Repository}/{ImageTag}:latest"));
-
-            DockerTasks.DockerTag(s => s
-                .SetSourceImage($"{Repository}/{ImageTag}:latest")
-                .SetTargetImage($"{Repository}/{ImageTag}:{ResolvedVersion}"));
-
-            Log.Information($"🐳 Built and Tagged Images: {ResolvedVersion}, latest");
         });
 
     Target GetVersion => _ => _
@@ -159,13 +110,10 @@ class Build : NukeBuild
             GitVersion = JsonSerializer.Deserialize<GitVersionInfo>(output);
 
             if (string.IsNullOrWhiteSpace(GitVersion?.SemVer))
-            {
                 Assert.Fail("❌ Failed to Extract SemVer from GitVersion.");
-            }
 
             VersionFile.WriteAllText(GitVersion.SemVer);
-
-            Log.Information($"🔖 GitVersion Resolved via CLI: {GitVersion.SemVer}");
+            Log.Information($"🔖 GitVersion Resolved: {GitVersion.SemVer}");
         });
 
     Target Clean => _ => _
@@ -182,13 +130,72 @@ class Build : NukeBuild
         .Executes(() =>
         {
             if (string.IsNullOrWhiteSpace(ImageTag))
-            {
                 Assert.Fail("❌ ImageTag is Required.");
+
+            GetResolvedVersion(); // Will assert if missing
+        });
+
+    Target BuildContainer => _ => _
+        .DependsOn(GetVersion, ValidateInputs)
+        .Executes(() =>
+        {
+            var version = GetResolvedVersion();
+
+            DockerTasks.DockerBuild(s => s
+                .SetPath(RootDirectory)
+                .SetFile(RootDirectory / Dockerfile)
+                .SetTag($"{Repository}/{ImageTag}:latest"));
+
+            DockerTasks.DockerTag(s => s
+                .SetSourceImage($"{Repository}/{ImageTag}:latest")
+                .SetTargetImage($"{Repository}/{ImageTag}:{version}"));
+
+            Log.Information($"🐳 Built and Tagged: {version}, latest");
+        });
+
+    Target Push => _ => _
+        .DependsOn(GetVersion)
+        .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
+        .Executes(() =>
+        {
+            if (string.IsNullOrWhiteSpace(GitHubPackagesToken))
+            {
+                Assert.Fail("❌ GitHubPackagesToken is not Set.");
             }
 
-            if (string.IsNullOrWhiteSpace(ResolvedVersion))
+            var version = GetResolvedVersion();
+
+            DockerTasks.DockerLogin(s => s
+                .SetServer("ghcr.io")
+                .SetUsername(GitHubUsername)
+                .SetPassword(GitHubPackagesToken));
+
+            DockerTasks.DockerPush(s => s
+                .SetName($"{Repository}/{ImageTag}:{version}"));
+
+            DockerTasks.DockerPush(s => s
+                .SetName($"{Repository}/{ImageTag}:latest"));
+
+            Log.Information($"📤 Pushed Docker Images: {version}, latest");
+        });
+
+    Target Tag => _ => _
+        .DependsOn(GetVersion)
+        .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
+        .Executes(() =>
+        {
+            var version = GetResolvedVersion();
+            var existingTags = GitTasks.Git("tag");
+
+            if (existingTags.All(l => l.Text != version))
             {
-                Assert.Fail("❌ .resolved-version is Missing. Run GetVersion First.");
+                GitTasks.Git($"tag {version}");
+                GitTasks.Git($"push origin {version}");
+                Log.Information($"🏷️ Created and Pushed Tag: {version}");
+            }
+            else
+            {
+                Log.Information($"✅ Tag {version} Already Exists");
             }
         });
 
@@ -203,7 +210,7 @@ class Build : NukeBuild
         });
 }
 
-class GitVersionInfo
+record GitVersionInfo
 {
-    public string SemVer { get; set; }
+    public string SemVer { get; init; }
 }
