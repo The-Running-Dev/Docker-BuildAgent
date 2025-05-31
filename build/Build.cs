@@ -80,10 +80,10 @@ class Build : NukeBuild
     }
 
     Target DockerPipeline => _ => _
-        .DependsOn(GetVersion, PrintInfo, BuildContainer)
+        .DependsOn(Publish)
         .Executes(() =>
         {
-            Log.Information("✅ Build Step Complete");
+            Log.Information("✅ Docker CI Complete");
         });
 
     Target GetVersion => _ => _
@@ -116,6 +116,7 @@ class Build : NukeBuild
         });
 
     Target ValidateInputs => _ => _
+        .DependsOn(GetVersion)
         .Executes(() =>
         {
             if (string.IsNullOrWhiteSpace(ImageTag))
@@ -127,7 +128,7 @@ class Build : NukeBuild
         });
 
     Target BuildContainer => _ => _
-        .DependsOn(GetVersion, ValidateInputs)
+        .DependsOn(PrintInfo)
         .Executes(() =>
         {
             var version = GetResolvedVersion();
@@ -145,13 +146,14 @@ class Build : NukeBuild
         });
 
     Target Publish => _ => _
-        .DependsOn(Push, Tag)
+        .DependsOn(Push)
         .Executes(() =>
         {
             Log.Information("✅ Publish Step Complete");
         });
 
     Target Push => _ => _
+        .DependsOn(Tag)
         .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
         .Executes(() =>
         {
@@ -172,6 +174,7 @@ class Build : NukeBuild
         });
 
     Target Tag => _ => _
+        .DependsOn(BuildContainer)
         .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
         .Executes(() =>
         {
@@ -193,6 +196,7 @@ class Build : NukeBuild
         });
 
     Target PrintInfo => _ => _
+        .DependsOn(ValidateInputs)
         .Executes(() =>
         {
             Log.Information($"🔧 Image Tag: {ImageTag}");
