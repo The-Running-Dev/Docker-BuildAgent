@@ -47,9 +47,6 @@ RUN npm install -g @angular/cli typescript angular-cli-ghpages@latest powershell
 RUN pwsh -Command "dotnet tool install --global GitVersion.Tool"
 RUN pwsh -Command "dotnet tool install --global Nuke.GlobalTool"
 
-# Make a symbolic link for GitVersion
-RUN ln -s /root/.dotnet/tools/dotnet-gitversion /usr/bin/gitversion
-
 # Add .dotnet/tools to PATH for all shells
 ENV PATH="${PATH}:/root/.dotnet/tools"
 

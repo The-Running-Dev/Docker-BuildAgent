@@ -150,7 +150,7 @@ class Build : NukeBuild
         .DependsOn(Clean)
         .Executes(() =>
         {
-            var process = ProcessTasks.StartProcess("gitversion", "/output json", RootDirectory, logOutput: true);
+            var process = ProcessTasks.StartProcess("dotnet-gitversion", "/output json", RootDirectory, logOutput: true);
             process.AssertZeroExitCode();
 
             var output = process.Output.StdToText();
