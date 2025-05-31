@@ -31,10 +31,14 @@ jobs:
 
       - name: Install .NET Tools and Setup PATH
         run: |
+          TOOL_PATH="$HOME/.dotnet/tools"
+
           dotnet tool install --global GitVersion.Tool
-          ln -sf /root/.dotnet/tools/dotnet-gitversion /root/.dotnet/tools/gitversion
+          ln -sf "$TOOL_PATH/dotnet-gitversion" "$TOOL_PATH/gitversion"
+
           dotnet tool install --global Nuke.GlobalTool
-          echo "/root/.dotnet/tools" >> $GITHUB_PATH
+          
+          echo "$TOOL_PATH" >> $GITHUB_PATH
         shell: bash
 
       - name: Run NUKE BuildAndPush
