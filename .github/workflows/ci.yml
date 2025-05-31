@@ -36,8 +36,8 @@ jobs:
           dotnet tool install --global Nuke.GlobalTool
         shell: bash
 
-      - name: Run NUKE BuildAndPush
+      - name: Run NUKE Build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GitHubPackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
-        run: nuke --target BuildAndPush
+        run: nuke --target DockerPipeline

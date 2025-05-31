@@ -76,27 +76,14 @@ class Build : NukeBuild
             Log.Information("ℹ️ No .env Found");
         }
 
-        return Execute<Build>(x => x.BuildAndPush);
+        return Execute<Build>(x => x.DockerPipeline);
     }
 
-    Target BuildAndPush => _ => _
-        .DependsOn(GetVersion, PrintInfo, BuildContainer, Push, Tag)
+    Target DockerPipeline => _ => _
+        .DependsOn(GetVersion, PrintInfo, BuildContainer, Publish)
         .Executes(() =>
         {
             Log.Information("✅ Build Step Complete");
-
-            if (!IsLocalBuild && !DryRun)
-            {
-                Log.Information("🚀 CI Build Detected — Pushing and Tagging...");
-                
-                Push.Invoke(null);
-                
-                Tag.Invoke(null);
-            }
-            else
-            {
-                Log.Information($"🏃 Skipping Push/Tag (IsLocalBuild: {IsLocalBuild}, DryRun: {DryRun})");
-            }
         });
 
     Target GetVersion => _ => _
@@ -122,6 +109,7 @@ class Build : NukeBuild
             if (VersionFile.Exists())
             {
                 VersionFile.DeleteFile();
+
                 Log.Information("🧹 Removed .resolved-version");
             }
         });
@@ -130,7 +118,9 @@ class Build : NukeBuild
         .Executes(() =>
         {
             if (string.IsNullOrWhiteSpace(ImageTag))
+            {
                 Assert.Fail("❌ ImageTag is Required.");
+            }
 
             GetResolvedVersion(); // Will assert if missing
         });
@@ -153,15 +143,19 @@ class Build : NukeBuild
             Log.Information($"🐳 Built and Tagged: {version}, latest");
         });
 
+    Target Publish => _ => _
+        .DependsOn(Push, Tag)
+        .Executes(() =>
+        {
+            Log.Information("✅ Publish Step Complete");
+        });
+
     Target Push => _ => _
-        .DependsOn(GetVersion)
         .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
         .Executes(() =>
         {
             if (string.IsNullOrWhiteSpace(GitHubPackagesToken))
-            {
-                Assert.Fail("❌ GitHubPackagesToken is not Set.");
-            }
+                Assert.Fail("❌ GitHubPackagesToken is Not Set.");
 
             var version = GetResolvedVersion();
 
@@ -170,17 +164,13 @@ class Build : NukeBuild
                 .SetUsername(GitHubUsername)
                 .SetPassword(GitHubPackagesToken));
 
-            DockerTasks.DockerPush(s => s
-                .SetName($"{Repository}/{ImageTag}:{version}"));
-
-            DockerTasks.DockerPush(s => s
-                .SetName($"{Repository}/{ImageTag}:latest"));
+            DockerTasks.DockerPush(s => s.SetName($"{Repository}/{ImageTag}:{version}"));
+            DockerTasks.DockerPush(s => s.SetName($"{Repository}/{ImageTag}:latest"));
 
             Log.Information($"📤 Pushed Docker Images: {version}, latest");
         });
 
     Target Tag => _ => _
-        .DependsOn(GetVersion)
         .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
         .Executes(() =>
         {
@@ -190,7 +180,9 @@ class Build : NukeBuild
             if (existingTags.All(l => l.Text != version))
             {
                 GitTasks.Git($"tag {version}");
+
                 GitTasks.Git($"push origin {version}");
+                
                 Log.Information($"🏷️ Created and Pushed Tag: {version}");
             }
             else
