@@ -1,0 +1,12 @@
+
+.vs/
+
+.env
+
+.resolved-version
+
+build/bin/
+
+build/obj/
+
+.nuke/temp/

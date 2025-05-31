@@ -1,0 +1,20 @@
+{
+	"$schema": "build.schema.json",
+	"GitHubPackagesToken": {
+		"description": "GitHub Token for Pushing Docker Images",
+		"prompt": true,
+		"secret": true
+	},
+	"ImageTag": {
+		"description": "Short Name of the Docker Image",
+		"default": "build-agent"
+	},
+	"Repository": {
+		"description": "Full Docker Repository Path",
+		"default": "ghcr.io/the-running-dev"
+	},
+	"GitHubUsername": {
+		"description": "GitHub Username or Org that Owns the Repository",
+		"default": "the-running-dev"
+	}
+}

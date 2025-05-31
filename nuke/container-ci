@@ -1,0 +1,12 @@
+#!/usr/bin/env pwsh
+
+$ErrorActionPreference = "Stop"
+
+# Resolve working directory inside container
+$workingDir = Convert-Path .
+
+# Just log it — we do NOT add GitVersion.Tool here, since it's precompiled into Build.dll
+Write-Host "🚀 Running Precompiled NUKE from: $workingDir"
+
+# Run NUKE with args, allowing config from .nuke/config and secrets from .env
+dotnet /nuke/Build.dll @args
