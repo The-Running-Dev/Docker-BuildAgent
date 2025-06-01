@@ -1,6 +1,4 @@
-# GitVersion.yml (for GitVersion 6.3+)
 mode: ContinuousDeployment
-# next-version: v1.0.0
 
 branches:
   main:
