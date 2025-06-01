@@ -72,6 +72,8 @@ class Docker : NukeBuild
             Log.Information($"✅ Loaded Secrets from {envFile}");
         }
 
+        ProcessTasks.StartProcess("git", $"config --global --add safe.directory \"{RootDirectory}\"").AssertZeroExitCode();
+
         return Execute<Docker>(x => x.ContainerCI);
     }
 
