@@ -39,5 +39,5 @@ jobs:
       - name: Run NUKE Build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+          RepositoryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
         run: nuke --target ContainerCI

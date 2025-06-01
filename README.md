@@ -1,6 +1,6 @@
 # Docker-BuildAgent
 
-![Build Status](https://img.shields.io/github/actions/workflow/status/the-running-dev/Docker-BuildAgent/ci?branch=main)
+![Build Status](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml/badge.svg?branch=main)
 
 ---
 

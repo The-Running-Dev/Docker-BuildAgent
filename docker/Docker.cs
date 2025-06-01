@@ -160,7 +160,7 @@ class Docker : NukeBuild
         {
             if (string.IsNullOrWhiteSpace(RepositoryToken))
             {
-                Assert.Fail("❌ GitHubPackagesToken is Not Set.");
+                Assert.Fail("❌ Repository Token is Not Set.");
             }
 
             var version = GetResolvedVersion();

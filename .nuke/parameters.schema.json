@@ -1,7 +1,7 @@
 {
 	"$schema": "build.schema.json",
-	"GitHubPackagesToken": {
-		"description": "GitHub Token for Pushing Docker Images",
+	"PackagesToken": {
+		"description": "Token for Pushing Docker Images",
 		"prompt": true,
 		"secret": true
 	},
