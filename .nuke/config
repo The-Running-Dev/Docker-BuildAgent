@@ -1,4 +1,4 @@
 # .nuke/config
 ImageTag=build-agent
 Repository=ghcr.io/the-running-dev
-GitHubUsername=the-running-dev
+RepositoryUsername=the-running-dev

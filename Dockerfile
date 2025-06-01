@@ -5,9 +5,9 @@ WORKDIR /src
 
 COPY . .
 
-RUN dotnet restore build/Build.csproj
+RUN dotnet restore docker/Docker.csproj
 
-RUN dotnet build build/Build.csproj -o /app/output
+RUN dotnet build docker/Docker.csproj -o /app/output
 
 # Stage 2: Final image
 FROM mcr.microsoft.com/devcontainers/javascript-node:latest

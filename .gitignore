@@ -10,3 +10,7 @@ build/bin/
 build/obj/
 
 .nuke/temp/
+
+docker/bin/
+
+docker/obj/

@@ -26,7 +26,7 @@
       "enum": [
         "BuildContainer",
         "Clean",
-        "DockerPipeline",
+        "ContainerCI",
         "GetVersion",
         "PrintInfo",
         "Publish",
@@ -118,15 +118,6 @@
           "type": "boolean",
           "description": "Force Push/Tag Even During Local Builds"
         },
-        "GitHubPackagesToken": {
-          "type": "string",
-          "description": "GitHub Token for Pushing Images",
-          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
-        },
-        "GitHubUsername": {
-          "type": "string",
-          "description": "GitHub Username"
-        },
         "ImageTag": {
           "type": "string",
           "description": "Docker Image Tag"
@@ -134,6 +125,15 @@
         "Repository": {
           "type": "string",
           "description": "Docker Image Repository"
+        },
+        "RepositoryToken": {
+          "type": "string",
+          "description": "Repository Token for Pushing Images",
+          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
+        },
+        "RepositoryUsername": {
+          "type": "string",
+          "description": "Repository Username"
         }
       }
     },
