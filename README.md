@@ -261,7 +261,7 @@ docker run --rm -it \
     -w "/workspace" \
     ghcr.io/the-running-dev/build-agent:latest pwsh -Command "nuke --target ContainerCI"
     # or through a predefined command
-    # -Command "container-ci"
+    # -Command "docker-ci"
 ```
 
 #### Example GitHub Action: Run Nuke Build in Your Container Project
@@ -277,7 +277,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Container CI
-        run: container-ci
+        run: docker-ci
         env:
           PackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
 ```
