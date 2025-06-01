@@ -1,12 +1,23 @@
 #!/usr/bin/env pwsh
-
 $ErrorActionPreference = "Stop"
 
-# Resolve working directory inside container
 $workingDir = Convert-Path .
-
-# Just log it — we do NOT add GitVersion.Tool here, since it's precompiled into Build.dll
 Write-Host "🚀 Running Docker CI: $workingDir"
+Write-Host "🧾 Arguments: $args"
 
-# Run NUKE with args, allowing config from .nuke/config and secrets from .env
-dotnet /nuke/Docker.dll @args
+# Verify dotnet is available
+if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+    Write-Error "❌ 'dotnet' Not Found in PATH"
+    
+    exit 127
+}
+
+try {
+    dotnet /nuke/Docker.dll @args
+
+    exit $LASTEXITCODE
+} catch {
+    Write-Error "💥 Build Failed: $_"
+
+    exit 1
+}
