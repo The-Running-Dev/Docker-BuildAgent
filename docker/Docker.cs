@@ -183,12 +183,12 @@ class Docker : NukeBuild
         .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
         .Executes(() =>
         {
-            var version = GetResolvedVersion();
+            var version = $"v{GetResolvedVersion()}";
             var existingTags = GitTasks.Git("tag");
 
-            if (existingTags.All(l => l.Text != $"v{version}"))
+            if (existingTags.All(l => l.Text != version))
             {
-                GitTasks.Git($"tag v{version}");
+                GitTasks.Git($"tag {version}");
 
                 GitTasks.Git($"push origin {version}");
                 
