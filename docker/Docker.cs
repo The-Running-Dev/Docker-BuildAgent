@@ -186,9 +186,9 @@ class Docker : NukeBuild
             var version = GetResolvedVersion();
             var existingTags = GitTasks.Git("tag");
 
-            if (existingTags.All(l => l.Text != version))
+            if (existingTags.All(l => l.Text != $"v{version}"))
             {
-                GitTasks.Git($"tag {version}");
+                GitTasks.Git($"tag v{version}");
 
                 GitTasks.Git($"push origin {version}");
                 
