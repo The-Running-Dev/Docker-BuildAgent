@@ -31,10 +31,12 @@
     - [Using Predefined Nuke Scripts in Your Projects](#using-predefined-nuke-scripts-in-your-projects)
       - [Example: Run Nuke Build in Your Container Project](#example-run-nuke-build-in-your-container-project)
       - [Example GitHub Action: Run Nuke Build in Your Container Project](#example-github-action-run-nuke-build-in-your-container-project)
+    - [Using `.nuke/config` and `.env` for Your Own Projects](#using-nukeconfig-and-env-for-your-own-projects)
   - [Security Notes](#security-notes)
   - [Related Resources](#related-resources)
   - [Contributing](#contributing)
   - [FAQ / Common Issues](#faq--common-issues)
+    - [What Happens When You Run `ContainerCI` or 'container-ci' Command](#what-happens-when-you-run-containerci-or-container-ci-command)
 
 ---
 
@@ -176,7 +178,7 @@ The `.github/workflows/ci.yml` workflow automates building, linting, scanning, a
 - **Default Shell:** PowerShell (`pwsh`)
 - **Default Working Directory:** `/workspace`
 - **How to update tool versions:** Edit the `Dockerfile` to specify desired versions.
-- **Build Automation:** The `docker/` directory contains a .NET (Nuke) build project for advanced automation. The `nuke/docker-ci` script enables containerized builds.
+- **Build Automation:** The `docker/` directory contains a .NET (Nuke) build project for advanced automation. The `nuke/cotainer-ci` script enables containerized builds.
 
 ## Nuke Build Automation
 
@@ -248,7 +250,7 @@ You can pass parameters to Nuke using the `--parameter value` syntax. For exampl
 ### Using Predefined Nuke Scripts in Your Projects
 
 - The `nuke` directory contains scripts and configuration for running Nuke builds for your container projects, enabling reproducible and isolated build environments.
-- The `nuke/docker-ci` script can be used to run builds inside a container, ensuring consistency across environments.
+- The `nuke/container-ci` script can be used to run builds inside a container, ensuring consistency across environments.
 - To use this feature, mount your source code and invoke the Nuke build script inside a Docker container, or adapt the provided scripts for your CI/CD system.
 
 #### Example: Run Nuke Build in Your Container Project
@@ -261,26 +263,70 @@ docker run --rm -it \
     -w "/workspace" \
     ghcr.io/the-running-dev/build-agent:latest pwsh -Command "nuke --target ContainerCI"
     # or through a predefined command
-    # -Command "docker-ci"
+    # -Command "container-ci"
 ```
 
 #### Example GitHub Action: Run Nuke Build in Your Container Project
 
 ```yaml
+name: Container-CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  packages: write
+  contents: write
+
 jobs:
-  Container:
+  Container-CI:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/the-running-dev/build-agent:latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
       - name: Container CI
         run: docker-ci
         env:
-          PackagesToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RepositoryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
 ```
+
+### Using `.nuke/config` and `.env` for Your Own Projects
+
+To use the `ContainerCI` target (or the `container-ci` command) in your own repository, you should provide configuration files for Nuke and your environment variables:
+
+- **.nuke/config**: This file configures Nuke build settings, such as default targets, parameters, and build environment preferences. You can copy or adapt the `.nuke/config` from this repository, or create your own to specify which targets to run and how to run them, as well as to provide build parameters. For example:
+
+```json
+{
+  "Repository": "ghcr.io/your-org",
+  "RepositoryUsername": "your-username",
+  "ImageTag": "latest"
+}
+```
+
+Place this file in the root of your repository or in the `.nuke/` directory.
+
+- **.env**: This file contains environment variables required for your build, such as secrets or tokens needed by your build logic. Example:
+
+```env
+RepositoryToken=your-ghcr-token
+```
+
+Place this file in your repository root. The build scripts and Nuke will automatically load these variables.
+
+**Tip:** Never commit secrets or sensitive tokens to your public repository. Use GitHub Actions secrets or a secure vault for production builds.
+
+By providing these files, you can easily reuse the `ContainerCI` pipeline and containerized build logic in your own projects, with minimal setup.
 
 ## Security Notes
 
@@ -316,3 +362,19 @@ For questions, issues, or support, please open an [issue](https://github.com/the
   - A: Use environment variables or GitHub Actions secrets. Never hardcode secrets in scripts or Dockerfiles.
 - **Q: GitVersion or Nuke not found in CI?**
   - A: The workflow now installs .NET tools globally, creates a symlink for GitVersion, and adds `/root/.dotnet/tools` to the PATH for reliable access.
+
+### What Happens When You Run `ContainerCI` or 'container-ci' Command
+
+The `ContainerCI` target is the main entry point for CI builds. When you run this target, it automatically runs a sequence of dependent targets in the following order:
+
+1. **Clean** – Cleans up previous build artifacts and removes the version file.
+2. **GetVersion** – Runs GitVersion to determine the semantic version and writes it to a file.
+3. **ValidateInputs** – Ensures all required parameters and environment variables are set.
+4. **PrintInfo** – Prints build and environment information for diagnostics.
+5. **BuildContainer** – Builds and tags the Docker image using the specified Dockerfile and tag.
+6. **Tag** – Creates and pushes a Git tag for the resolved version.
+7. **Push** – Logs in to the Docker registry and pushes the built image.
+8. **Publish** – Finalizes the publish step (can be customized for additional publishing logic).
+9. **ContainerCI** – Marks CI completion (top-level target).
+
+Each target depends on the previous one, so running `ContainerCI` ensures the full build, versioning, tagging, and publishing pipeline is executed in the correct order. This makes it easy to automate complex CI/CD workflows with a single command.
