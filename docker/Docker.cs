@@ -188,9 +188,9 @@ class Docker : NukeBuild
 
             if (existingTags.All(l => l.Text != version))
             {
-                GitTasks.Git($"tag {version}");
+                GitTasks.Git($"tag -f {version}");
 
-                GitTasks.Git($"push origin {version}");
+                GitTasks.Git($"push origin -f {version}");
                 
                 Log.Information($"🏷️ Created and Pushed Tag: {version}");
             }
