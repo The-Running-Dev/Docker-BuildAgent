@@ -27,6 +27,8 @@
         "BuildContainer",
         "Clean",
         "ContainerCI",
+        "CreateRelease",
+        "GetChangeLog",
         "GetVersion",
         "PrintInfo",
         "Publish",
@@ -106,6 +108,11 @@
   "allOf": [
     {
       "properties": {
+        "BuildNotificationsWebhookUrl": {
+          "type": "string",
+          "description": "Webhook URL for Build Notifications",
+          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
+        },
         "Dockerfile": {
           "type": "string",
           "description": "Dockerfile Path"
@@ -114,7 +121,11 @@
           "type": "boolean",
           "description": "Enable Dry Run (Skip Push and Tag)"
         },
-        "ForceCiBehavior": {
+        "ForceNotifications": {
+          "type": "boolean",
+          "description": "Force Notifications Even During Local Builds"
+        },
+        "ForcePush": {
           "type": "boolean",
           "description": "Force Push/Tag Even During Local Builds"
         },
@@ -134,6 +145,10 @@
         "RepositoryUsername": {
           "type": "string",
           "description": "Repository Username"
+        },
+        "SendNotifications": {
+          "type": "boolean",
+          "description": "Send Notifications"
         }
       }
     },

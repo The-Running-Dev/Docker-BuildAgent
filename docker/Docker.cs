@@ -1,13 +1,21 @@
+using System;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Net.Http;
 using System.Text.Json;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
+using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 
 using DotNetEnv;
 
 using Nuke.Common;
 using Nuke.Common.IO;
+using Nuke.Common.Git;
 using Nuke.Common.Tooling;
+using Nuke.Common.Execution;
 using Nuke.Common.Tools.Git;
 using Nuke.Common.Tools.Docker;
 
@@ -27,20 +35,37 @@ class Docker : NukeBuild
 
     [Parameter("Docker Image Tag")]
     readonly string ImageTag;
-    
+
+    [Parameter("Webhook URL for Build Notifications")]
+    [Secret]
+    readonly string BuildNotificationsWebhookUrl;
+
     [Parameter("Dockerfile Path")]
     readonly string Dockerfile = "Dockerfile";
 
     [Parameter("Enable Dry Run (Skip Push and Tag)")]
     readonly bool DryRun;
 
+    [GitRepository] readonly GitRepository GitRepository;
+
     GitVersionInfo GitVersion;
 
     AbsolutePath VersionFile => RootDirectory / ".resolved-version";
 
     [Parameter("Force Push/Tag Even During Local Builds")]
-    readonly bool ForceCiBehavior;
-    
+    readonly bool ForcePush;
+
+    [Parameter("Send Notifications")]
+    readonly bool SendNotifications = true;
+
+    [Parameter("Force Notifications Even During Local Builds")]
+    readonly bool ForceNotifications;
+
+    DateTime BuildStartTime { get; set; } = DateTime.UtcNow;
+
+    TimeSpan BuildDuration { get; set; }
+
+    bool BuildSucceeded { get; set; } = true;
 
     string GetResolvedVersion()
     {
@@ -50,6 +75,89 @@ class Docker : NukeBuild
         }
 
         return VersionFile.ReadAllText().Trim();
+    }
+
+    async Task SendNotification()
+    {
+        if (string.IsNullOrWhiteSpace(BuildNotificationsWebhookUrl))
+        {
+            Log.Warning("⚠️ Build Notifications Webhook Url is Not Set.");
+
+            return;
+        }
+
+        var title = BuildSucceeded ? "✅ Build Succeeded" : "❌ Build Failed";
+        var color = BuildSucceeded ? 0x57F287 : 0xED4245;
+
+        var gitCommit = GitRepository?.Commit ?? "unknown";
+        var gitCommitMessage = ProcessTasks
+            .StartProcess("git", "log -1 --pretty=%B", logOutput: false)
+            .AssertZeroExitCode()
+            .Output
+            .Select(o => o.Text.Trim())
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Take(20)
+            .ToList();
+
+        var formattedCommitMessage = string.Join("\n", gitCommitMessage);
+        var gitBranch = GitRepository?.Branch ?? "unknown";
+        var durationText = BuildDuration.TotalMinutes >= 1
+            ? $"{BuildDuration.TotalMinutes:N1}m"
+            : $"{BuildDuration.TotalSeconds:N0}s";
+
+        // Use Git.GetRepoBranchCommitUrls to get URLs
+        var (repoUrl, branchUrl, commitUrl) = Git.GetRepoBranchCommitUrls(gitBranch, gitCommit);
+        var branchLink = branchUrl != null ? $"[`{gitBranch}`]({branchUrl})" : $"`{gitBranch}`";
+        var commitLink = commitUrl != null ? $"[`{gitCommit}`]({commitUrl})" : $"`{gitCommit}`";
+
+        var description =
+            $"**Branch:** {branchLink}\n" +
+            $"**Commit:** {commitLink}\n" +
+            $"**Version:** `{GitVersion?.SemVer ?? "N/A"}`\n" +
+            $"**Message:**\n```{formattedCommitMessage}```\n" +
+            $"**Duration:** `{durationText}`";
+
+        var payload = new
+        {
+            embeds = new[]
+            {
+                new
+                {
+                    title,
+                    description,
+                    color,
+                    timestamp = DateTime.UtcNow.ToString("o"),
+                    footer = new { text = "NUKE Build System" }
+                }
+            }
+        };
+
+        using var client = new HttpClient();
+        var response = await client.PostAsJsonAsync(BuildNotificationsWebhookUrl, payload);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+
+            Log.Error($"❌ Failed to Send Discord Notification: {response.StatusCode}\n{error}");
+        }
+    }
+
+    protected override void OnBuildFinished()
+    {
+        BuildDuration = DateTime.UtcNow - BuildStartTime;
+        var notificationsAreEnabled = SendNotifications && !string.IsNullOrEmpty(BuildNotificationsWebhookUrl);
+
+        if (ExecutionPlan.Any(x => x.Status == ExecutionStatus.Failed))
+        {
+            BuildSucceeded = false;
+        }
+
+        if (notificationsAreEnabled && (ForceNotifications || (!IsLocalBuild && !DryRun)))
+        {
+            Log.Information($"Sending...{BuildNotificationsWebhookUrl}");
+            SendNotification().GetAwaiter().GetResult();
+        }
     }
 
     public static int Main()
@@ -84,6 +192,105 @@ class Docker : NukeBuild
             Log.Information("✅ Container CI Complete");
         });
 
+    Target Publish => _ => _
+        .DependsOn(Push)
+        .Executes(() =>
+        {
+            Log.Information("✅ Publish Step Complete");
+        });
+
+    Target Push => _ => _
+        .DependsOn(Tag)
+        .OnlyWhenDynamic(() => ForcePush || (!IsLocalBuild && !DryRun))
+        .Executes(() =>
+        {
+            if (string.IsNullOrWhiteSpace(RepositoryToken))
+            {
+                Assert.Fail("❌ Repository Token is Not Set.");
+            }
+
+            var version = GetResolvedVersion();
+
+            DockerTasks.DockerLogin(s => s
+                .SetServer(Regex.Replace(Repository, @"/.*$", ""))
+                .SetUsername(RepositoryUsername)
+                .SetPassword(RepositoryToken));
+
+            DockerTasks.DockerPush(s => s.SetName($"{Repository}/{ImageTag}:{version}"));
+            DockerTasks.DockerPush(s => s.SetName($"{Repository}/{ImageTag}:latest"));
+
+            Log.Information($"📤 Pushed Docker Images: {version}, latest");
+        });
+
+    Target Tag => _ => _
+        .DependsOn(BuildContainer)
+        .OnlyWhenDynamic(() => ForcePush || (!IsLocalBuild && !DryRun))
+        .Executes(() =>
+        {
+            var version = $"v{GetResolvedVersion()}";
+            var existingTags = GitTasks.Git("tag");
+
+            if (existingTags.All(l => l.Text != version))
+            {
+                GitTasks.Git($"tag -f {version}");
+
+                GitTasks.Git($"push origin -f {version}");
+
+                Log.Information($"🏷️ Created and Pushed Tag: {version}");
+            }
+            else
+            {
+                Log.Information($"✅ Tag {version} Already Exists");
+            }
+        });
+
+    Target BuildContainer => _ => _
+        .DependsOn(PrintInfo)
+        .Executes(() =>
+        {
+            var version = GetResolvedVersion();
+
+            Log.Information($"Building: {RootDirectory / Dockerfile}, Tag: {Repository}/{ImageTag}:latest...");
+
+            DockerTasks.DockerBuild(s => s
+                .SetProcessLogger((_, _) => { })
+                .SetPath(RootDirectory)
+                .SetFile(RootDirectory / Dockerfile)
+                .SetTag($"{Repository}/{ImageTag}:latest"));
+
+            DockerTasks.DockerTag(s => s
+                .SetSourceImage($"{Repository}/{ImageTag}:latest")
+                .SetTargetImage($"{Repository}/{ImageTag}:{version}"));
+
+            Log.Information($"🐳 Built and Tagged: {version}, latest");
+        });
+
+    Target PrintInfo => _ => _
+        .DependsOn(ValidateInputs)
+        .Executes(() =>
+        {
+            Log.Information($"🔧 Image Tag: {ImageTag}");
+            Log.Information($"🔧 Repository: {Repository}");
+            Log.Information($"🔧 Repository Username: {RepositoryUsername}");
+            Log.Information($"🔧 Git Version: {GitVersion?.SemVer ?? "Unavailable"}");
+            Log.Information($"🔧 Force Push: {ForcePush}");
+            Log.Information($"🔧 Send Notifications: {SendNotifications}");
+            Log.Information($"🔧 Force Notifications: {ForceNotifications}");
+            Log.Information($"🔧 Dry Run: {DryRun}");
+        });
+
+    Target ValidateInputs => _ => _
+        .DependsOn(GetVersion)
+        .Executes(() =>
+        {
+            if (string.IsNullOrWhiteSpace(ImageTag))
+            {
+                Assert.Fail("❌ ImageTag is Required.");
+            }
+
+            GetResolvedVersion();
+        });
+
     Target GetVersion => _ => _
         .DependsOn(Clean)
         .Executes(() =>
@@ -115,104 +322,76 @@ class Docker : NukeBuild
             }
         });
 
-    Target ValidateInputs => _ => _
-        .DependsOn(GetVersion)
+    Target GetChangeLog => _ => _
         .Executes(() =>
         {
-            if (string.IsNullOrWhiteSpace(ImageTag))
+            var changelogPath = "CHANGELOG.md";
+            var changeLog = Git.GetChangelog();
+
+            if (string.IsNullOrEmpty(changeLog))
             {
-                Assert.Fail("❌ ImageTag is Required.");
+                Log.Information("No New Commits Since Last Tag...");
+
+                return;
             }
 
-            GetResolvedVersion();
-        });
+            var today = DateTime.UtcNow.ToString("yyyy.MM.dd");
+            var changelogBuilder = new StringBuilder();
+            changelogBuilder.AppendLine($"## {today}\n");
 
-    Target BuildContainer => _ => _
-        .DependsOn(PrintInfo)
-        .Executes(() =>
-        {
-            var version = GetResolvedVersion();
+            // Append the rest of the old changelog (if any)
+            var oldChangelog = File.Exists(changelogPath) ? File.ReadAllText(changelogPath) : "";
+            changelogBuilder.AppendLine(oldChangelog);
 
-            Log.Information($"Building: {RootDirectory/Dockerfile}, Tag: {Repository}/{ImageTag}:latest...");
+            File.WriteAllText(changelogPath, changelogBuilder.ToString());
+        });    
 
-            DockerTasks.DockerBuild(s => s
-                .SetProcessLogger((_, _) => { })
-                .SetPath(RootDirectory)
-                .SetFile(RootDirectory / Dockerfile)
-                .SetTag($"{Repository}/{ImageTag}:latest"));
-            
-            DockerTasks.DockerTag(s => s
-                .SetSourceImage($"{Repository}/{ImageTag}:latest")
-                .SetTargetImage($"{Repository}/{ImageTag}:{version}"));
-
-            Log.Information($"🐳 Built and Tagged: {version}, latest");
-        });
-
-    Target Publish => _ => _
-        .DependsOn(Push)
-        .Executes(() =>
-        {
-            Log.Information("✅ Publish Step Complete");
-        });
-
-    Target Push => _ => _
-        .DependsOn(Tag)
-        .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
-        .Executes(() =>
-        {
-            if (string.IsNullOrWhiteSpace(RepositoryToken))
-            {
-                Assert.Fail("❌ Repository Token is Not Set.");
-            }
-
-            var version = GetResolvedVersion();
-
-            DockerTasks.DockerLogin(s => s
-                .SetServer(Regex.Replace(Repository, @"/.*$", ""))
-                .SetUsername(RepositoryUsername)
-                .SetPassword(RepositoryToken));
-
-            DockerTasks.DockerPush(s => s.SetName($"{Repository}/{ImageTag}:{version}"));
-            DockerTasks.DockerPush(s => s.SetName($"{Repository}/{ImageTag}:latest"));
-
-            Log.Information($"📤 Pushed Docker Images: {version}, latest");
-        });
-
-    Target Tag => _ => _
-        .DependsOn(BuildContainer)
-        .OnlyWhenDynamic(() => ForceCiBehavior || (!IsLocalBuild && !DryRun))
-        .Executes(() =>
+    Target CreateRelease => _ => _
+        .DependsOn(Push, GetChangeLog)
+        .OnlyWhenDynamic(() => !string.IsNullOrWhiteSpace(Repository) && !string.IsNullOrWhiteSpace(RepositoryToken))
+        .Executes(async () =>
         {
             var version = $"v{GetResolvedVersion()}";
-            var existingTags = GitTasks.Git("tag");
+            var changelogPath = "CHANGELOG.md";
+            var releaseNotes = File.Exists(changelogPath) ? File.ReadAllText(changelogPath) : "No changelog available.";
 
-            if (existingTags.All(l => l.Text != version))
+            // Compose Docker image asset links
+            var dockerImageLatest = $"{Repository}/{ImageTag}:latest";
+            var dockerImageVersion = $"{Repository}/{ImageTag}:{GetResolvedVersion()}";
+            var assetsText =
+                $"**Docker Images:**\n" +
+                $"- `{dockerImageLatest}`\n" +
+                $"- `{dockerImageVersion}`\n\n";
+
+            var body = assetsText + releaseNotes;
+
+            var apiUrl = $"https://api.github.com/repos/{Repository}/releases";
+            var tagName = version;
+
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NukeBuild", "1.0"));
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", RepositoryToken);
+
+            var payload = new
             {
-                GitTasks.Git($"tag -f {version}");
+                tag_name = tagName,
+                name = tagName,
+                body = body,
+                draft = false,
+                prerelease = false
+            };
 
-                GitTasks.Git($"push origin -f {version}");
-                
-                Log.Information($"🏷️ Created and Pushed Tag: {version}");
+            var response = await client.PostAsJsonAsync(apiUrl, payload);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Log.Information($"🚀 GitHub Release '{tagName}' Created Successfully.");
             }
             else
             {
-                Log.Information($"✅ Tag {version} Already Exists");
+                var error = await response.Content.ReadAsStringAsync();
+
+                Log.Error($"❌ Failed to Create GitHub Release: {response.StatusCode}\n{error}");
             }
         });
-
-    Target PrintInfo => _ => _
-        .DependsOn(ValidateInputs)
-        .Executes(() =>
-        {
-            Log.Information($"🔧 Image Tag: {ImageTag}");
-            Log.Information($"🔧 Repository: {Repository}");
-            Log.Information($"🔧 Repository Username: {RepositoryUsername}");
-            Log.Information($"🔧 Git Version: {GitVersion?.SemVer ?? "Unavailable"}");
-            Log.Information($"🔧 Dry Run: {DryRun}");
-        });
-}
-
-record GitVersionInfo
-{
-    public string SemVer { get; init; }
 }
