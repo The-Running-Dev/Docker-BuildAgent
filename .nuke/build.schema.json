@@ -24,17 +24,12 @@
     "ExecutableTarget": {
       "type": "string",
       "enum": [
-        "BuildContainer",
-        "Clean",
-        "ContainerCI",
+        "Build",
         "CreateRelease",
-        "GetChangeLog",
-        "GetVersion",
-        "PrintInfo",
-        "Publish",
+        "Image",
         "Push",
-        "Tag",
-        "ValidateInputs"
+        "Setup",
+        "Tag"
       ]
     },
     "Verbosity": {
@@ -108,12 +103,11 @@
   "allOf": [
     {
       "properties": {
-        "BuildNotificationsWebhookUrl": {
-          "type": "string",
-          "description": "Webhook URL for Build Notifications",
-          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
+        "CreateGitHubRelease": {
+          "type": "boolean",
+          "description": "Dockerfile Path"
         },
-        "Dockerfile": {
+        "DockerFile": {
           "type": "string",
           "description": "Dockerfile Path"
         },
@@ -123,32 +117,41 @@
         },
         "ForceNotifications": {
           "type": "boolean",
-          "description": "Force Notifications Even During Local Builds"
+          "description": "Force Notifications for Local Builds"
         },
         "ForcePush": {
           "type": "boolean",
-          "description": "Force Push/Tag Even During Local Builds"
+          "description": "Force Push/Tag for Local Builds"
         },
         "ImageTag": {
           "type": "string",
-          "description": "Docker Image Tag"
+          "description": "Image Tag"
+        },
+        "Notifications": {
+          "type": "boolean",
+          "description": "Send Notifications"
+        },
+        "NotificationsWebHookUrl": {
+          "type": "string",
+          "description": "WebHook URL for Notifications",
+          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
         "Repository": {
           "type": "string",
-          "description": "Docker Image Repository"
+          "description": "Docker Repository"
         },
         "RepositoryToken": {
           "type": "string",
           "description": "Repository Token for Pushing Images",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "RepositoryUsername": {
+        "RepositoryUser": {
           "type": "string",
-          "description": "Repository Username"
+          "description": "Repository User"
         },
-        "SendNotifications": {
-          "type": "boolean",
-          "description": "Send Notifications"
+        "TemplatesDir": {
+          "type": "string",
+          "description": "Templates Directory"
         }
       }
     },

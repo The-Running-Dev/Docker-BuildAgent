@@ -1,7 +1,6 @@
 [CmdletBinding()]
 Param(
-    [Parameter(Position=0,Mandatory=$false,ValueFromRemainingArguments=$true)]
-    [string[]]$BuildArguments
+    [Parameter(ValueFromRemainingArguments)][string[]]$BuildArguments
 )
 
 Write-Output "PowerShell $($PSVersionTable.PSEdition) version $($PSVersionTable.PSVersion)"
@@ -13,7 +12,7 @@ $PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
 # CONFIGURATION
 ###########################################################################
 
-$BuildProjectFile = "$PSScriptRoot\docker\Docker.csproj"
+$BuildProjectFile = "$PSScriptRoot\Forge\Forge.csproj"
 $TempDirectory = "$PSScriptRoot\\.nuke\temp"
 
 $DotNetGlobalFile = "$PSScriptRoot\\global.json"
@@ -29,7 +28,10 @@ $env:DOTNET_NOLOGO = 1
 
 function ExecSafe([scriptblock] $cmd) {
     & $cmd
-    if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+    if ($LASTEXITCODE) {
+        exit $LASTEXITCODE
+    }
 }
 
 # If dotnet CLI is installed globally and it matches requested version, use for execution
@@ -71,4 +73,4 @@ if (Test-Path env:NUKE_ENTERPRISE_TOKEN) {
 }
 
 ExecSafe { & $env:DOTNET_EXE build $BuildProjectFile /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet }
-ExecSafe { & $env:DOTNET_EXE run --project $BuildProjectFile --no-build -- $BuildArguments }
+ExecSafe { & $env:DOTNET_EXE run --project $BuildProjectFile --no-build --no-logo --type docker -- $BuildArguments }
