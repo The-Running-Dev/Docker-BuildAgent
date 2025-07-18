@@ -24,7 +24,7 @@ using Utilities;
 /// <remarks>This class provides a framework for executing builds with customizable parameters and notification
 /// settings. It includes properties for managing build state and methods for configuring and executing build
 /// targets.</remarks>
-/// <typeparam name="TParams">The type of parameters used for the build, which must inherit from <see cref="ForgeParameters"/>.</typeparam>
+/// <typeparam name="TParams">The type of parameters used for the build, which must inherit from <see cref="ForgeParams"/>.</typeparam>
 /// <typeparam name="TNotifications">The type of notifications used for the build, which must implement <see cref="INotifications"/>.</typeparam>
 public abstract class Base<TParams, TNotifications> : NukeBuild
     where TParams : ForgeParams, new()
