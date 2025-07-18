@@ -13,19 +13,17 @@ permissions:
 jobs:
   Build-Docs:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/the-running-dev/build-agent:latest
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0 
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
       - name: Build Documentation
         run: |
-          npm install -g pnpm
           pnpm install
           pnpm run build:prod
 
