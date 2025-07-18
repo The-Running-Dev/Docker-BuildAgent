@@ -58,4 +58,4 @@ if [[ ! -z ${NUKE_ENTERPRISE_TOKEN+x} && "$NUKE_ENTERPRISE_TOKEN" != "" ]]; then
 fi
 
 "$DOTNET_EXE" build "$BUILD_PROJECT_FILE" -o $ARTIFACTS_DIR -c Release /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet
-"$DOTNET_EXE" "$ARTIFACTS_DIR/Forge.dll" --no-build -- "$@"
+"$DOTNET_EXE" "$ARTIFACTS_DIR/Forge.dll" --no-logo --type docker -- "$@"
