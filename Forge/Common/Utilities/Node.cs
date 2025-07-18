@@ -87,7 +87,7 @@ public static class Node
     /// package manager. If a "pnpm-lock.yaml" file is found, it returns "pnpm". If a "yarn.lock" file is found, it
     /// returns "yarn". If neither file is present, it defaults to "npm".</remarks>
     /// <param name="p">The parameters containing the root directory of the project to inspect.</param>
-    /// <returns>A string representing the detected package manager. Returns <see langword="npm"/> if no specific package manager
+    /// <returns>A string representing the detected package manager. Returns "npm" if no specific package manager
     /// lock file is found.</returns>
     public static string DetectPackageManager(NodeParams p)
     {
