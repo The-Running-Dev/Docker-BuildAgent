@@ -26,6 +26,7 @@ jobs:
         run: |
           pnpm install
           pnpm run build:prod
+        working-directory: Docs
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3

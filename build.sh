@@ -5,6 +5,7 @@ bash --version 2>&1 | head -n 1
 set -eo pipefail
 SCRIPT_DIR=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
 
+ARTIFACTS_DIR="${SCRIPT_DIR}/artifacts"
 BUILD_PROJECT_FILE="$SCRIPT_DIR/Forge/Forge.csproj"
 TEMP_DIRECTORY="$SCRIPT_DIR//.nuke/temp"
 
@@ -32,6 +33,7 @@ else
     # If global.json exists, load expected version
     if [[ -f "$DOTNET_GLOBAL_FILE" ]]; then
         DOTNET_VERSION=$(FirstJsonValue "version" "$(cat "$DOTNET_GLOBAL_FILE")")
+
         if [[ "$DOTNET_VERSION" == ""  ]]; then
             unset DOTNET_VERSION
         fi
@@ -55,5 +57,5 @@ if [[ ! -z ${NUKE_ENTERPRISE_TOKEN+x} && "$NUKE_ENTERPRISE_TOKEN" != "" ]]; then
     "$DOTNET_EXE" nuget add source "https://f.feedz.io/nuke/enterprise/nuget" --name "nuke-enterprise" --username "PAT" --password "$NUKE_ENTERPRISE_TOKEN" --store-password-in-clear-text &>/dev/null || true
 fi
 
-"$DOTNET_EXE" build "$BUILD_PROJECT_FILE" /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet
-"$DOTNET_EXE" run --project "$BUILD_PROJECT_FILE" --no-build -- "$@"
+"$DOTNET_EXE" build "$BUILD_PROJECT_FILE" -o $ARTIFACTS_DIR -c Release /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet
+"$DOTNET_EXE" run "$ARTIFACTS_DIR/Forge.dll" --no-build -- "$@"
