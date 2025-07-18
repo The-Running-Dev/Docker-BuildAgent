@@ -7,11 +7,23 @@ namespace Entities;
 /// to track changes in a repository and to display commit history.</remarks>
 public class CommitInfo
 {
+    /// <summary>
+    /// Gets or sets the unique identifier for the commit.
+    /// </summary>
     public string Hash { get; set; }
 
+    /// <summary>
+    /// Gets or sets the name or email of the person who made the commit.
+    /// </summary>
     public string Author { get; set; }
     
+    /// <summary>
+    /// Gets or sets the date and time when the commit was made.
+    /// </summary>
     public string Date { get; set; }
     
+    /// <summary>
+    /// Gets or sets the message describing the changes made in the commit.
+    /// </summary>
     public string Message { get; set; }
 }
