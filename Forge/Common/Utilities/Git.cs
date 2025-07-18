@@ -92,9 +92,15 @@ public static class Git
     /// <returns>A string representing the latest Git tag, or <see langword="null"/> if no tags are found.</returns>
     public static string GetLastTag()
     {
-        var result = ProcessTasks.StartProcess("git", "describe --tags --abbrev=0", logOutput: false, logInvocation: false)
-            .AssertZeroExitCode()
-            .Output
+        var process = ProcessTasks.StartProcess("git", "describe --tags --abbrev=0", logOutput: false, logInvocation: false);
+        process.WaitForExit();
+
+        if (process.ExitCode != 0)
+        {
+            return null;
+        }
+
+        var result = process.Output
             .Select(x => x.Text)
             .FirstOrDefault();
 
