@@ -32,7 +32,7 @@ public static class Files
             .Where(line => !string.IsNullOrEmpty(line))
             .ToList();
     }
-    
+
     /// <summary>
     /// Generates an environment file from a specified map file and writes it to the given output path.
     /// </summary>
@@ -53,7 +53,7 @@ public static class Files
         // Default to Nuke's Log if no delegate is provided
         logInfo ??= Log.Information;
         logWarning ??= Log.Warning;
-        
+
         foreach (var mapFileValue in envVars)
         {
             if (string.IsNullOrEmpty(mapFileValue.Value))
@@ -67,7 +67,7 @@ public static class Files
         if (directory != null && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
-            
+
             logInfo($"✅ Created Directory: {directory}");
         }
 
@@ -134,5 +134,30 @@ public static class Files
         }
 
         return result;
+    }
+    
+    /// <summary>
+    /// Escapes a value for safe use in an environment (.env) file.
+    /// Wraps the value in double quotes if it contains spaces, special characters, or newlines, and escapes embedded quotes.
+    /// </summary>
+    /// <param name="value">The value to escape.</param>
+    /// <returns>The escaped value, suitable for .env files.</returns>
+    public static string EscapeValue(string value)
+    {
+        if (value == null)
+        {
+            return string.Empty;
+        }
+
+        // Escape embedded double quotes
+        var escaped = value.Replace("\"", "\\\"");
+
+        // If value contains whitespace, #, =, or newlines, wrap in double quotes
+        if (escaped.Any(c => char.IsWhiteSpace(c)) || escaped.Contains('#') || escaped.Contains('=') || escaped.Contains('\n') || escaped.Contains('\r'))
+        {
+            return $"\"{escaped}\"";
+        }
+
+        return escaped;
     }
 }

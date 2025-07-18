@@ -1,4 +1,4 @@
-name: Container-CI
+name: Docker-CI
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  Container-CI:
+  Docker-CI:
     runs-on: ubuntu-latest
 
     steps:
@@ -37,5 +37,5 @@ jobs:
       - name: Run NUKE Build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RepositoryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
-        run: .\build.ps1
+          RegistryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+        run: nuke --type docker

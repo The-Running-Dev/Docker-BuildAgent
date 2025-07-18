@@ -11,3 +11,5 @@ node_modules/
 .angular/
 BarStrad*
 set-environment.ps1
+
+.build/.build.env
