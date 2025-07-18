@@ -1,0 +1,33 @@
+<svg width="200" height="200" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Terminal body -->
+  <rect x="50" y="30" width="200" height="120" rx="15" ry="15" fill="#333"/>
+  <!-- Terminal screen -->
+  <rect x="60" y="40" width="180" height="100" rx="10" ry="10" fill="#0f0"/>
+  <!-- Text on terminal -->
+  <text x="70" y="95" font-family="monospace" font-size="20" fill="#000">
+    > run dev
+  </text>
+
+  <!-- Eyes -->
+  <circle cx="100" cy="70" r="5" fill="black"/>
+  <circle cx="120" cy="70" r="5" fill="black"/>
+
+  <!-- Legs -->
+  <line x1="90" y1="150" x2="80" y2="200" stroke="black" stroke-width="6"/>
+  <line x1="130" y1="150" x2="140" y2="200" stroke="black" stroke-width="6"/>
+  <!-- Shoes -->
+  <rect x="70" y="200" width="20" height="10" rx="2" ry="2" fill="blue"/>
+  <rect x="130" y="200" width="20" height="10" rx="2" ry="2" fill="red"/>
+
+  <!-- Arms -->
+  <line x1="60" y1="80" x2="30" y2="60" stroke="black" stroke-width="5"/>
+  <line x1="190" y1="80" x2="220" y2="60" stroke="black" stroke-width="5"/>
+  
+  <!-- Wrench -->
+  <path d="M20 55 L22 52 L27 58 L25 60 Z" fill="gray"/>
+  <rect x="27" y="58" width="5" height="10" fill="gray"/>
+
+  <!-- Laptop -->
+  <rect x="215" y="45" width="25" height="15" fill="#666"/>
+  <line x1="215" y1="45" x2="240" y2="60" stroke="black" stroke-width="1"/>
+</svg>

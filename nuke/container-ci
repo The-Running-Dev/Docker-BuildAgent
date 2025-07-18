@@ -2,22 +2,20 @@
 $ErrorActionPreference = "Stop"
 
 $workingDir = Convert-Path .
+Write-Host "🚀 ================ OBSOLETE ====================" -ForegroundColor Yellow
+Write-Host "🚀 Use `docker-ci` Instead " -ForegroundColor Yellow
+Write-Host "🚀 ================ OBSOLETE ====================" -ForegroundColor Yellow
 Write-Host "🚀 Running Docker CI: $workingDir"
 Write-Host "🧾 Arguments: $args"
 
-# Verify dotnet is available
-if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-    Write-Error "❌ 'dotnet' Not Found in PATH"
-    
-    exit 127
+if ($args -notcontains '--root') {
+    $args += '--root'
+    $args += $workingDir
 }
 
-try {
-    dotnet /nuke/Docker.dll @args
+& dotnet /nuke/docker/Docker.dll @args
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Build Failed: $LASTEXITCODE"
 
     exit $LASTEXITCODE
-} catch {
-    Write-Error "💥 Build Failed: $_"
-
-    exit 1
 }

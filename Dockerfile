@@ -1,26 +1,15 @@
-# Stage 1: Build NUKE project
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS builder
-
-WORKDIR /src
-
-COPY . .
-
-RUN dotnet restore docker/Docker.csproj
-
-RUN dotnet build docker/Docker.csproj -o /app/output
-
-# Stage 2: Final image
 FROM mcr.microsoft.com/devcontainers/javascript-node:latest
 
 LABEL maintainer="ben@subzerodev.com" \
-      version="1.1" \
+      version="0.3" \
       description="Build Agent with Node.js, Angular CLI, TypeScript, Docker, PowerShell, and GitVersion"
 
 # Disable .NET CLI telemetry
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
 ENV NUKE_TELEMETRY_OPTOUT=1
 
-COPY --from=builder /app/output /nuke
+COPY templates/ /nuke/templates/
+COPY artifacts/ /nuke/forge/
 
 # Copy all files from nuke/ into /usr/local/bin/
 COPY nuke/ /usr/local/bin/

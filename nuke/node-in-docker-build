@@ -1,0 +1,31 @@
+#!/usr/bin/env pwsh
+$ErrorActionPreference = "Stop"
+
+$workingDir = Convert-Path .
+Write-Host "🚀 Running Node-in-Docker Build: $workingDir"
+Write-Host "🧾 Arguments: $args"
+
+if (Test-Path (Join-Path $workingDir "set-environment.ps1")) {
+    Write-Host "🔧 Setting Environment Variables..."
+    
+    . (Join-Path $workingDir "set-environment.ps1")
+}
+
+if ($args -notcontains '--root') {
+    $args += '--root'
+    $args += $workingDir
+}
+
+& dotnet /nuke/forge/Forge.dll --type node @args
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Build Failed: $LASTEXITCODE"
+
+    exit $LASTEXITCODE
+}
+
+& dotnet /nuke/forge/Forge.dll --type docker @args
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Build Failed: $LASTEXITCODE"
+
+    exit $LASTEXITCODE
+}

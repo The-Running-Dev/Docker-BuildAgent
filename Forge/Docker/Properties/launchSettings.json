@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Docker": {
+      "commandName": "Project",
+      "commandLineArgs": "--create-github-release true"
+    }
+  }
+}

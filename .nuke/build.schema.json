@@ -24,17 +24,12 @@
     "ExecutableTarget": {
       "type": "string",
       "enum": [
-        "BuildContainer",
-        "Clean",
-        "ContainerCI",
+        "Build",
         "CreateRelease",
-        "GetChangeLog",
-        "GetVersion",
-        "PrintInfo",
-        "Publish",
+        "Image",
         "Push",
-        "Tag",
-        "ValidateInputs"
+        "Setup",
+        "Tag"
       ]
     },
     "Verbosity": {
@@ -108,14 +103,13 @@
   "allOf": [
     {
       "properties": {
-        "BuildNotificationsWebhookUrl": {
-          "type": "string",
-          "description": "Webhook URL for Build Notifications",
-          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
+        "CreateGitHubRelease": {
+          "type": "boolean",
+          "description": "Should a GitHub release be created"
         },
-        "Dockerfile": {
+        "DockerFile": {
           "type": "string",
-          "description": "Dockerfile Path"
+          "description": "Dockerfile to use for building the image"
         },
         "DryRun": {
           "type": "boolean",
@@ -123,32 +117,41 @@
         },
         "ForceNotifications": {
           "type": "boolean",
-          "description": "Force Notifications Even During Local Builds"
+          "description": "Force Notifications for Local Builds"
         },
         "ForcePush": {
           "type": "boolean",
-          "description": "Force Push/Tag Even During Local Builds"
+          "description": "Force Push/Tag for Local Builds"
         },
         "ImageTag": {
           "type": "string",
-          "description": "Docker Image Tag"
+          "description": "Tag for the Docker Image"
         },
-        "Repository": {
-          "type": "string",
-          "description": "Docker Image Repository"
+        "Notifications": {
+          "type": "boolean",
+          "description": "Enable Notifications for the Build"
         },
-        "RepositoryToken": {
+        "NotificationsWebHookUrl": {
           "type": "string",
-          "description": "Repository Token for Pushing Images",
+          "description": "WebHook URL for Notifications",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "RepositoryUsername": {
+        "RegistryToken": {
           "type": "string",
-          "description": "Repository Username"
+          "description": "Registry Registry token for pushing images",
+          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "SendNotifications": {
-          "type": "boolean",
-          "description": "Send Notifications"
+        "RegistryUrl": {
+          "type": "string",
+          "description": "Docker Registry for pushing images"
+        },
+        "RegistryUser": {
+          "type": "string",
+          "description": "Registry Registry user for pushing images"
+        },
+        "TemplatesDir": {
+          "type": "string",
+          "description": "Templates Directory for Dockerfile templates"
         }
       }
     },

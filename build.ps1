@@ -1,35 +1,25 @@
 [CmdletBinding()]
 Param(
-    [Parameter(Position=0,Mandatory=$false,ValueFromRemainingArguments=$true)]
-    [string[]]$BuildArguments
+    [Parameter()][string]$type = 'docker',
+    [Parameter(ValueFromRemainingArguments)][string[]]$buildArguments
 )
 
-Write-Output "PowerShell $($PSVersionTable.PSEdition) version $($PSVersionTable.PSVersion)"
-
-Set-StrictMode -Version 2.0; $ErrorActionPreference = "Stop"; $ConfirmPreference = "None"; trap { Write-Error $_ -ErrorAction Continue; exit 1 }
-$PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
-
-###########################################################################
-# CONFIGURATION
-###########################################################################
-
-$BuildProjectFile = "$PSScriptRoot\docker\Docker.csproj"
-$TempDirectory = "$PSScriptRoot\\.nuke\temp"
-
-$DotNetGlobalFile = "$PSScriptRoot\\global.json"
-$DotNetInstallUrl = "https://dot.net/v1/dotnet-install.ps1"
-$DotNetChannel = "STS"
+$artifactsDir = "$PSScriptRoot\artifacts"
+$buildProjectFile = "$PSScriptRoot\Forge\Forge.csproj"
+$tempDirectory = "$PSScriptRoot\\.nuke\temp"
+$dotNetGlobalFile = "$PSScriptRoot\\global.json"
+$dotNetInstallUrl = "https://dot.net/v1/dotnet-install.ps1"
+$dotNetChannel = "STS"
 
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = 1
 $env:DOTNET_NOLOGO = 1
 
-###########################################################################
-# EXECUTION
-###########################################################################
-
 function ExecSafe([scriptblock] $cmd) {
     & $cmd
-    if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+    if ($LASTEXITCODE) {
+        exit $LASTEXITCODE
+    }
 }
 
 # If dotnet CLI is installed globally and it matches requested version, use for execution
@@ -63,12 +53,17 @@ else {
     $env:PATH = "$DotNetDirectory;$env:PATH"
 }
 
-Write-Output "Microsoft (R) .NET SDK version $(& $env:DOTNET_EXE --version)"
+Write-Output "PowerShell $($PSVersionTable.PSEdition) v$($PSVersionTable.PSVersion)"
+Write-Output ".NET SDK v$(& $env:DOTNET_EXE --version)"
 
-if (Test-Path env:NUKE_ENTERPRISE_TOKEN) {
-    & $env:DOTNET_EXE nuget remove source "nuke-enterprise" > $null
-    & $env:DOTNET_EXE nuget add source "https://f.feedz.io/nuke/enterprise/nuget" --name "nuke-enterprise" --username "PAT" --password $env:NUKE_ENTERPRISE_TOKEN > $null
+if (Test-Path (Join-Path $PSScriptRoot 'set-environment.ps1')) {
+    & (Join-Path $PSScriptRoot 'set-environment.ps1')
 }
 
-ExecSafe { & $env:DOTNET_EXE build $BuildProjectFile /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet }
-ExecSafe { & $env:DOTNET_EXE run --project $BuildProjectFile --no-build -- $BuildArguments }
+ExecSafe {
+    & $env:DOTNET_EXE build $buildProjectFile -o $artifactsDir -c Release /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet
+}
+
+ExecSafe {
+    & $env:DOTNET_EXE $(Join-Path $artifactsDir 'Forge.dll') --no-logo --type $type -- $($buildArguments -join ' ')
+}
