@@ -4,6 +4,10 @@ using Nuke.Common.IO;
 
 namespace Entities;
 
+/// <summary>
+/// Represents the configuration for build-related operations, including directory paths and file settings.
+/// </summary>
+/// <param name="rootDirectory">The root directory of the project. This is used as the base path for constructing other paths.</param>
 public class BuildConfig(AbsolutePath rootDirectory)
 {
     public string Directory = ".build";
