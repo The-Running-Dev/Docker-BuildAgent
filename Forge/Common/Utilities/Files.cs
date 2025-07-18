@@ -73,7 +73,7 @@ public static class Files
 
         File.WriteAllLines(outputPath, envVars
             .Where(kv => !string.IsNullOrEmpty(kv.Value))
-            .Select(kv => $"{kv.Key}={kv.Value}"));
+            .Select(kv => $"{kv.Key}={EscapeValue(kv.Value)}"));
 
         logInfo($"✅ Environment Written to {Path.GetFileName(outputPath)}");
 
