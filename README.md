@@ -1,5 +1,27 @@
 # Docker-BuildAgent
 
+---
+
+## 📚 Documentation Portal
+
+This repository now includes a full documentation site at [build-agent.subzerodev.com](https://build-agent.subzerodev.com), covering all usage, customization, parameters, targets, advanced topics, and troubleshooting for the Build Agent and Forge system.
+
+**Start here:** [Docs Site Home](https://build-agent.subzerodev.com)
+
+### Key Documentation Pages
+
+- [🚀 Fast Track / Usage Guide](https://build-agent.subzerodev.com/usage)
+- [📝 Customization Options](https://build-agent.subzerodev.com/customization)
+- [⚙️ Parameters & Settings](https://build-agent.subzerodev.com/parameters)
+- [🎯 Build Targets](https://build-agent.subzerodev.com/targets)
+- [🐳 Docker Templates](https://build-agent.subzerodev.com/docker-templates)
+- [🔄 CI/CD Examples](https://build-agent.subzerodev.com/ci-cd)
+- [⚡ Advanced Usage](https://build-agent.subzerodev.com/advanced)
+- [🛠️ Development Setup](https://build-agent.subzerodev.com/development)
+- [❓ Troubleshooting & FAQ](https://build-agent.subzerodev.com/troubleshooting)
+
+For the most up-to-date and detailed information, always refer to the documentation site. The rest of this README provides a high-level summary.
+
 ![Build Status](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml/badge.svg?branch=main)
 
 ---
@@ -7,6 +29,8 @@
 ## Table of Contents
 
 - [Docker-BuildAgent](#docker-buildagent)
+  - [📚 Documentation Portal](#-documentation-portal)
+    - [Key Documentation Pages](#key-documentation-pages)
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
   - [Features](#features)
@@ -20,23 +44,11 @@
       - [Tagging Support](#tagging-support)
   - [Environment Variables](#environment-variables)
   - [Customization](#customization)
-  - [Troubleshooting](#troubleshooting)
   - [Image Details](#image-details)
-  - [Nuke Build Automation](#nuke-build-automation)
-    - [Docker Nuke Targets](#docker-nuke-targets)
-    - [Passing Parameters to Nuke](#passing-parameters-to-nuke)
-    - [Environment Variables for Nuke](#environment-variables-for-nuke)
-    - [Running Nuke Locally](#running-nuke-locally)
-    - [Nuke in CI/CD](#nuke-in-cicd)
-    - [Using Predefined Nuke Scripts in Your Projects](#using-predefined-nuke-scripts-in-your-projects)
-      - [Example: Run Nuke Build in Your Container Project](#example-run-nuke-build-in-your-container-project)
-      - [Example GitHub Action: Run Nuke Build in Your Container Project](#example-github-action-run-nuke-build-in-your-container-project)
-    - [Using `.nuke/config` and `.env` for Your Own Projects](#using-nukeconfig-and-env-for-your-own-projects)
-  - [Security Notes](#security-notes)
+  - [Example: Run Nuke Build in Your Container Project](#example-run-nuke-build-in-your-container-project)
+  - [Example GitHub Action: Run Nuke Build in Your Container Project](#example-github-action-run-nuke-build-in-your-container-project)
   - [Related Resources](#related-resources)
   - [Contributing](#contributing)
-  - [FAQ / Common Issues](#faq--common-issues)
-    - [What Happens When You Run `ContainerCI` or 'container-ci' Command](#what-happens-when-you-run-containerci-or-container-ci-command)
 
 ---
 
@@ -64,8 +76,6 @@ Dockerfile                # Main Docker image definition
 README.md                 # Project documentation
 build.sh                  # Bash build/push script (Linux/macOS/CI)
 build.ps1                 # PowerShell build script (Windows)
-build.cmd                 # Batch build script (Windows)
-Build.sln                 # .NET solution for build automation
 GitVersion.yml            # GitVersion configuration for semantic versioning
 docker/                   # .NET build project (Nuke, custom build logic)
 .github/workflows/        # GitHub Actions workflow(s)
@@ -103,7 +113,7 @@ docker/                   # .NET build project (Nuke, custom build logic)
 
 ### Build and Push to Container Registry
 
-You can use the provided `build.sh`, `build.ps1`, or `build.cmd` script to build and push the image to GHCR. The scripts support custom tags (e.g., version numbers) as well as the default `latest` tag.
+You can use the provided `build.sh`, `build.ps1` script to build and push the image to GHCR. The scripts support custom tags (e.g., version numbers) as well as the default `latest` tag.
 
 1. **Set the required environment variable:**
    - `PackagesToken`: Your packages token (with write:packages scope)
@@ -112,7 +122,7 @@ You can use the provided `build.sh`, `build.ps1`, or `build.cmd` script to build
 
    ```sh
    # For the latest tag (default)
-   export PackagesToken=YOUR_TOKEN
+   export REGISTRY_TOKEN=YOUR_TOKEN
    chmod +x build.sh
    ./build.sh
 
@@ -122,13 +132,13 @@ You can use the provided `build.sh`, `build.ps1`, or `build.cmd` script to build
    Or on Windows:
 
    ```powershell
-   $env:PackagesToken="YOUR_TOKEN"
+   $env:RegistryToken="YOUR_TOKEN"
    ./build.ps1 v1.2.3
    ```
 
 ### GitHub Actions CI/CD
 
-The `.github/workflows/ci.yml` workflow automates building, linting, scanning, and pushing the Docker image on every push to the `main` branch, or when a new tag is pushed, or via manual dispatch. It requires the `GITHUBPACKAGESTOKEN` secret to be set in your repository.
+The `.github/workflows/ci.yml` workflow automates building, linting, scanning, and pushing the Docker image on every push to the `main` branch, or when a new tag is pushed, or via manual dispatch. It requires the `REGISTRY_TOKEN` secret to be set in your repository.
 
 #### Workflow Steps
 
@@ -137,7 +147,7 @@ The `.github/workflows/ci.yml` workflow automates building, linting, scanning, a
 - Sets up .NET SDK
 - Installs GitVersion
 - Installs NUKE
-- Runs the NUKE target ContainerCI
+- Runs the NUKE target Build
 
 #### Tagging Support
 
@@ -154,21 +164,7 @@ The `.github/workflows/ci.yml` workflow automates building, linting, scanning, a
 - To change the base image, edit the `FROM` line in the `Dockerfile`.
 - To install additional global npm packages, add them to the `npm install -g` command in the `Dockerfile`.
 - Add or update PowerShell/.NET tools as needed using `dotnet tool install --global <tool>`.
-- Use the `docker/` directory for advanced .NET build automation with Nuke.
-
-## Troubleshooting
-
-- **Docker login/authentication errors:**
-  - Ensure your `PackagesToken` is valid and has the correct permissions (`write:packages`).
-  - Use GitHub Actions secrets for sensitive values.
-- **Permission denied on build.sh:**
-  - Run `chmod +x build.sh` before executing the script.
-- **Image push fails:**
-  - Check your network connection and GHCR access rights.
-- **.NET build issues:**
-  - Ensure you have the .NET 8 SDK installed locally if running .NET builds outside the container.
-- **CI tool access issues:**
-  - Ensure the CI environment has access to the required tools and permissions. The workflow sets up tools in the `/root/.dotnet/tools` directory and updates the PATH.
+- Use the `Forge/` directory for advanced .NET build automation with Nuke.
 
 ## Image Details
 
@@ -178,82 +174,9 @@ The `.github/workflows/ci.yml` workflow automates building, linting, scanning, a
 - **Default Shell:** PowerShell (`pwsh`)
 - **Default Working Directory:** `/workspace`
 - **How to update tool versions:** Edit the `Dockerfile` to specify desired versions.
-- **Build Automation:** The `docker/` directory contains a .NET (Nuke) build project for advanced automation. The `nuke/cotainer-ci` script enables containerized builds.
+- **Build Automation:** The `Forge/` directory contains a .NET (Nuke) build project for advanced automation. The `nuke/docker-ci` script enables containerized builds.
 
-## Nuke Build Automation
-
-This project uses [Nuke](https://nuke.build/) for advanced .NET build automation. The `docker/` directory contains a Nuke build project (`Docker.csproj`, `Docker.cs`, etc.) that defines custom build logic for CI/CD scenarios, including Docker image builds, versioning, and publishing.
-
-### Docker Nuke Targets
-
-- `ContainerCI` – Main entry for CI builds; depends on `Publish` and marks CI completion
-- `GetVersion` – Runs GitVersion, writes resolved version to file
-- `Clean` – Removes version file and cleans up artifacts
-- `ValidateInputs` – Ensures required parameters are set, depends on `GetVersion`
-- `BuildContainer` – Builds and tags Docker images, depends on `PrintInfo`
-- `Publish` – Final publish step, depends on `Push`
-- `Push` – Logs in and pushes Docker images, depends on `Tag`
-- `Tag` – Creates and pushes a Git tag for the version, depends on `BuildContainer`
-- `PrintInfo` – Prints build and environment info, depends on `ValidateInputs`
-
-### Passing Parameters to Nuke
-
-You can pass parameters to Nuke using the `--parameter value` syntax. For example:
-
-```pwsh
-./build.sh --target ContainerCI --configuration Release --docker-tag v1.2.3
-```
-
-### Environment Variables for Nuke
-
-- `Repository` – Docker image repository (e.g., ghcr.io/owner/image)
-- `RepositoryUsername` – Username for the Docker registry (e.g., GitHub username)
-- `RepositoryToken` – Token or password for the Docker registry (e.g., GitHub Packages token)
-- `ImageTag` – Tag for the Docker image (e.g., latest, v1.2.3)
-- `Dockerfile` – Path to the Dockerfile (default: Dockerfile)
-- `DryRun` – Set to true to skip push and tag steps (optional)
-- `ForceCiBehavior` – Set to true to force push/tag even during local builds (optional)
-- Any other secrets or tokens used in your build logic should be set as environment variables or GitHub Actions secrets
-
-### Running Nuke Locally
-
-1. **Restore .NET tools and dependencies:**
-
-   ```pwsh
-   dotnet tool restore
-   dotnet restore docker/Docker.csproj
-   ```
-
-2. **Run a Nuke target (e.g., BuildAndPush):**
-
-   ```pwsh
-   ./build.ps1 ContainerCI
-   ```
-   
-   ```sh
-   ./build.sh ContainerCI
-   ```
-
-3. **List all available Nuke targets and parameters:**
-
-   ```pwsh
-   ./build.ps1 --help
-   ```
-
-### Nuke in CI/CD
-
-- The GitHub Actions workflow (`.github/workflows/ci.yml`) installs .NET tools, sets up the environment, and runs Nuke targets as part of the build process.
-- The workflow combines tool installation, symlink creation, and PATH setup for reliable tool access.
-- You can customize the workflow to run specific targets (e.g., `ContainerCI`, `Publish`, `Tag`, etc.).
-- The Nuke build scripts (`build.sh`, `build.ps1`, `build.cmd`) are cross-platform entry points for running the build pipeline.
-
-### Using Predefined Nuke Scripts in Your Projects
-
-- The `nuke` directory contains scripts and configuration for running Nuke builds for your container projects, enabling reproducible and isolated build environments.
-- The `nuke/container-ci` script can be used to run builds inside a container, ensuring consistency across environments.
-- To use this feature, mount your source code and invoke the Nuke build script inside a Docker container, or adapt the provided scripts for your CI/CD system.
-
-#### Example: Run Nuke Build in Your Container Project
+## Example: Run Nuke Build in Your Container Project
 
 ```pwsh
 # Run from the project root, mounting the workspace
@@ -261,12 +184,12 @@ You can pass parameters to Nuke using the `--parameter value` syntax. For exampl
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     -w "/workspace" \
-    ghcr.io/the-running-dev/build-agent:latest pwsh -Command "nuke --target ContainerCI"
+    ghcr.io/the-running-dev/build-agent:latest pwsh -Command "nuke --target Build"
     # or through a predefined command
-    # -Command "container-ci"
+    # -Command "docker-build"
 ```
 
-#### Example GitHub Action: Run Nuke Build in Your Container Project
+## Example GitHub Action: Run Nuke Build in Your Container Project
 
 ```yaml
 name: Container-CI
@@ -294,46 +217,11 @@ jobs:
           fetch-depth: 0
 
       - name: Container CI
-        run: container-ci
+        run: docker-build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RepositoryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
 ```
-
-### Using `.nuke/config` and `.env` for Your Own Projects
-
-To use the `ContainerCI` target (or the `container-ci` command) in your own repository, you should provide configuration files for Nuke and your environment variables:
-
-- **.nuke/config**: This file configures Nuke build settings, such as default targets, parameters, and build environment preferences. You can copy or adapt the `.nuke/config` from this repository, or create your own to specify which targets to run and how to run them, as well as to provide build parameters. For example:
-
-```json
-{
-  "Repository": "ghcr.io/your-org",
-  "RepositoryUsername": "your-username",
-  "ImageTag": "latest"
-}
-```
-
-Place this file in the root of your repository or in the `.nuke/` directory.
-
-- **.env**: This file contains environment variables required for your build, such as secrets or tokens needed by your build logic. Example:
-
-```env
-RepositoryToken=your-ghcr-token
-```
-
-Place this file in your repository root. The build scripts and Nuke will automatically load these variables.
-
-**Tip:** Never commit secrets or sensitive tokens to your public repository. Use GitHub Actions secrets or a secure vault for production builds.
-
-By providing these files, you can easily reuse the `ContainerCI` pipeline and containerized build logic in your own projects, with minimal setup.
-
-## Security Notes
-
-- **Never expose your GitHub token in logs or public repositories.**
-- Always use GitHub Actions secrets or environment variables for sensitive data.
-- Review Dockerfile and scripts for any hardcoded credentials before sharing.
-- The build process removes npm cache to prevent accidental exposure of secrets or private keys.
 
 ## Related Resources
 
@@ -350,31 +238,3 @@ By providing these files, you can easily reuse the `ContainerCI` pipeline and co
 ## Contributing
 
 For questions, issues, or support, please open an [issue](https://github.com/the-running-dev/Docker-BuildAgent/issues).
-
-
-## FAQ / Common Issues
-
-- **Q: I get a permission denied error on build.sh**
-  - A: Run `chmod +x build.sh` before executing the script.
-- **Q: .NET build fails outside the container**
-  - A: Make sure you have the .NET 8 SDK installed locally.
-- **Q: How do I pass secrets to Nuke or Docker builds?**
-  - A: Use environment variables or GitHub Actions secrets. Never hardcode secrets in scripts or Dockerfiles.
-- **Q: GitVersion or Nuke not found in CI?**
-  - A: The workflow now installs .NET tools globally, creates a symlink for GitVersion, and adds `/root/.dotnet/tools` to the PATH for reliable access.
-
-### What Happens When You Run `ContainerCI` or 'container-ci' Command
-
-The `ContainerCI` target is the main entry point for CI builds. When you run this target, it automatically runs a sequence of dependent targets in the following order:
-
-1. **Clean** – Cleans up previous build artifacts and removes the version file.
-2. **GetVersion** – Runs GitVersion to determine the semantic version and writes it to a file.
-3. **ValidateInputs** – Ensures all required parameters and environment variables are set.
-4. **PrintInfo** – Prints build and environment information for diagnostics.
-5. **BuildContainer** – Builds and tags the Docker image using the specified Dockerfile and tag.
-6. **Tag** – Creates and pushes a Git tag for the resolved version.
-7. **Push** – Logs in to the Docker registry and pushes the built image.
-8. **Publish** – Finalizes the publish step (can be customized for additional publishing logic).
-9. **ContainerCI** – Marks CI completion (top-level target).
-
-Each target depends on the previous one, so running `ContainerCI` ensures the full build, versioning, tagging, and publishing pipeline is executed in the correct order. This makes it easy to automate complex CI/CD workflows with a single command.
