@@ -1,29 +1,35 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.IO;
 using System.Text.RegularExpressions;
 
-using Extensions;
-
-using Nuke.Common;
+using Serilog;
 using Nuke.Common.IO;
 using Nuke.Common.Tooling;
 using Nuke.Common.Utilities.Collections;
 
+using Extensions;
 using Parameters;
-
-using Serilog;
 
 namespace Utilities;
 
 /// <summary>
-/// Provides methods for building and managing node-based projects.
+/// Provides methods for detecting Node.js application types, package managers, and executing build scripts.
 /// </summary>
-/// <remarks>The <see cref="Node"/> class includes methods to execute build scripts and copy files to artifact
-/// directories. It is designed to work with specific configuration files located in the root directory.</remarks>
+/// <remarks>The <see cref="Node"/> class includes static methods to analyze Node.js projects by detecting the
+/// application type based on configuration files and dependencies, identifying the package manager used, and executing
+/// build scripts. It also supports copying files to an artifacts directory and running specified commands.</remarks>
 public static class Node
 {
-    public static string DetectAppType(string rootDirectory)
+    /// <summary>
+    /// Detects the type of Node.js application based on the presence of specific configuration files and dependencies
+    /// within the specified root directory.
+    /// </summary>
+    /// <remarks>The method checks for the presence of specific files and dependencies to determine the
+    /// application type. If a <c>package.json</c> file is not found in the root directory, the method logs a warning
+    /// and returns "unknown". The method logs the detected application type for informational purposes.</remarks>
+    /// <param name="rootDirectory">The root directory of the application to analyze.</param>
+    /// <returns>A string representing the detected application type. Possible return values include "angular", "nextjs",
+    /// "nestjs", "vite", "react", "express", "node", or "unknown" if the application type cannot be determined.</returns>
+    public static string DetectApplicationType(string rootDirectory)
     {
         var packageJsonPath = Path.Combine(rootDirectory, "package.json");
 
@@ -127,6 +133,7 @@ public static class Node
         foreach (var script in scripts)
         {
             var match = Regex.Match(script, @"^(npm|pnpm|yarn)\s+(.*)", RegexOptions.IgnoreCase);
+
             if (match.Success)
             {
                 var packageManager = match.Groups[1].Value;
@@ -175,7 +182,7 @@ public static class Node
         foreach (var relativePath in files)
         {
             var sourcePath = Path.Combine(p.RootDirectory, relativePath);
-            var destinationPath = Path.Combine(p.ArtifactsDirectory, relativePath);
+            var destinationPath = Path.Combine(p.ArtifactsDir, relativePath);
 
             if (File.Exists(sourcePath))
             {
@@ -189,7 +196,7 @@ public static class Node
             else if (Directory.Exists(sourcePath))
             {
                 var finalDestination = Path.Combine(
-                    p.ArtifactsDirectory,
+                    p.ArtifactsDir,
                     Path.GetFileName(relativePath) // copies to artifacts/data if src/data
                 );
 

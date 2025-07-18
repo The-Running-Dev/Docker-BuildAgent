@@ -10,7 +10,7 @@ namespace Parameters;
 /// associated commit details. It is used to configure notifications sent to a specified webhook URL.</remarks>
 public class NotificationParams
 {
-    public string WebHookUrl { get; set; } = string.Empty;
+    public string? WebHookUrl { get; set; } = string.Empty;
     
     public bool BuildSucceeded { get; set; }
     

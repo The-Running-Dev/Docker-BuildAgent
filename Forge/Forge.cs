@@ -1,12 +1,13 @@
 using System;
-using System.CommandLine;
 using System.IO;
 using System.Text;
+using System.CommandLine;
 
 using Serilog;
 using Nuke.Common;
 
 using Utilities;
+using Extensions;
 using Parameters;
 using Notifications;
 
@@ -16,8 +17,20 @@ using Notifications;
 /// <remarks>The <see cref="Forge"/> class provides a command-line interface to execute different build processes
 /// based on the specified build type. It supports Docker and Node builds, and can be extended to include additional
 /// build types. The class also includes targets for building and updating the changelog.</remarks>
-public class Forge : BaseBuild<ForgeParams, DiscordNotifications>
+public class Forge : Base<ForgeParams, DiscordNotifications>
 {
+    /// <summary>
+    /// Configures the current instance by hydrating it with Nuke CLI parameters.
+    /// </summary>
+    /// <remarks>This method copies command-line interface parameters into the current instance, enabling the
+    /// use of these parameters within the application. The hydration process is performed with verbose output to
+    /// provide detailed information about the parameters being copied.</remarks>
+    protected override void Configure()
+    {
+        // Copy Nuke CLI parameters
+        Parameters.Hydrate(this, verbose: Verbosity == Verbosity.Verbose);
+    }
+
     public static int Main(string[] args)
     {
         Option<string> buildTypeOption = new("--type")
@@ -50,9 +63,9 @@ public class Forge : BaseBuild<ForgeParams, DiscordNotifications>
         switch (buildType.ToLowerInvariant())
         {
             case "docker":
-                return DockerBuild.Main();
+                return Docker.Main();
             case "node":
-                return NodeBuild.Main();
+                return Node.Main();
             default:
                 return Build<Forge>(x => x.Build);
         }

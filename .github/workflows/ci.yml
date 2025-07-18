@@ -38,4 +38,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RepositoryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
-        run: nuke --target ContainerCI
+        run: .\build.ps1

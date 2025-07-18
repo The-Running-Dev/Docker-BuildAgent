@@ -8,7 +8,6 @@ using Nuke.Common.Tooling;
 using Nuke.Common.Tools.Docker;
 
 using Parameters;
-using Extensions;
 
 namespace Utilities;
 
@@ -31,9 +30,9 @@ public static class Docker
     {
         DockerTasks.DockerLogin(s => s
             .DisableProcessInvocationLogging()
-            .SetServer(Regex.Replace(p.Repository, @"/.*$", ""))
-            .SetUsername(p.User)
-            .SetPassword(p.Token));
+            .SetServer(Regex.Replace(p.RegistryUrl, @"/.*$", ""))
+            .SetUsername(p.RegistryUser)
+            .SetPassword(p.RegistryToken));
     }
 
     /// <summary>
@@ -53,14 +52,15 @@ public static class Docker
         {
             Log.Warning($"Dockerfile not Found, Using a Template...");
             
-            var appType = Node.DetectAppType(p.RootDirectory);
-
+            var appType = Node.DetectApplicationType(p.RootDirectory);
             var templateDockerFile = Path.Combine(p.TemplatesDir, $"Dockerfile.{appType}");
 
             if (!File.Exists(templateDockerFile))
             {
                 Assert.Fail($"No Dockerfile Template Exists {dockerFile}, Aborting...");
             }
+
+            Log.Warning($"Using Dockerfile Template: {templateDockerFile}...");
 
             File.Copy(templateDockerFile, dockerFile);
         }

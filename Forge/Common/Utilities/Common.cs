@@ -16,12 +16,28 @@ namespace Utilities;
 public static class Common
 {
     /// <summary>
-    /// Retrieves the version information from the specified root directory using GitVersion.
+    /// Retrieves the version information for a project located in the specified root directory.
     /// </summary>
-    /// <param name="rootDirectory">The root directory from which to retrieve the version information.</param>
-    /// <returns>A <see cref="VersionInfo"/> object containing the version details.</returns>
+    /// <param name="rootDirectory">The root directory of the project for which to retrieve version information. This directory must contain a .git
+    /// folder.</param>
+    /// <returns>A <see cref="VersionInfo"/> object containing the version details of the project.  If the .git directory is not
+    /// found, returns a default <see cref="VersionInfo"/> with version set to "0.0.0".</returns>
     public static VersionInfo GetVersion(string rootDirectory)
     {
+        var gitDir = Path.Combine(rootDirectory, ".git");
+
+        if (!Directory.Exists(gitDir))
+        {
+            // Return a default VersionInfo if .git is missing
+            return new VersionInfo
+            {
+                Version = "0.0.0",
+                FullVersion = "0.0.0",
+                Date = "",
+                Hash = ""
+            };
+        }
+
         var process = ProcessTasks.StartProcess("dotnet-gitversion", "/output json", rootDirectory, logOutput: false, logInvocation: false);
         process.AssertZeroExitCode();
 

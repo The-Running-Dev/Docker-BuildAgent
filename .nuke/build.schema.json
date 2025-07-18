@@ -105,11 +105,11 @@
       "properties": {
         "CreateGitHubRelease": {
           "type": "boolean",
-          "description": "Dockerfile Path"
+          "description": "Should a GitHub release be created"
         },
         "DockerFile": {
           "type": "string",
-          "description": "Dockerfile Path"
+          "description": "Dockerfile to use for building the image"
         },
         "DryRun": {
           "type": "boolean",
@@ -125,33 +125,33 @@
         },
         "ImageTag": {
           "type": "string",
-          "description": "Image Tag"
+          "description": "Tag for the Docker Image"
         },
         "Notifications": {
           "type": "boolean",
-          "description": "Send Notifications"
+          "description": "Enable Notifications for the Build"
         },
         "NotificationsWebHookUrl": {
           "type": "string",
           "description": "WebHook URL for Notifications",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "Repository": {
+        "RegistryToken": {
           "type": "string",
-          "description": "Docker Repository"
-        },
-        "RepositoryToken": {
-          "type": "string",
-          "description": "Repository Token for Pushing Images",
+          "description": "Registry Registry token for pushing images",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "RepositoryUser": {
+        "RegistryUrl": {
           "type": "string",
-          "description": "Repository User"
+          "description": "Docker Registry for pushing images"
+        },
+        "RegistryUser": {
+          "type": "string",
+          "description": "Registry Registry user for pushing images"
         },
         "TemplatesDir": {
           "type": "string",
-          "description": "Templates Directory"
+          "description": "Templates Directory for Dockerfile templates"
         }
       }
     },

@@ -2,7 +2,7 @@
 $ErrorActionPreference = "Stop"
 
 $workingDir = Convert-Path .
-Write-Host "🚀 Running Node CI: $workingDir"
+Write-Host "🚀 Running Docker Build: $workingDir"
 Write-Host "🧾 Arguments: $args"
 
 if (Test-Path (Join-Path $workingDir "set-environment.ps1")) {
@@ -11,7 +11,12 @@ if (Test-Path (Join-Path $workingDir "set-environment.ps1")) {
     . (Join-Path $workingDir "set-environment.ps1")
 }
 
-& dotnet /nuke/forge/Forge.dll --type node @args
+if ($args -notcontains '--root') {
+    $args += '--root'
+    $args += $workingDir
+}
+
+& dotnet /nuke/forge/Forge.dll --type docker @args
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Build Failed: $LASTEXITCODE"
 

@@ -5,6 +5,8 @@ using System.Collections.Generic;
 
 using Serilog;
 
+using Entities;
+
 namespace Utilities;
 
 /// <summary>
@@ -31,6 +33,18 @@ public static class Files
             .ToList();
     }
     
+    /// <summary>
+    /// Generates an environment file from a specified map file and writes it to the given output path.
+    /// </summary>
+    /// <remarks>This method parses the environment variables from the specified map file and writes them to
+    /// the output path. It logs the creation of directories and any warnings about empty environment
+    /// variables.</remarks>
+    /// <param name="mapFilePath">The path to the map file containing environment variable definitions.</param>
+    /// <param name="outputPath">The path where the generated environment file will be written.</param>
+    /// <param name="logInfo">An optional action to log informational messages. If not provided, a default logger is used.</param>
+    /// <param name="logWarning">An optional action to log warning messages. If not provided, a default logger is used.</param>
+    /// <returns><see langword="true"/> if the environment file is generated successfully; otherwise, <see langword="false"/> if
+    /// any environment variable is empty.</returns>
     public static bool GenerateEnvironmentFile(string mapFilePath, string outputPath, Action<string> logInfo = null, Action<string> logWarning = null)
     {
         var isSuccessful = true;
@@ -39,7 +53,7 @@ public static class Files
         // Default to Nuke's Log if no delegate is provided
         logInfo ??= Log.Information;
         logWarning ??= Log.Warning;
-
+        
         foreach (var mapFileValue in envVars)
         {
             if (string.IsNullOrEmpty(mapFileValue.Value))
@@ -47,6 +61,14 @@ public static class Files
                 logWarning($"⚠️ {mapFileValue.Key} is Empty, Set {mapFileValue.Template}");
                 isSuccessful = false;
             }
+        }
+
+        var directory = Path.GetDirectoryName(outputPath);
+        if (directory != null && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+            
+            logInfo($"✅ Created Directory: {directory}");
         }
 
         File.WriteAllLines(outputPath, envVars
@@ -58,6 +80,16 @@ public static class Files
         return isSuccessful;
     }
 
+    /// <summary>
+    /// Parses a map file to extract key-value pairs, resolving values from constants or environment variables.
+    /// </summary>
+    /// <remarks>Each line in the map file should be in the format "key=value". Lines starting with "#" or
+    /// containing only whitespace are ignored. Values can be prefixed with "const:" to use a constant value or "env:"
+    /// to resolve the value from an environment variable. If no prefix is provided, the method attempts to resolve the
+    /// value as an environment variable.</remarks>
+    /// <param name="mapFilePath">The path to the map file containing key-value definitions.</param>
+    /// <returns>A list of <see cref="MapFileValue"/> objects representing the parsed key-value pairs. Returns an empty list if
+    /// the file does not exist or contains no valid entries.</returns>
     public static List<MapFileValue> ParseEnvironment(string mapFilePath)
     {
         if (!File.Exists(mapFilePath))
@@ -102,23 +134,5 @@ public static class Files
         }
 
         return result;
-    }
-
-    public class MapFileValue
-    {
-        public string Key { get; set; }
-        
-        public string Value { get; set; }
-        
-        public string Template { get; set; }
-
-        public MapFileValue(string key, string template, string value)
-        {
-            Key = key;
-            Template = template;
-            Value = value;
-        }
-        
-        public override string ToString() => $"{Key}={Value}";
     }
 }

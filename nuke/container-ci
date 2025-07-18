@@ -8,8 +8,12 @@ Write-Host "🚀 ================ OBSOLETE ====================" -ForegroundColo
 Write-Host "🚀 Running Docker CI: $workingDir"
 Write-Host "🧾 Arguments: $args"
 
-& dotnet /nuke/docker/Docker.dll @args
+if ($args -notcontains '--root') {
+    $args += '--root'
+    $args += $workingDir
+}
 
+& dotnet /nuke/docker/Docker.dll @args
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Build Failed: $LASTEXITCODE"
 

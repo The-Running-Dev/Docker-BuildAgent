@@ -48,7 +48,7 @@ public static class GitHub
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NukeBuild", "1.0"));
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", p.Token);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", p.RegistryToken);
 
         var payload = new
         {

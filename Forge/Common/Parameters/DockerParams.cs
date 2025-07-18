@@ -3,45 +3,50 @@
 namespace Parameters;
 
 /// <summary>
-/// Represents the parameters required for Docker operations, including building and pushing Docker images.
+/// Represents the parameters required for configuring Docker operations, such as building and pushing Docker images.
 /// </summary>
 /// <remarks>This class provides properties to specify paths, tags, and credentials necessary for Docker image
-/// management. It includes options for specifying the Dockerfile location, image tags, and repository details.
-/// Additionally, it supports creating a GitHub release associated with the Docker image.</remarks>
+/// management. It includes options for setting the Dockerfile path, image tags, and registry credentials, as well as a
+/// flag for creating a GitHub release.</remarks>
 public class DockerParams : ForgeParams
 {
     /// <summary>
     /// Gets or sets the directory path where Dockerfile template files are stored.
     /// </summary>
-    public string TemplatesDir { get; set; }
+    public string TemplatesDir { get; set; } = "/nuke/templates";
 
     /// <summary>
     /// Gets or sets the path to the Dockerfile used for building Docker images.
     /// </summary>
-    public string DockerFile { get; set; }
+    public string DockerFile { get; set; } = "Dockerfile";
 
     /// <summary>
-    /// Gets or sets the tag associated with the image.
+    /// Gets or sets the tag associated with the container image.
+    /// </summary>
+    public string ImageTag { get; set; } = "container-app";
+
+    /// <summary>
+    /// Gets or sets the tag associated with the container image.
     /// </summary>
     public List<string> Tags { get; set; }
 
     /// <summary>
-    /// Gets or sets the repository where to push the Docker image.
+    /// Gets or sets the registry URL where to push the Docker image.
     /// </summary>
-    public string Repository { get; set; }
+    public string RegistryUrl { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the repository username.
+    /// Gets or sets the registry user.
     /// </summary>
-    public string User { get; set; }
+    public string RegistryUser { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the repository token.
+    /// Gets or sets the registry token.
     /// </summary>
-    public string Token { get; set; }
+    public string RegistryToken { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets a value indicating whether a GitHub release should be created.
     /// </summary>
-    public bool CreateGitHubRelease { get; set; }
+    public bool CreateGitHubRelease { get; set; } = false;
 }

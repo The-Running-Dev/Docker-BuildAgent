@@ -8,8 +8,8 @@ LABEL maintainer="ben@subzerodev.com" \
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
 ENV NUKE_TELEMETRY_OPTOUT=1
 
-COPY Templates/ /nuke/templates/
-COPY Artifacts/ /nuke/forge/
+COPY templates/ /nuke/templates/
+COPY artifacts/ /nuke/forge/
 
 # Copy all files from nuke/ into /usr/local/bin/
 COPY nuke/ /usr/local/bin/
