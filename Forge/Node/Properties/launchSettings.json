@@ -2,7 +2,7 @@
   "profiles": {
     "Node": {
       "commandName": "Project",
-      "commandLineArgs": "--root \"D:\\Dropbox\\Projects\\Docker-BuildAgent\\BarStrad.UI\""
+      "commandLineArgs": "--root \"%ROOT_PATH%\""
     }
   }
 }
