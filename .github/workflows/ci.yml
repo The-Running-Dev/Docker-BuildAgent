@@ -18,12 +18,14 @@ on:
   pull_request:
     paths-ignore:
       - 'documentation/**'
+      - '.github/**'
   push:
     branches:
       - '**'
       - '!main'
     paths-ignore:
       - 'documentation/**'
+      - '.github/**'
 
 permissions:
   packages: write

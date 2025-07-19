@@ -19,6 +19,7 @@ on:
       - main
     paths-ignore:
       - 'documentation/**'
+      - '.github/**'
 
 permissions:
   packages: write

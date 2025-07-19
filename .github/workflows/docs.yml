@@ -27,10 +27,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/the-running-dev/build-agent:latest
-    
-    defaults:
-      run:
-        shell: pwsh
   
     steps:
       - name: Checkout Repository
@@ -39,7 +35,9 @@ jobs:
           fetch-depth: 0
 
       - name: Build Documentation
-        run: node-template-build -appDir 'documentation'
+        shell: pwsh
+        run: |
+          node-template-build -appDir 'documentation'
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
