@@ -27,7 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/the-running-dev/build-agent:latest
-
+    
+    defaults:
+      run:
+        shell: pwsh
+  
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
