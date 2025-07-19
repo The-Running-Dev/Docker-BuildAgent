@@ -17,27 +17,18 @@ jobs:
       image: ghcr.io/the-running-dev/build-agent:latest
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: recursive
-
-      - name: Run setup.ps1
-        shell: pwsh
-        run: ./docs-ui/setup.ps1
 
       - name: Build Documentation
-        run: |
-          pnpm install
-          pnpm run build:prod
-        working-directory: docs
+        run: node-template-build
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/build
+          path: docs-ui/build
 
   deploy:
     name: Deploy to GitHub Pages
