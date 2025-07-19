@@ -1,5 +1,5 @@
 
-# CI-Build: Main continuous integration workflow for Docker images and Nuke builds.
+# CI-Build: Main continuous integration workflow for Docker images and Nuke builds. Ignores changes in the 'documentation' directory.
 #
 # Triggers:
 #   - On workflow_dispatch (manual)
@@ -19,6 +19,8 @@ on:
   push:
     branches:
       - '**'
+    paths-ignore:
+      - 'documentation/**'
 
 permissions:
   packages: write

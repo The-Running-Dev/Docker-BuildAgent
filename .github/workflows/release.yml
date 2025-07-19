@@ -1,5 +1,5 @@
 
-# Release: Publishes Docker images and creates a GitHub release on tag push or manual trigger.
+# Release: Publishes Docker images and creates a GitHub release on tag push or manual trigger. Ignores changes in the 'documentation' directory.
 #
 # Triggers:
 #   - On workflow_dispatch (manual)
@@ -17,6 +17,8 @@ on:
   push:
     tags:
       - 'v*'
+    paths-ignore:
+      - 'documentation/**'
 
 permissions:
   packages: write
