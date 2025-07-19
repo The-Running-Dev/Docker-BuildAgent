@@ -1,9 +1,9 @@
 
-# Docs-CI: Builds and deploys documentation to GitHub Pages on main branch push or manual trigger.
+# Docs: Builds and deploys documentation to GitHub Pages when triggered by release or manually.
 #
 # Triggers:
 #   - On workflow_dispatch (manual)
-#   - On push to main branch
+#   - On repository_dispatch with 'docs-update' event (from Release workflow)
 #
 # Steps:
 #   1. Checks out the repository
@@ -11,15 +11,12 @@
 #   3. Uploads the built documentation as an artifact
 #   4. Deploys the documentation to GitHub Pages
 #
-name: Docs-CI
+name: Docs
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - 'documentation/**'
+  repository_dispatch:
+    types: [docs-update]
 
 permissions:
   packages: write

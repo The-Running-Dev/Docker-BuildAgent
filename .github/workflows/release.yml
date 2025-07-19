@@ -1,9 +1,9 @@
 
-# Release: Publishes Docker images and creates a GitHub release on tag push or manual trigger. Ignores changes in the 'documentation' directory.
+# Release: Publishes Docker images and creates a GitHub release on main branch push or manual trigger. Ignores changes in the 'documentation' directory.
 #
 # Triggers:
 #   - On workflow_dispatch (manual)
-#   - On push of tags starting with 'v'
+#   - On push to main branch only
 #
 # Steps:
 #   1. Checks out the repository
@@ -15,8 +15,8 @@ name: Release
 on:
   workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
     paths-ignore:
       - 'documentation/**'
 
@@ -42,3 +42,19 @@ jobs:
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
         run: nuke --type docker --create-github-release true
+
+      - name: Check for Documentation Changes
+        id: docs-changed
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q '^documentation/'; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger Docs Build
+        if: steps.docs-changed.outputs.changed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: docs-update
