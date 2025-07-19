@@ -1,17 +1,17 @@
 
-# CI-Build: Main continuous integration workflow for Docker images and Nuke builds. Ignores changes in the 'documentation' directory.
+# CI: Main continuous integration workflow for Docker images and Nuke builds. Ignores changes in the 'documentation' directory.
 #
 # Triggers:
 #   - On workflow_dispatch (manual)
 #   - On pull requests
-#   - On any branch push (but job runs only once per PR)
+#   - On any branch push except main
 #
 # Steps:
 #   1. Checks out the repository
 #   2. Runs shared setup steps from .github/actions/common
 #   3. Runs the Nuke build in docker dry-run mode
 #
-name: CI-Build
+name: CI
 
 on:
   workflow_dispatch:
@@ -21,6 +21,7 @@ on:
   push:
     branches:
       - '**'
+      - '!main'
     paths-ignore:
       - 'documentation/**'
 
@@ -32,8 +33,8 @@ jobs:
   Build:
     runs-on: ubuntu-latest
 
-    # Skip push events if there's an open PR for this branch (to avoid duplicate runs)
-    if: github.event_name != 'push' || github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Run on PR events and workflow_dispatch always, run on push events for non-main branches
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
 
     steps:
       - name: Checkout Repository
