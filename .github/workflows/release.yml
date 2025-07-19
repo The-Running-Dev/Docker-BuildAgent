@@ -1,26 +1,22 @@
 
-# CI-Build: Main continuous integration workflow for Docker images and Nuke builds. Ignores changes in the 'documentation' directory.
+# Release: Publishes Docker images and creates a GitHub release on tag push or manual trigger. Ignores changes in the 'documentation' directory.
 #
 # Triggers:
 #   - On workflow_dispatch (manual)
-#   - On pull requests
-#   - On any branch push (but job runs only once per PR)
+#   - On push of tags starting with 'v'
 #
 # Steps:
 #   1. Checks out the repository
 #   2. Runs shared setup steps from .github/actions/common
-#   3. Runs the Nuke build in docker dry-run mode
+#   3. Runs the Nuke build with GitHub release creation enabled
 #
-name: CI-Build
+name: Release
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths-ignore:
-      - 'documentation/**'
   push:
-    branches:
-      - '**'
+    tags:
+      - 'v*'
     paths-ignore:
       - 'documentation/**'
 
@@ -31,9 +27,6 @@ permissions:
 jobs:
   Build:
     runs-on: ubuntu-latest
-
-    # Skip push events if there's an open PR for this branch (to avoid duplicate runs)
-    if: github.event_name != 'push' || github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout Repository
@@ -48,4 +41,4 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
-        run: nuke --type docker --dry-run true
+        run: nuke --type docker --create-github-release true

@@ -1,0 +1,54 @@
+#!/usr/bin/env pwsh
+<#
+.SYNOPSIS
+    Builds a Node.js documentation app from a template, copying only missing files.
+.PARAMETER projectDir
+    The root directory of the project.
+.PARAMETER nodeAppDir
+    The directory for the node app (relative to projectDir).
+.PARAMETER nodeTemplateRepositoryUrl
+    The git URL for the template.
+.PARAMETER nodeTemplateDirPath
+    Where to clone the template.
+.EXAMPLE
+    ./node-template-build.ps1 -projectDir . -nodeAppDir docs-ui
+#>
+[CmdletBinding()]
+param(
+    [Parameter()][string]$projectDir = $(Convert-Path .),
+    [Parameter()][string]$appDir = 'documentation',
+    [Parameter()][string]$nodeTemplateRepositoryUrl = 'https://github.com/The-Running-Dev/Docusaurus-Template.git',
+    [Parameter()][string]$nodeTemplateDirPath = '/node-template'
+)
+
+$ErrorActionPreference = "Stop"
+
+Import-Module (Join-Path $PSScriptRoot 'nuke-helpers.psm1')
+
+$appDirPath = Join-Path $projectDir $appDir
+
+# Clone $nodeTemplateRepositoryUrl into $nodeTemplateDir
+& git clone --depth 1 $nodeTemplateRepositoryUrl $nodeTemplateDirPath
+
+Write-Host "🚀 Running Node Template Build: $projectDir"
+Write-Host "🧾 Node App Directory: $appDir"
+Write-Host "🧾 Node App Directory Path: $appDirPath"
+Write-Host "🧾 Node Template Repository URL: $nodeTemplateRepositoryUrl"
+Write-Host "🧾 Node Template Directory: $nodeTemplateDirPath"
+
+if (Test-Path (Join-Path $projectDir "set-environment.ps1")) {
+    Write-Host "🔧 Setting Environment Variables..."
+    
+    . (Join-Path $projectDir "set-environment.ps1")
+}
+
+Copy-Directory `
+    -sourceDir $nodeTemplateDirPath `
+    -destinationDir (Join-Path $projectDir $appDir) `
+    -overwrite:$false
+
+Set-Location $appDirPath
+
+& pnpm install
+
+& pnpm run build:prod

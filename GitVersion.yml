@@ -1,30 +1,33 @@
 mode: ContinuousDeployment
 next-version: v0.0.0
 
+
 branches:
   main:
     regex: ^main$
     increment: Minor
   feature:
-    regex: ^features?[/-]
+    regex: ^features?[/-](?<BranchName>.+)
     increment: Inherit
     source-branches: [main]
   release:
-    regex: ^releases?[/-]
+    regex: ^releases?[/-](?<BranchName>.+)
     increment: Patch
     source-branches: [main]
   hotfix:
-    regex: ^hotfix(es)?[/-]
+    regex: ^hotfix(es)?[/-](?<BranchName>.+)
     increment: Patch
     source-branches: [main]
   pull-request:
-    regex: ^(pull|pr)[/-]
+    regex: ^(pull|pr)[/-](?<BranchName>.+)
     increment: Inherit
     source-branches: [main, feature, release, hotfix]
+    label: pr-{BranchName}
 
 ignore:
   sha: []
   commits-before: 2024-01-01T00:00:00Z
+
 
 commit-message-incrementing: Enabled
 tag-prefix: v

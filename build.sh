@@ -6,7 +6,7 @@ set -eo pipefail
 SCRIPT_DIR=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
 
 ARTIFACTS_DIR="${SCRIPT_DIR}/artifacts"
-BUILD_PROJECT_FILE="$SCRIPT_DIR/Forge/Forge.csproj"
+BUILD_PROJECT_FILE="$SCRIPT_DIR/forge/Forge.csproj"
 TEMP_DIRECTORY="$SCRIPT_DIR//.nuke/temp"
 
 DOTNET_GLOBAL_FILE="$SCRIPT_DIR//global.json"
