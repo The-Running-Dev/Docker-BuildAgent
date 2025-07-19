@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: ./.github/workflows/_shared-setup.yml
+      - uses: ./.github/actions/common
 
       - name: Build Container
         env:
