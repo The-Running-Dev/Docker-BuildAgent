@@ -5,7 +5,7 @@ Param(
 )
 
 $artifactsDir = "$PSScriptRoot\artifacts"
-$buildProjectFile = "$PSScriptRoot\Forge\Forge.csproj"
+$buildProjectFile = "$PSScriptRoot\forge\Forge.csproj"
 $tempDirectory = "$PSScriptRoot\\.nuke\temp"
 $dotNetGlobalFile = "$PSScriptRoot\\global.json"
 $dotNetInstallUrl = "https://dot.net/v1/dotnet-install.ps1"
@@ -54,7 +54,7 @@ else {
 }
 
 Write-Output "PowerShell $($PSVersionTable.PSEdition) v$($PSVersionTable.PSVersion)"
-Write-Output ".NET SDK v$(& $env:DOTNET_EXE --version)"
+Write-Output "Microsoft (R) .NET SDK version $("$($env:DOTNET_EXE) --version")"
 
 if (Test-Path (Join-Path $PSScriptRoot 'set-environment.ps1')) {
     & (Join-Path $PSScriptRoot 'set-environment.ps1')

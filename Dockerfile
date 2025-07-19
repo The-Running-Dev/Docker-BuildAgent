@@ -4,7 +4,7 @@ LABEL maintainer="ben@subzerodev.com" \
       version="0.3" \
       description="Build Agent with Node.js, Angular CLI, TypeScript, Docker, PowerShell, and GitVersion"
 
-# Disable .NET CLI telemetry
+# Disable telemetry
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
 ENV NUKE_TELEMETRY_OPTOUT=1
 
