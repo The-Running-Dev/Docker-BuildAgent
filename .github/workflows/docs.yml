@@ -1,3 +1,16 @@
+
+# Docs-CI: Builds and deploys documentation to GitHub Pages on main branch push or manual trigger.
+#
+# Triggers:
+#   - On workflow_dispatch (manual)
+#   - On push to main branch
+#
+# Steps:
+#   1. Checks out the repository
+#   2. Builds documentation using node-template-build
+#   3. Uploads the built documentation as an artifact
+#   4. Deploys the documentation to GitHub Pages
+#
 name: Docs-CI
 
 on:

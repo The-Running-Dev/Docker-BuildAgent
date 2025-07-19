@@ -1,3 +1,15 @@
+
+# Release: Publishes Docker images and creates a GitHub release on tag push or manual trigger.
+#
+# Triggers:
+#   - On workflow_dispatch (manual)
+#   - On push of tags starting with 'v'
+#
+# Steps:
+#   1. Checks out the repository
+#   2. Runs shared setup steps from .github/actions/common
+#   3. Runs the Nuke build with GitHub release creation enabled
+#
 name: Release
 
 on:
@@ -15,6 +27,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: ./.github/actions/common
 
       - name: Run NUKE Build

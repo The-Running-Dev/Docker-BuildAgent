@@ -1,15 +1,24 @@
-# .github/workflows/_shared-setup.yml (as a composite action)
+
+# .github/actions/common/action.yml (composite action)
+#
+# Shared Build Setup: Provides common steps for Docker/Nuke builds in CI workflows.
+#
+# Steps included:
+#   - Set up Docker Buildx for advanced Docker builds
+#   - Install .NET SDK 8.x for building .NET projects
+#   - Install global .NET tools: GitVersion.Tool and Nuke.GlobalTool
+#
+# Usage:
+#   - Reference this action in your workflow with:
+#       uses: ./.github/actions/common
+#   - Place a checkout step before this action in your workflow.
+
 name: Shared Build Setup
 description: Common steps for Docker/Nuke builds
 
 runs:
   using: "composite"
   steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
 

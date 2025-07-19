@@ -1,3 +1,16 @@
+
+# CI-Build: Main continuous integration workflow for Docker images and Nuke builds.
+#
+# Triggers:
+#   - On workflow_dispatch (manual)
+#   - On pull requests
+#   - On any branch push
+#
+# Steps:
+#   1. Checks out the repository
+#   2. Runs shared setup steps from .github/actions/common
+#   3. Runs the Nuke build in docker dry-run mode
+#
 name: CI-Build
 
 on:
@@ -16,6 +29,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: ./.github/actions/common
 
       - name: Run NUKE Build
