@@ -54,7 +54,7 @@ else {
 }
 
 Write-Output "PowerShell $($PSVersionTable.PSEdition) v$($PSVersionTable.PSVersion)"
-Write-Output "Microsoft (R) .NET SDK version $("$($env:DOTNET_EXE) --version")"
+Write-Output "Microsoft (R) .NET SDK version $(& $env:DOTNET_EXE --version)"
 
 if (Test-Path (Join-Path $PSScriptRoot 'set-environment.ps1')) {
     & (Join-Path $PSScriptRoot 'set-environment.ps1')
