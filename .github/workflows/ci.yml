@@ -4,7 +4,7 @@
 # Triggers:
 #   - On workflow_dispatch (manual)
 #   - On pull requests
-#   - On any branch push
+#   - On any branch push (but job runs only once per PR)
 #
 # Steps:
 #   1. Checks out the repository
@@ -16,6 +16,8 @@ name: CI-Build
 on:
   workflow_dispatch:
   pull_request:
+    paths-ignore:
+      - 'documentation/**'
   push:
     branches:
       - '**'
@@ -29,6 +31,9 @@ permissions:
 jobs:
   Build:
     runs-on: ubuntu-latest
+
+    # Skip push events if there's an open PR (to avoid duplicate runs)
+    if: github.event_name != 'push' || github.event.pull_request == null
 
     steps:
       - name: Checkout Repository
