@@ -1,7 +1,7 @@
 ---
 id: docker-templates
-title: "🐳 Docker Templates"
-sidebar_position: 5
+title: 🐳 Docker Templates
+sidebar_position: 6
 ---
 
 The following templates are included inside the Build Agent image at `/nuke/templates`. When you run a build and no `Dockerfile` exists in your project directory, the agent will:

@@ -1,7 +1,7 @@
 ---
 id: targets
 title: 🎯 Targets
-sidebar_position: 4
+sidebar_position: 5
 ---
 
 This page describes the main build targets available in the Forge system for Docker and Node.js projects.

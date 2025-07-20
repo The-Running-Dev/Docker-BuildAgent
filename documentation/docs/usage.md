@@ -4,7 +4,13 @@ title: 🚀 Fast Track
 sidebar_position: 1
 ---
 
-### 🐳 Docker Image
+## Quick Start Examples
+
+The Build Agent supports 4 different build types. Here are the most common scenarios to get you started quickly:
+
+> 💡 **Need help choosing?** Check out our comprehensive [Build Types Reference](build-types) for detailed comparisons, parameters, and decision guidance.
+
+### 🐳 Docker Image Build
 
 Creates a Docker image for your project artifacts (from the default `ArtifactsDir`).
 
@@ -33,7 +39,7 @@ docker run `
 
 This will run the `Docker` forge with all it's [targets](targets#-docker-targets) and default [parameters](parameters#-docker), and build your Docker image.
 
-### 🟢 Node.js App
+### 🟢 Node.js Application Build
 
 1. Map your project directory (`./`) to `/workspace`
 2. Define a `build:prod` npm script inside your `package.json`
@@ -55,7 +61,7 @@ By default, the `Node` build target runs 2 scripts:
 
 You can customize this by specifying your own `.build.scripts`, see [customization](customization).
 
-### 🟢 🐳 Node.js App, Inside a Docker Image
+### 🟢 🐳 Node.js + Docker Combined Build
 
 1. Map your project directory (`./`) to `/workspace`
 2. Expose the Docker host to the container, either through docker.sock volume bind (on Linux) or DOCKER_HOST environment variable.
@@ -71,3 +77,11 @@ You can customize this by specifying your own `.build.scripts`, see [customizati
 ```
 
 This will run the `Node` forge with all it's [targets](targets#-node-targets) and default [parameters](parameters#-nodejs), and build your Node application. And after that, it will run the `Docker` forge with all it's [targets](targets#-docker-targets) and default [parameters](parameters#-docker), and build your Docker image.
+
+## 📚 Learn More
+
+These examples show the most common use cases. For complete information about all build types, parameters, and advanced scenarios:
+
+- **[Build Types Reference](build-types)** - Comprehensive guide to all 4 build commands
+- **[Parameters](parameters)** - Detailed parameter documentation  
+- **[Customization](customization)** - Advanced configuration options

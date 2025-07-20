@@ -1,6 +1,6 @@
 ---
 id: index
-title: Introduction
+title: 🏠 Introduction
 sidebar_position: 0
 ---
 
@@ -27,9 +27,10 @@ sidebar_position: 0
 - 🔢 GitVersion for semantic versioning in CI/CD
 - 📝 CHANGELOG generation
 
-
 ## ⚡ Fast Track
 
-For more details, see the [Usage Guide](usage) and [Customization Options](customization).
+Ready to get started? Check out our [Fast Track Guide](usage) for quick examples, or explore the comprehensive [Build Types Reference](build-types) to understand all available build commands and choose the right approach for your project.
 
-📦 ⚡ 🛠️
+For advanced configuration, see [Customization Options](customization).
+
+<!-- 📦 ⚡ 🛠️ -->

@@ -1,7 +1,7 @@
 ---
 id: development
 title: "🛠️ Development"
-sidebar_position: 8
+sidebar_position: 10
 ---
 
 This section explains how to set up Docker-BuildAgent and the Forge build orchestrator for local development and CI/CD pipelines.

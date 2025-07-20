@@ -1,7 +1,7 @@
 ---
 id: troubleshooting
 title: "❓ Troubleshooting & FAQ"
-sidebar_position: 9
+sidebar_position: 11
 ---
 
 This section covers common issues, troubleshooting steps, and frequently asked questions for Docker-BuildAgent and the Forge build orchestrator.

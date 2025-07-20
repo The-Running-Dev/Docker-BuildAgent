@@ -61,6 +61,11 @@ const config: Config = {
           label: 'Docs',
         },
         {
+          label: `v${version}`,
+          position: 'right',
+          href: '#',
+        },
+        {
           href: 'https://github.com/The-Running-Dev/Docker-BuildAgent',
           label: 'GitHub',
           position: 'right',
@@ -74,7 +79,7 @@ const config: Config = {
           href: 'https://ghcr.io/the-running-dev/build-agent',
           label: 'Container Registry',
           position: 'right',
-        },
+        }
       ],
     },
     prism: {

@@ -19,3 +19,20 @@ set-environment.ps1
 documentation/.docusaurus/
 
 *.code-workspace
+
+documentation/*.example
+documentation/scripts/get-version.js
+documentation/scripts/write-version.js
+documentation/pnpm-lock.yaml
+documentation/README.md
+documentation/LICENSE
+documentation/setup.ps1
+documentation/package.json
+documentation/src/css/custom.nuke.css
+documentation/VERSION.txt
+documentation/tsconfig.json
+documentation/static/img/docusaurus-social-card.jpg
+documentation/static/img/undraw_docusaurus_tree.svg
+documentation/static/img/undraw_docusaurus_react.svg
+documentation/static/img/docusaurus.png
+documentation/static/img/undraw_docusaurus_mountain.svg

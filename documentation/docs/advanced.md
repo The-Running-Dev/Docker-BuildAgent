@@ -1,7 +1,7 @@
 ---
 id: advanced
 title: "⚡ Advanced"
-sidebar_position: 7
+sidebar_position: 9
 ---
 
 You can run various tools inside the container for reproducible environments:
