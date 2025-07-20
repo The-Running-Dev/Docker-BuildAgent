@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 using Serilog;
@@ -95,7 +96,16 @@ public class Docker : Base<DockerParams, DiscordNotifications>
             !string.IsNullOrWhiteSpace(RegistryToken))
         .Executes(async () =>
         {
-            await GitHub.CreateRelease(Parameters);
+            try
+            {
+                await GitHub.CreateRelease(Parameters);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "❌ Failed to Create GitHub Release.");
+
+                Assert.Fail($"Failed to Create GitHub Release: {ex.Message}");
+            }
         });
 
     public Target Push => _ => _
@@ -118,7 +128,7 @@ public class Docker : Base<DockerParams, DiscordNotifications>
         .OnlyWhenDynamic(() => ForcePush || (!IsLocalBuild && !DryRun))
         .Executes(() =>
         {
-            Git.CreateTag(Parameters.Version.ToString());
+            Git.CreateTag($"v{Parameters.Version}");
         });
 
     public Target Image => _ => _

@@ -24,6 +24,7 @@ permissions:
 
 jobs:
   Build-Docs:
+    name: Build Docs
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/the-running-dev/build-agent:latest
@@ -35,14 +36,12 @@ jobs:
           fetch-depth: 0
 
       - name: Build Documentation
-        shell: pwsh
-        run: |
-          node-template-build -appDir 'documentation'
+        run: node-template-build -appDir 'documentation'
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs-ui/build
+          path: documentation/build
 
   deploy:
     name: Deploy to GitHub Pages

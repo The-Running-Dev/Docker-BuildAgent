@@ -2,26 +2,48 @@
 <#
 .SYNOPSIS
     Builds a Node.js documentation app from a template, copying only missing files.
+.DESCRIPTION
+    This script clones a Node.js documentation template repository and copies files to the specified app directory,
+    preserving existing files. It automatically detects the package manager (npm, pnpm, or yarn) or allows manual specification.
+    Supports skipping installation and building for production.
 .PARAMETER projectDir
-    The root directory of the project.
-.PARAMETER nodeAppDir
-    The directory for the node app (relative to projectDir).
+    The root directory of the project. Defaults to current directory.
+.PARAMETER appDir
+    The directory for the node app (relative to projectDir). Defaults to 'documentation'.
 .PARAMETER nodeTemplateRepositoryUrl
-    The git URL for the template.
+    The git URL for the template repository. Defaults to the Docusaurus template.
 .PARAMETER nodeTemplateDirPath
-    Where to clone the template.
+    Where to clone the template. Defaults to '/node-template'.
+.PARAMETER skipInstall
+    Skip running package manager install command.
+.PARAMETER packageManager
+    Manually specify the package manager to use (npm, pnpm, or yarn). If not specified, auto-detects based on lock files.
+.PARAMETER isProduction
+    Build for production using 'build:prod' script.
 .EXAMPLE
-    ./node-template-build.ps1 -projectDir . -nodeAppDir docs-ui
+    node-template-build -appDir docs-ui
+    # Builds documentation in docs-ui directory using auto-detected package manager
+.EXAMPLE
+    node-template-build -packageManager pnpm -skipInstall -isProduction:$false
+    # Uses pnpm, skips install, and doesn't build for production
+.EXAMPLE
+    node-template-build -projectDir /workspace -appDir documentation -isProduction
+    # Builds in /workspace/documentation directory for production
 #>
 [CmdletBinding()]
 param(
     [Parameter()][string]$projectDir = $(Convert-Path .),
     [Parameter()][string]$appDir = 'documentation',
     [Parameter()][string]$nodeTemplateRepositoryUrl = 'https://github.com/The-Running-Dev/Docusaurus-Template.git',
-    [Parameter()][string]$nodeTemplateDirPath = '/node-template'
+    [Parameter()][string]$nodeTemplateDirPath = '/node-template',
+    [Parameter()][switch]$skipInstall = $false,
+    [Parameter()][string]$packageManager,
+    [Parameter()][switch]$isProduction
 )
 
-$ErrorActionPreference = "Stop"
+# Set the script root to the directory where this script is located
+# since without the .ps1 extension $PSScriptRoot will not be set.
+$PSScriptRoot = "/usr/local/bin"
 
 Import-Module (Join-Path $PSScriptRoot 'nuke-helpers.psm1')
 
@@ -36,11 +58,7 @@ Write-Host "🧾 Node App Directory Path: $appDirPath"
 Write-Host "🧾 Node Template Repository URL: $nodeTemplateRepositoryUrl"
 Write-Host "🧾 Node Template Directory: $nodeTemplateDirPath"
 
-if (Test-Path (Join-Path $projectDir "set-environment.ps1")) {
-    Write-Host "🔧 Setting Environment Variables..."
-    
-    . (Join-Path $projectDir "set-environment.ps1")
-}
+Set-BuildEnvironment -projectDir $projectDir
 
 Copy-Directory `
     -sourceDir $nodeTemplateDirPath `
@@ -49,6 +67,16 @@ Copy-Directory `
 
 Set-Location $appDirPath
 
-& pnpm install
+if (-not $packageManager) {
+    $packageManager = Get-PackageManager -projectDir $appDirPath
+}
 
-& pnpm run build:prod
+if (-not $skipInstall) {
+    & $packageManager install
+}
+
+if ($isProduction) {
+    Write-Host "Building for Production..."
+
+    & $packageManager run build:prod
+}

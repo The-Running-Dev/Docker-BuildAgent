@@ -1,7 +1,6 @@
 mode: ContinuousDeployment
 next-version: v0.0.0
 
-
 branches:
   main:
     regex: ^main$
@@ -27,7 +26,6 @@ branches:
 ignore:
   sha: []
   commits-before: 2024-01-01T00:00:00Z
-
 
 commit-message-incrementing: Enabled
 tag-prefix: v

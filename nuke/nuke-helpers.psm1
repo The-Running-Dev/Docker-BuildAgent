@@ -1,16 +1,113 @@
 
 <#
 .SYNOPSIS
-    Helper module for copying directory trees with optional overwrite.
+    Helper module for copying directory trees with optional overwrite and common build operations.
 .DESCRIPTION
-    Provides the Copy-Directory function, which recursively copies all files and subdirectories from a source directory to a destination directory, preserving structure. You can choose to overwrite existing files or skip them.
+    Provides functions for directory copying, build script initialization, and common build operations.
 .EXAMPLE
     Copy-Directory -sourceDir './template' -destinationDir './docs-ui' -overwrite
     # Copies all files from ./template to ./docs-ui, overwriting existing files.
 .EXAMPLE
-    Copy-Directory -sourceDir './template' -destinationDir './docs-ui'
-    # Copies all files from ./template to ./docs-ui, skipping files that already exist.
+    Initialize-BuildScript -scriptName "Docker Build"
+    # Sets up common build script initialization
 #>
+
+function Initialize-BuildScript {
+<#
+.SYNOPSIS
+    Initialize common build script settings and display startup information.
+.PARAMETER scriptName
+    The name of the script being executed (for display purposes).
+.PARAMETER workingDir
+    The working directory (defaults to current directory).
+.PARAMETER arguments
+    The arguments passed to the script.
+.EXAMPLE
+    Initialize-BuildScript -scriptName "Docker Build" -arguments $args
+#>
+    param(
+        [string]$scriptName,
+        [string]$workingDir = (Convert-Path .),
+        [array]$arguments = @()
+    )
+    
+    $script:ErrorActionPreference = "Stop"
+    
+    Write-Host "🚀 Running $scriptName`: $workingDir"
+    Write-Host "🧾 Arguments: $arguments"
+    
+    return $workingDir
+}
+
+function Set-BuildEnvironment {
+<#
+.SYNOPSIS
+    Load environment variables from set-environment.ps1 if it exists.
+.PARAMETER projectDir
+    The directory to look for set-environment.ps1 in.
+.EXAMPLE
+    Set-BuildEnvironment -projectDir $workingDir
+#>
+    param(
+        [string]$projectDir
+    )
+    
+    $envScript = Join-Path $projectDir "set-environment.ps1"
+
+    if (Test-Path $envScript) {
+        Write-Host "🔧 Setting Environment Variables..."
+        . $envScript
+    }
+}
+
+function Add-RootArgument {
+<#
+.SYNOPSIS
+    Add --root argument to arguments array if not already present.
+.PARAMETER arguments
+    The arguments array to modify.
+.PARAMETER rootPath
+    The root path to add.
+.EXAMPLE
+    $args = Add-RootArgument -arguments $args -rootPath $workingDir
+#>
+    param(
+        [array]$arguments,
+        [string]$rootPath
+    )
+    
+    if ($arguments -notcontains '--root') {
+        $arguments += '--root'
+        $arguments += $rootPath
+    }
+    
+    return $arguments
+}
+
+function Invoke-DotNetCommand {
+<#
+.SYNOPSIS
+    Execute a dotnet command with error handling.
+.PARAMETER dllPath
+    Path to the .NET DLL to execute.
+.PARAMETER arguments
+    Arguments to pass to the command.
+.EXAMPLE
+    Invoke-DotNetCommand -dllPath "/nuke/forge/Forge.dll" -arguments $args
+#>
+    param(
+        [string]$dllPath,
+        [array]$arguments
+    )
+    
+    & dotnet $dllPath @arguments
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Build Failed: $LASTEXITCODE"
+        
+        exit $LASTEXITCODE
+    }
+}
 
 function Copy-Directory {
 <#
@@ -72,5 +169,50 @@ function Copy-Directory {
     }
 }
 
-Export-ModuleMember `
-    Copy-Directory
+<#
+.SYNOPSIS
+    Helper module for Node.js operations including package manager detection.
+.DESCRIPTION
+    Provides functions for common Node.js build operations like detecting package managers.
+#>
+
+function Get-PackageManager {
+<#
+.SYNOPSIS
+    Detects the package manager used in the specified project directory.
+.DESCRIPTION
+    Checks for the presence of lock files specific to pnpm and yarn to determine the package manager. 
+    If a "pnpm-lock.yaml" file is found, it returns "pnpm". If a "yarn.lock" file is found, it returns "yarn". 
+    If neither file is present, it defaults to "npm".
+.PARAMETER ProjectDirectory
+    The root directory of the project to inspect. Defaults to current directory.
+.EXAMPLE
+    $pm = Get-PackageManager -projectDir "."
+.EXAMPLE
+    $pm = Get-PackageManager
+#>
+    param(
+        [string]$projectDir = (Get-Location).Path
+    )
+    
+    $pm = "npm"
+    
+    if (Test-Path (Join-Path $projectDir "pnpm-lock.yaml")) {
+        $pm = "pnpm"
+    }
+    elseif (Test-Path (Join-Path $projectDir "yarn.lock")) {
+        $pm = "yarn"
+    }
+    
+    Write-Host "🔍 Detected Package Manager: $pm"
+    
+    return $pm
+}
+
+Export-ModuleMember -Function `
+    Copy-Directory, `
+    Initialize-BuildScript, `
+    Set-BuildEnvironment, `
+    Add-RootArgument, `
+    Invoke-DotNetCommand, `
+    Get-PackageManager

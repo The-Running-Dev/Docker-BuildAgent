@@ -13,3 +13,9 @@ BarStrad*
 set-environment.ps1
 
 .build/.build.env
+
+.pnpm-store/
+
+documentation/.docusaurus/
+
+*.code-workspace

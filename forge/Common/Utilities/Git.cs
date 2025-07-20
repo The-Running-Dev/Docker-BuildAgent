@@ -8,7 +8,6 @@ using Nuke.Common.Tooling;
 using Nuke.Common.Tools.Git;
 using Nuke.Common.Utilities;
 
-
 using Entities;
 
 namespace Utilities;

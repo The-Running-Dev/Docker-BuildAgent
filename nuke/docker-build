@@ -1,24 +1,15 @@
 #!/usr/bin/env pwsh
-$ErrorActionPreference = "Stop"
 
-$workingDir = Convert-Path .
-Write-Host "🚀 Running Docker Build: $workingDir"
-Write-Host "🧾 Arguments: $args"
+# Set the script root to the directory where this script is located
+# since without the .ps1 extension $PSScriptRoot will not be set.
+$PSScriptRoot = "/usr/local/bin"
 
-if (Test-Path (Join-Path $workingDir "set-environment.ps1")) {
-    Write-Host "🔧 Setting Environment Variables..."
-    
-    . (Join-Path $workingDir "set-environment.ps1")
-}
+Import-Module (Join-Path $PSScriptRoot 'nuke-helpers.psm1')
 
-if ($args -notcontains '--root') {
-    $args += '--root'
-    $args += $workingDir
-}
+$workingDir = Initialize-BuildScript -scriptName "Docker Build" -arguments $args
 
-& dotnet /nuke/forge/Forge.dll --type docker @args
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Build Failed: $LASTEXITCODE"
+Set-BuildEnvironment -projectDir $workingDir
 
-    exit $LASTEXITCODE
-}
+$args = Add-RootArgument -arguments $args -rootPath $workingDir
+
+Invoke-DotNetCommand -dllPath "/nuke/forge/Forge.dll" -arguments (@("--type", "docker") + $args)

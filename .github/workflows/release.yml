@@ -37,7 +37,7 @@ jobs:
 
       - uses: ./.github/actions/common
 
-      - name: Run NUKE Build
+      - name: Build and Publish Image
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
