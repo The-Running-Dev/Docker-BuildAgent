@@ -3,7 +3,7 @@
 #
 # Triggers:
 #   - On workflow_dispatch (manual)
-#   - On repository_dispatch with 'docs-update' event (from Release workflow)
+#   - On repository_dispatch with 'Update-Documentation' event (from Release workflow)
 #
 # Steps:
 #   1. Checks out the repository
@@ -16,7 +16,7 @@ name: Docs
 on:
   workflow_dispatch:
   repository_dispatch:
-    types: [docs-update]
+    types: [Update-Documentation]
 
 permissions:
   packages: write

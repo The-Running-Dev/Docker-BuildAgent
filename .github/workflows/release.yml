@@ -1,5 +1,7 @@
 
-# Release: Publishes Docker images and creates a GitHub release on main branch push or manual trigger. Ignores changes in the 'documentation' directory.
+# Release:
+#  Publishes Docker images and creates a GitHub release on main branch push or manual trigger.
+#  Ignores changes in the 'documentation' directory.
 #
 # Triggers:
 #   - On workflow_dispatch (manual)
@@ -58,4 +60,4 @@ jobs:
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: docs-update
+          event-type: Update-Documentation
