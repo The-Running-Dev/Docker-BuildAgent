@@ -38,7 +38,7 @@ param(
     [Parameter()][string]$nodeTemplateDirPath = '/node-template',
     [Parameter()][switch]$skipInstall = $false,
     [Parameter()][string]$packageManager,
-    [Parameter()][switch]$isProduction
+    [Parameter()][switch]$isProduction = $true
 )
 
 # Set the script root to the directory where this script is located
