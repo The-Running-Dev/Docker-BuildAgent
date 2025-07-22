@@ -84,6 +84,70 @@ public static class Git
     }
 
     /// <summary>
+    /// Generates a changelog from the specified starting point.
+    /// </summary>
+    /// <param name="fromTag">The tag to start generating changelog from. If null, uses the last tag. If empty string, generates from entire history.</param>
+    /// <returns>A formatted changelog string.</returns>
+    public static string GenerateChangeLog(string fromTag = null)
+    {
+        // Handle different starting points
+        string startTag;
+        if (fromTag == null)
+        {
+            // Default behavior: from last tag
+            startTag = GetLastTag();
+        }
+        else if (fromTag == "")
+        {
+            // Empty string means entire history
+            startTag = null;
+        }
+        else
+        {
+            // Specific tag provided
+            startTag = fromTag;
+        }
+
+        var commits = GetCommitsSince(startTag);
+
+        if (commits.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        // Group commits by date (descending: latest date first)
+        var commitsByDate = commits
+            .GroupBy(c => c.Date)
+            .OrderByDescending(g => g.Key);
+
+        var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var changelogBuilder = new StringBuilder();
+        
+        if (startTag == null)
+        {
+            changelogBuilder.AppendLine($"## Complete History (Generated {today})\n");
+        }
+        else
+        {
+            changelogBuilder.AppendLine($"## Changes since {startTag} (Generated {today})\n");
+        }
+
+        foreach (var group in commitsByDate)
+        {
+            changelogBuilder.AppendLine($"### {group.Key}\n");
+
+            foreach (var commit in group)
+            {
+                changelogBuilder.AppendLine($"- {commit.Message}");
+            }
+
+            changelogBuilder.AppendLine();
+        }
+
+        return changelogBuilder.ToString();
+    }
+
+    /// <summary>
     /// Retrieves the most recent Git tag from the current repository.
     /// </summary>
     /// <remarks>This method executes a Git command to obtain the latest tag and trims any surrounding

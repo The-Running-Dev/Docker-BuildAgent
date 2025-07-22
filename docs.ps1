@@ -53,6 +53,7 @@ $appDir = 'documentation'
 Write-Host "🔨 Phase 1: Preparing Documentation Environment..." -ForegroundColor Cyan
 
 & docker run `
+    --rm `
     -v ./:/workspace `
     -it ghcr.io/the-running-dev/build-agent:latest `
     node-template-build `
@@ -68,7 +69,7 @@ Write-Host "🔨 Phase 1: Preparing Documentation Environment..." -ForegroundCol
 # - Installs dependencies using pnpm
 # - Runs prebuild steps (if any)
 # - Starts the development server with hot-reload
-Write-Host "🚀 Phase 2: Starting development server..." -ForegroundColor Green
+Write-Host "🚀 Phase 2: Starting Development Server..." -ForegroundColor Green
 
 $appDirPath = Join-Path . $appDir -Resolve
 
@@ -84,7 +85,7 @@ Write-Host "📦 Installing Dependencies with pnpm..." -ForegroundColor Yellow
 Write-Host "⚙️ Running Pre-Build Step..." -ForegroundColor Yellow
 & pnpm run prebuild:prod
 
-Write-Host "🌐 Starting Docusaurus Development Server..." -ForegroundColor Green
+Write-Host "🌐 Starting Development Server..." -ForegroundColor Green
 Write-Host "   📍 URL: http://localhost:3000" -ForegroundColor Cyan
 Write-Host "   🔄 Hot-Reload Enabled for Live Editing" -ForegroundColor Cyan
 & pnpm start
@@ -93,7 +94,7 @@ Write-Host "   🔄 Hot-Reload Enabled for Live Editing" -ForegroundColor Cyan
 # Start the development server in a new PowerShell window
 # -NoExit keeps the window open after the server starts
 # This allows you to see server logs and stop it with Ctrl+C
-Write-Host "🪟 Opening New PowerShell Window for Development Server..." -ForegroundColor Magenta
+Write-Host "🪟 Opening New Window for Development Server..." -ForegroundColor Magenta
 
 Start-Process pwsh `
     -ArgumentList  `

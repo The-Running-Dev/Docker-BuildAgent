@@ -59,4 +59,9 @@ public class ForgeParams
     /// Gets or sets the verbosity level for logging output.
     /// </summary>
     public Verbosity Verbosity { get; set; }
+
+    /// <summary>
+    /// Gets or sets the changelog generation source. Can be a tag name (e.g., 'v0.1.0'), 'start' for entire history, or empty/null for last tag.
+    /// </summary>
+    public string ChangeLogFrom { get; set; }
 }

@@ -11,10 +11,9 @@ ENV NUKE_TELEMETRY_OPTOUT=1
 COPY templates/ /nuke/templates/
 COPY artifacts/ /nuke/forge/
 
-# Copy all files from nuke/ into /usr/local/bin/
-COPY nuke/ /usr/local/bin/
-
-# Make all copied files in /usr/local/bin executable
+# Copy and setup nuke scripts and bin
+COPY scripts/nuke/* /nuke/scripts/
+COPY scripts/nuke/bin/ /usr/local/bin/
 RUN chmod +x /usr/local/bin/*
 
 # Install PowerShell and prerequisites

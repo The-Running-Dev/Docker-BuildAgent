@@ -19,6 +19,9 @@ using Notifications;
 /// build types. The class also includes targets for building and updating the changelog.</remarks>
 public class Forge : Base<ForgeParams, DiscordNotifications>
 {
+    [Parameter("Changelog generation source: tag name (e.g., 'v0.1.0'), 'start' for entire history, or empty for last tag")]
+    public readonly string ChangeLogFrom;
+
     /// <summary>
     /// Configures the current instance by hydrating it with Nuke CLI parameters.
     /// </summary>
@@ -29,6 +32,9 @@ public class Forge : Base<ForgeParams, DiscordNotifications>
     {
         // Copy Nuke CLI parameters
         Parameters.Hydrate(this, verbose: Verbosity == Verbosity.Verbose);
+        
+        // Copy changelog parameter
+        Parameters.ChangeLogFrom = ChangeLogFrom;
     }
 
     public static int Main(string[] args)
@@ -43,9 +49,15 @@ public class Forge : Base<ForgeParams, DiscordNotifications>
             Description = "Root Directory (default: Current Directory)"
         };
 
+        Option<string> changelogFromOption = new("--changelog-from")
+        {
+            Description = "Changelog source: tag name (e.g., 'v0.1.0'), 'start' for entire history, or empty for last tag"
+        };
+
         RootCommand rootCommand = new("");
         rootCommand.Options.Add(buildTypeOption);
         rootCommand.Options.Add(rootOption);
+        rootCommand.Options.Add(changelogFromOption);
 
         var parseResult = rootCommand.Parse(args);
 
@@ -56,8 +68,23 @@ public class Forge : Base<ForgeParams, DiscordNotifications>
             ? parsedRoot
             : Environment.CurrentDirectory;
 
+        // Set environment variables for NUKE parameter binding
+        // This allows the [Parameter] attributes to pick up the values
+        var changelogFrom = parseResult.GetValue(changelogFromOption);
+
+        if (changelogFrom != null)
+        {
+            Environment.SetEnvironmentVariable("ChangeLogFrom", changelogFrom);
+            Console.WriteLine($"🔧 Set ChangeLogFrom = {changelogFrom}");
+        }
+
         Console.WriteLine("╬════════════════════");
         Console.WriteLine($"║ 🔧 Forge: {buildType}");
+        
+        if (changelogFrom != null)
+        {
+            Console.WriteLine($"║ 📝 Changelog from: {changelogFrom}");
+        }
         Console.WriteLine("╬════════════════════");
 
         switch (buildType.ToLowerInvariant())
@@ -82,23 +109,63 @@ public class Forge : Base<ForgeParams, DiscordNotifications>
         .Executes(() =>
         {
             var changelogPath = "CHANGELOG.md";
-            var changeLog = Git.ChangeLog;
+            
+            // Determine the starting point for changelog generation
+            string fromTag = null;
+            string changelogSource = Parameters.ChangeLogFrom?.Trim() ?? "";
+            
+            if (changelogSource.Equals("start", StringComparison.OrdinalIgnoreCase))
+            {
+                // Generate from entire history
+                fromTag = "";
+                Log.Information("🔄 Generating changelog from entire git history...");
+            }
+            else if (!string.IsNullOrEmpty(changelogSource))
+            {
+                // Generate from specific tag
+                fromTag = changelogSource;
+                Log.Information($"🔄 Generating changelog from tag: {fromTag}...");
+            }
+            else
+            {
+                // Default: from last tag (null means use default behavior)
+                Log.Information("🔄 Generating changelog from last tag...");
+            }
+            
+            var changeLog = Git.GenerateChangeLog(fromTag);
 
             if (string.IsNullOrEmpty(changeLog))
             {
-                Log.Information("No New Commits Since Last Tag...");
-
+                Log.Information("ℹ️ No commits found for changelog generation.");
                 return;
             }
 
             var today = DateTime.UtcNow.ToString("yyyy.MM.dd");
             var changelogBuilder = new StringBuilder();
-            changelogBuilder.AppendLine($"## {today}\n");
+            
+            // If generating from start or specific tag, don't add today's header since GenerateChangeLog already adds one
+            if (!changelogSource.Equals("start", StringComparison.OrdinalIgnoreCase) && string.IsNullOrEmpty(changelogSource))
+            {
+                changelogBuilder.AppendLine($"## {today}\n");
+                changelogBuilder.AppendLine(changeLog);
+            }
+            else
+            {
+                changelogBuilder.AppendLine(changeLog);
+            }
 
-            // Append the rest of the old changelog (if any)
-            var oldChangelog = File.Exists(changelogPath) ? File.ReadAllText(changelogPath) : "";
-            changelogBuilder.AppendLine(oldChangelog);
+            // Append the rest of the old changelog (if any and not generating from start)
+            if (!changelogSource.Equals("start", StringComparison.OrdinalIgnoreCase))
+            {
+                var oldChangelog = File.Exists(changelogPath) ? File.ReadAllText(changelogPath) : "";
+                if (!string.IsNullOrEmpty(oldChangelog))
+                {
+                    changelogBuilder.AppendLine(oldChangelog);
+                }
+            }
 
             File.WriteAllText(changelogPath, changelogBuilder.ToString());
+            
+            Log.Information($"✅ Changelog generated and saved to {changelogPath}");
         });
 }

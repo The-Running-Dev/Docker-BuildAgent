@@ -25,11 +25,8 @@
       "type": "string",
       "enum": [
         "Build",
-        "CreateRelease",
-        "Image",
-        "Push",
-        "Setup",
-        "Tag"
+        "BuildDocumentation",
+        "Setup"
       ]
     },
     "Verbosity": {
@@ -103,13 +100,13 @@
   "allOf": [
     {
       "properties": {
-        "CreateGitHubRelease": {
-          "type": "boolean",
-          "description": "Should a GitHub release be created"
-        },
-        "DockerFile": {
+        "AppDir": {
           "type": "string",
-          "description": "Dockerfile to use for building the image"
+          "description": "Directory name for the documentation app"
+        },
+        "ArtifactsDir": {
+          "type": "string",
+          "description": "Directory where build artifacts are stored"
         },
         "DryRun": {
           "type": "boolean",
@@ -123,9 +120,17 @@
           "type": "boolean",
           "description": "Force Push/Tag for Local Builds"
         },
-        "ImageTag": {
+        "IsProduction": {
+          "type": "boolean",
+          "description": "Build for production deployment"
+        },
+        "NodeTemplateDirPath": {
           "type": "string",
-          "description": "Tag for the Docker Image"
+          "description": "Local path where template will be cloned"
+        },
+        "NodeTemplateRepositoryUrl": {
+          "type": "string",
+          "description": "Git repository URL for the template"
         },
         "Notifications": {
           "type": "boolean",
@@ -136,22 +141,13 @@
           "description": "WebHook URL for Notifications",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
         },
-        "RegistryToken": {
+        "PackageManager": {
           "type": "string",
-          "description": "Registry Registry token for pushing images",
-          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
+          "description": "Package manager to use (npm, pnpm, yarn)"
         },
-        "RegistryUrl": {
-          "type": "string",
-          "description": "Docker Registry for pushing images"
-        },
-        "RegistryUser": {
-          "type": "string",
-          "description": "Registry Registry user for pushing images"
-        },
-        "TemplatesDir": {
-          "type": "string",
-          "description": "Templates Directory for Dockerfile templates"
+        "SkipInstall": {
+          "type": "boolean",
+          "description": "Skip package manager install step"
         }
       }
     },

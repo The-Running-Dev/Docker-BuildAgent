@@ -1,16 +1,11 @@
 ﻿using System;
-using System.IO;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-
-using Nuke.Common.ChangeLog;
-
-using Parameters;
+using System.Text.RegularExpressions;
 
 using Serilog;
+using Octokit;
+
+using Parameters;
 
 namespace Utilities;
 
@@ -20,14 +15,16 @@ namespace Utilities;
 public static class GitHub
 {
     /// <summary>
-    /// Creates a new release on GitHub for the specified Docker image version.
+    /// Creates or updates a GitHub release for a specified repository using the provided Docker parameters.
     /// </summary>
-    /// <remarks>This method reads the changelog from a local file named "CHANGELOG.md" if it exists, and
-    /// includes it in the release notes. It also lists the Docker image tags as part of the release assets. The release
-    /// is created as a non-draft and non-prerelease.</remarks>
-    /// <param name="p">The parameters required for creating the release, including repository URL, version, tags, and authentication
-    /// token.</param>
+    /// <remarks>This method constructs the release notes by combining Docker image asset links with the
+    /// changelog. It then attempts to find an existing release by the specified tag. If a release is found, it updates
+    /// the release; otherwise, it creates a new release. The method requires a valid GitHub repository URL and
+    /// appropriate credentials.</remarks>
+    /// <param name="p">The <see cref="DockerParams"/> object containing the necessary parameters for the release, including tags,
+    /// repository URL, and release tag.</param>
     /// <returns></returns>
+    /// <exception cref="ArgumentException">Thrown if <paramref name="p"/>.RepositoryUrl is not a valid GitHub URL.</exception>
     public static async Task CreateRelease(DockerParams p)
     {
         var releaseNotes = Git.ChangeLog ?? string.Empty;
@@ -43,91 +40,62 @@ public static class GitHub
 
         var body = assetsText + releaseNotes;
 
-        var repo = Regex.Replace(p.RepositoryUrl, @"(https?:\/\/)?(www\.)?(ghcr\.io|github\.com)\/", "");
-        var apiBase = $"https://api.github.com/repos/{repo}";
-        var tagName = p.Version.Version;
+        // Parse owner and repo from RepositoryUrl
+        var match = Regex.Match(p.RepositoryUrl, @"github\.com[:/](?<owner>[^/]+)/(?<repo>[^/]+)");
+        if (!match.Success)
+        {
+            throw new ArgumentException("RepositoryUrl must be a valid GitHub URL.");
+        }
 
-        using var client = new HttpClient();
-        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NukeBuild", "1.0"));
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("token", p.RegistryToken);
+        var owner = match.Groups["owner"].Value;
+        var repo = match.Groups["repo"].Value.Replace(".git", "");
 
-        // 1. Try to get the release by tag
-        var getReleaseUrl = $"{apiBase}/releases/tags/{tagName}";
-        HttpResponseMessage getResponse = null;
+        var client = new GitHubClient(new Octokit.ProductHeaderValue("NukeBuild"))
+        {
+            Credentials = new Credentials(p.RegistryToken)
+        };
+
+        // Try to get the release by tag
+        Release release = null;
         try
         {
-            getResponse = await client.GetAsync(getReleaseUrl);
+            release = await client.Repository.Release.Get(owner, repo, p.ReleaseTag);
         }
-        catch (Exception ex)
+        catch (NotFoundException)
         {
-            Log.Error(ex, "❌ Error while checking for existing GitHub release.");
+            // Release does not exist
         }
 
-        if (getResponse is { IsSuccessStatusCode: true })
+        if (release != null)
         {
-            // Release exists, update it
-            var release = await getResponse.Content.ReadFromJsonAsync<dynamic>();
-            var releaseId = release.id;
-
-            var updatePayload = new
+            // Update existing release
+            var update = new ReleaseUpdate
             {
-                tag_name = tagName,
-                name = tagName,
-                body = body,
-                draft = false,
-                prerelease = false
+                TagName = p.ReleaseTag,
+                Name = p.ReleaseTag,
+                Body = body,
+                Draft = false,
+                Prerelease = false
             };
 
-            var updateUrl = $"{apiBase}/releases/{releaseId}";
-            var updateResponse = await client.PatchAsJsonAsync(updateUrl, updatePayload);
-
-            if (updateResponse.IsSuccessStatusCode)
-            {
-                Log.Information($"🚀 GitHub Release {tagName} Updated...");
-            }
-            else
-            {
-                var error = await updateResponse.Content.ReadAsStringAsync();
-
-                Log.Error($"❌ Failed to Update GitHub Release: {updateResponse.StatusCode}\n{error}");
-            }
+            await client.Repository.Release.Edit(owner, repo, release.Id, update);
+            
+            Log.Information($"🚀 GitHub Release {p.ReleaseTag} Updated...");
         }
         else
         {
-            // Release does not exist, create it
-            var createPayload = new
+            // Create new release
+            var newRelease = new NewRelease(p.ReleaseTag)
             {
-                tag_name = tagName,
-                name = tagName,
-                body = body,
-                draft = false,
-                prerelease = false
+                Name = p.ReleaseTag,
+                Body = body,
+                Draft = false,
+                Prerelease = false
             };
 
-            var createUrl = $"{apiBase}/releases";
-            var createResponse = await client.PostAsJsonAsync(createUrl, createPayload);
-
-            if (createResponse.IsSuccessStatusCode)
-            {
-                Log.Information($"🚀 GitHub Release {tagName} Created...");
-            }
-            else
-            {
-                var error = await createResponse.Content.ReadAsStringAsync();
-
-                Log.Error($"❌ Failed to Create GitHub Release: {createResponse.StatusCode}\n{error}");
-            }
+            await client.Repository.Release.Create(owner, repo, newRelease);
+            
+            Log.Information($"🚀 GitHub Release {p.ReleaseTag} Created...");
         }
-    }
-}
-
-// Helper extension for PATCH
-public static class HttpClientExtensions
-{
-    public static async Task<HttpResponseMessage> PatchAsJsonAsync<T>(this HttpClient client, string requestUri, T value)
-    {
-        var content = JsonContent.Create(value);
-        var request = new HttpRequestMessage(new HttpMethod("PATCH"), requestUri) { Content = content };
-        return await client.SendAsync(request);
     }
 }

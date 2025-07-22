@@ -41,7 +41,7 @@ public class Docker : Base<DockerParams, DiscordNotifications>
 
     [Parameter("Should a GitHub release be created")]
     public readonly bool CreateGitHubRelease;
-
+    
     /// <summary>
     /// Configures the current instance by setting up necessary parameters and paths.
     /// </summary>
@@ -64,6 +64,8 @@ public class Docker : Base<DockerParams, DiscordNotifications>
             $"{registryUrl}{Parameters.ImageTag}:latest",
             $"{registryUrl}{Parameters.ImageTag}:{Parameters.Version}"
         ];
+
+        Parameters.ReleaseTag = $"v{Parameters.Version}"; // Add "v" prefix to match Git tag format
     }
 
     /// <summary>
@@ -128,7 +130,7 @@ public class Docker : Base<DockerParams, DiscordNotifications>
         .OnlyWhenDynamic(() => ForcePush || (!IsLocalBuild && !DryRun))
         .Executes(() =>
         {
-            Git.CreateTag($"v{Parameters.Version}");
+            Git.CreateTag(Parameters.ReleaseTag);
         });
 
     public Target Image => _ => _
