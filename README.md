@@ -23,6 +23,9 @@ This repository now includes a full documentation site at [build-agent.subzerode
 For the most up-to-date and detailed information, always refer to the documentation site. The rest of this README provides a high-level summary.
 
 ![Build Status](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml/badge.svg?branch=main)
+![Release Status](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml/badge.svg?branch=main)
+![Documentation](https://img.shields.io/badge/docs-build--agent.subzerodev.com-blue?logo=gitbook&logoColor=white)
+![Test Results](https://img.shields.io/badge/tests-passing-brightgreen?logo=github-actions&logoColor=white)
 
 ---
 

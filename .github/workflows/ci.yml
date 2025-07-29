@@ -87,54 +87,9 @@ jobs:
       - name: Setup Build Environment
         uses: ./.github/actions/common
 
-      # Run all tests with coverage collection
+       # Execute tests steps
       - name: Run Tests & Generate Coverage
-        run: |
-          dotnet test forge/Common.Tests/Common.Tests.csproj \
-            --configuration Release \
-            --collect:"XPlat Code Coverage" \
-            --results-directory ./test-results \
-            --logger trx \
-            --logger "console;verbosity=detailed" \
-            --verbosity normal
-        shell: bash
-
-      # Publish test results inline in GitHub
-      - name: Publish Test Results
-        uses: dorny/test-reporter@v1
-        if: always()
-        with:
-          name: 'Test Results'
-          path: './test-results/**/*.trx'
-          reporter: 'dotnet-trx'
-          fail-on-error: true
-
-      # Generate and display coverage report inline
-      - name: Generate Coverage Report
-        uses: danielpalme/ReportGenerator-GitHub-Action@5.3.10
-        with:
-          reports: './test-results/**/coverage.cobertura.xml'
-          targetdir: './coverage-report'
-          reporttypes: 'HtmlInline;Cobertura;MarkdownSummaryGithub'
-          sourcedirs: './forge'
-          title: 'Code Coverage Report'
-
-      # Add coverage summary to PR and workflow summary
-      - name: Add Coverage PR Comment
-        uses: marocchino/sticky-pull-request-comment@v2
-        if: github.event_name == 'pull_request'
-        with:
-          recreate: true
-          path: './coverage-report/SummaryGithub.md'
-
-      # Upload detailed coverage report as artifact (optional)
-      - name: Upload Detailed Coverage Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-html-report
-          path: './coverage-report'
-          retention-days: 30
-        if: always()
+        uses: ./.github/actions/tests
 
       # Run the Docker build in dry-run mode for validation
       - name: Validate Build
