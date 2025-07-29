@@ -71,8 +71,6 @@ jobs:
       # Build Docker image and create GitHub release with artifacts
       - name: 🚀 Build and Publish Release
         run: nuke --type docker --create-github-release true
-        shell: pwsh
-        working-directory: ${{ github.workspace }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}

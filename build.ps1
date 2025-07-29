@@ -78,32 +78,30 @@ Param(
 $artifactsDir = Join-Path $PSScriptRoot "artifacts"
 $solutionFile = Join-Path $PSScriptRoot "forge\Forge.sln"
 
-Write-Host "🔨 Docker Build Agent - Local Build Script" -ForegroundColor Cyan
+Write-Host "Docker Build Agent - Local Build Script" -ForegroundColor Cyan
 Write-Host "Build Type: $type" -ForegroundColor Green
 Write-Host "Production Mode: $($isProd.IsPresent)" -ForegroundColor Green
 Write-Host "Artifacts Directory: $artifactsDir" -ForegroundColor Yellow
 
 # Import the helper module for common build operations
-Write-Host "📦 Loading build helpers..." -ForegroundColor Blue
+Write-Host "Loading build helpers..." -ForegroundColor Blue
 Import-Module (Join-Path $PSScriptRoot 'scripts/nuke/nuke-helpers.psm1') -Force
 
 # Initialize build environment (sets up paths, validates prerequisites)
-Write-Host "🚀 Initializing build environment..." -ForegroundColor Blue
+Write-Host "Initializing build environment..." -ForegroundColor Blue
 Initialize-Build
 
 # Execute dotnet build to create the artifacts
-Write-Host "🔧 Compiling Forge solution..." -ForegroundColor Blue
+Write-Host "Compiling Forge solution..." -ForegroundColor Blue
 Invoke-DotNetBuild `
     -ProjectOrSolution $solutionFile `
     -OutputDirectory $artifactsDir `
     -IsProduction:$isProd
 
 # Execute the build workflow for the specified type
-Write-Host "⚡ Executing $type build workflow..." -ForegroundColor Blue
+Write-Host "Executing $type build workflow..." -ForegroundColor Blue
 Invoke-Forge `
     -BuildTypes $type `
     -Arguments $buildArguments `
     -WorkingDir . `
     -ArtifactsDir $artifactsDir
-
-Write-Host "✅ Build completed successfully!" -ForegroundColor Green
