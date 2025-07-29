@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using Entities;
 
 namespace Parameters;
 
@@ -23,6 +24,6 @@ public class NotificationParams
     public string Branch { get; set; } = string.Empty;
     
     public string? Version { get; set; }
-    
-    public (string RepoUrl, string BranchUrl, string CommitUrl) GitUrls { get; set; }
+
+    public GitUrls? Urls { get; set; }
 }

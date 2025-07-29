@@ -56,6 +56,11 @@ public class ForgeParams
     public bool DryRun { get; set; }
 
     /// <summary>
+    /// Gets or sets the configuration settings for the change log.
+    /// </summary>
+    public ChangeLogConfig ChangeLogConfig { get; set; }
+
+    /// <summary>
     /// Gets or sets the verbosity level for logging output.
     /// </summary>
     public Verbosity Verbosity { get; set; }

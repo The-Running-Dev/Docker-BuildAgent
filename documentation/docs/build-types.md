@@ -71,31 +71,140 @@ If no `.build.scripts` file exists, defaults to:
 
 ## 🔄 node-in-docker-build
 
-**Purpose**: Combines Node.js build with Docker image creation in a single command.
+**Purpose**: Combines Node.js build with Docker image creation in a comprehensive two-phase build pipeline.
 
 **What it does**:
 
-- Executes `node-build` first to build the Node.js application
-- Then executes `docker-build` to create a Docker image
-- Perfect for Node.js applications that need to be containerized
-- Maintains the same parameters and options as both individual commands
+- **Phase 1**: Node.js Application Build
+  - Auto-detects package manager (npm, pnpm, yarn)
+  - Executes build scripts from `.build.scripts` or conventions
+  - Generates production-ready artifacts
+  - Copies built files to artifacts directory
+
+- **Phase 2**: Docker Image Creation
+  - Builds Docker image using specified Dockerfile
+  - Tags image with version information
+  - Optionally pushes to container registry
+  - Creates Git tags and GitHub releases
+
+**Build Target Execution Order**:
+
+1. `Setup` - Initialize parameters and environment
+2. `Clean` - Remove previous artifacts
+3. `GenerateEnvironment` - Set up build environment
+4. `BuildApplication` - Execute Node.js build process
+5. `CopyToArtifacts` - Move built files to artifacts directory
+6. `BuildDockerImage` - Create Docker container image
+7. `CreateGitTag` - Tag the release in Git
+8. `PushToRegistry` - Push image to container registry
+9. `PublishToGitHub` - Create GitHub release
+10. `Build` - Final completion target
 
 **Usage**:
 
 ```bash
+# Basic usage
 docker run \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
   node-in-docker-build
+
+# With custom parameters
+docker run \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v ./:/workspace \
+  -it ghcr.io/the-running-dev/build-agent:latest \
+  node-in-docker-build \
+  --artifacts-dir ./dist \
+  --image-tag my-app:latest \
+  --registry-url ghcr.io/myorg \
+  --create-github-release true
 ```
+
+**Key Parameters**:
+
+### Node.js Build Parameters
+
+- `--artifacts-dir` - Directory for build artifacts (default: 'artifacts')
+
+### Docker Build Parameters
+
+- `--templates-dir` - Directory containing Dockerfile templates (default: '/nuke/templates')
+- `--docker-file` - Dockerfile to use for building (default: 'Dockerfile')
+- `--image-tag` - Tag for the Docker image (default: 'container-app')
+- `--registry-url` - Container registry URL for pushing images
+- `--registry-user` - Registry username for authentication
+- `--registry-token` - Registry token/password for authentication
+
+### Release & Git Parameters
+
+- `--create-github-release` - Create GitHub release (default: false)
+- `--release-tag` - Tag for the release (default: 'v0.0.0')
+- `--force-push` - Force push operations
+- `--dry-run` - Simulate build without pushing
+
+### Common Parameters
+
+- `--notifications` - Enable Discord notifications
+- `--notifications-web-hook-url` - Discord webhook URL
+- `--verbosity` - Logging verbosity level (Quiet, Minimal, Normal, Verbose)
+
+**Configuration Examples**:
+
+```bash
+# Production build with registry push
+node-in-docker-build \
+  --artifacts-dir ./build \
+  --image-tag myapp:v1.2.3 \
+  --registry-url ghcr.io/myorg \
+  --registry-user $GITHUB_ACTOR \
+  --registry-token $GITHUB_TOKEN \
+  --create-github-release true \
+  --release-tag v1.2.3
+
+# Development build (dry run)
+node-in-docker-build \
+  --image-tag myapp:dev \
+  --dry-run true \
+  --verbosity Verbose
+
+# Custom Dockerfile and artifacts location
+node-in-docker-build \
+  --docker-file Dockerfile.prod \
+  --artifacts-dir ./dist/app \
+  --templates-dir ./docker-templates \
+  --image-tag myapp:custom
+```
+
+**Project Structure Requirements**:
+
+```text
+your-project/
+├── package.json              # Node.js project configuration
+├── .build.scripts            # Optional: Custom build commands
+├── Dockerfile                # Docker image definition
+├── set-environment.ps1       # Optional: Environment setup
+└── artifacts/                # Default output directory
+    └── (built files)
+```
+
+**Environment Variables**:
+
+The build process respects these environment variables:
+
+- `GITHUB_TOKEN` - For GitHub release creation
+- `REGISTRY_USER` - Container registry username
+- `REGISTRY_TOKEN` - Container registry authentication
+- `DISCORD_WEBHOOK_URL` - For build notifications
 
 **Use Cases**:
 
-- Angular applications with Nginx
-- React applications with static serving
-- Node.js APIs with Express
-- Next.js applications
+- **Frontend Applications**: Angular, React, Vue.js with Nginx serving
+- **Node.js APIs**: Express, Fastify, NestJS applications
+- **Full-Stack Apps**: Next.js, Nuxt.js applications
+- **Static Sites**: Gatsby, Hugo with Node.js build pipeline
+- **Microservices**: Node.js services requiring containerization
 
 ---
 
@@ -183,7 +292,7 @@ All build commands share these common capabilities:
 |-------------|-------------------|----------|
 | Pure Docker projects | `docker-build` | Existing Dockerfile, containerizing artifacts |
 | Node.js apps (no container) | `node-build` | Build and test Node.js applications |
-| Node.js apps (with container) | `node-in-docker-build` | Full-stack apps, APIs, SPAs |
+| Node.js apps (with container) | `node-in-docker-build` | Complete CI/CD pipeline with registry push |
 | Documentation sites | `node-template-build` | Docusaurus, GitBook, static sites |
 
 ---

@@ -25,11 +25,8 @@
       "type": "string",
       "enum": [
         "Build",
-        "CreateRelease",
-        "Image",
-        "Push",
-        "Setup",
-        "Tag"
+        "ChangeLog",
+        "Setup"
       ]
     },
     "Verbosity": {
@@ -103,13 +100,8 @@
   "allOf": [
     {
       "properties": {
-        "CreateGitHubRelease": {
-          "type": "boolean",
-          "description": "Should a GitHub release be created"
-        },
-        "DockerFile": {
-          "type": "string",
-          "description": "Dockerfile to use for building the image"
+        "ChangeLogSource": {
+          "type": "string"
         },
         "DryRun": {
           "type": "boolean",
@@ -123,10 +115,6 @@
           "type": "boolean",
           "description": "Force Push/Tag for Local Builds"
         },
-        "ImageTag": {
-          "type": "string",
-          "description": "Tag for the Docker Image"
-        },
         "Notifications": {
           "type": "boolean",
           "description": "Enable Notifications for the Build"
@@ -135,23 +123,6 @@
           "type": "string",
           "description": "WebHook URL for Notifications",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
-        },
-        "RegistryToken": {
-          "type": "string",
-          "description": "Registry Registry token for pushing images",
-          "default": "Secrets must be entered via 'nuke :secrets [profile]'"
-        },
-        "RegistryUrl": {
-          "type": "string",
-          "description": "Docker Registry for pushing images"
-        },
-        "RegistryUser": {
-          "type": "string",
-          "description": "Registry Registry user for pushing images"
-        },
-        "TemplatesDir": {
-          "type": "string",
-          "description": "Templates Directory for Dockerfile templates"
         }
       }
     },

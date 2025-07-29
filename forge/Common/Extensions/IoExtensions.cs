@@ -28,7 +28,7 @@ public static class IoExtensions
         {
             var destFile = file.Replace(sourceDir, targetDir);
         
-            // ✅ Ensure the destination directory exists
+            // Ensure the destination directory exists
             var destDir = Path.GetDirectoryName(destFile);
             
             if (!Directory.Exists(destDir))

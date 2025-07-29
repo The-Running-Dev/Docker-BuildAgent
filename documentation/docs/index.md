@@ -33,4 +33,13 @@ Ready to get started? Check out our [Fast Track Guide](usage) for quick examples
 
 For advanced configuration, see [Customization Options](customization).
 
+## 🏗️ Architecture & Development
+
+For developers and advanced users, explore our architecture guides:
+
+- **[Multi-Build Architecture](architecture/multi-build-architecture)** - Understanding the modular build system
+- **[Dependency Injection](architecture/dependency-injection)** - Service architecture and testing
+- **[Development Guide](architecture/development-guide)** - Complete setup and contribution guide
+- **[Configuration & Compatibility](architecture/configuration-compatibility)** - Environment setup and platform compatibility
+
 <!-- 📦 ⚡ 🛠️ -->

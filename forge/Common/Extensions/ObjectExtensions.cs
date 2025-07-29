@@ -181,11 +181,15 @@ public static class ObjectExtensions
             // Simple types
             if (value is null || value is string || value.GetType().IsPrimitive)
             {
-                sb.AppendLine($"{Indent(indent)}🔧 {displayName}: {value}");
+                sb.AppendLine($"{Indent(indent)}[CONFIG] {displayName}: {value}");
+            }
+            else if (value.GetType().IsEnum)
+            {
+                sb.AppendLine($"{Indent(indent)}[CONFIG] {displayName}: {value}");
             }
             else if (value is IEnumerable enumerable and not string)
             {
-                sb.AppendLine($"{Indent(indent)}🔧 {displayName}: [");
+                sb.AppendLine($"{Indent(indent)}[CONFIG] {displayName}: [");
 
                 foreach (var item in enumerable)
                 {
@@ -208,7 +212,7 @@ public static class ObjectExtensions
             // Nested object
             else
             {
-                sb.AppendLine($"{Indent(indent)}🔧 {displayName}:");
+                sb.AppendLine($"{Indent(indent)}[CONFIG] {displayName}:");
                 sb.Append(value.ToDisplayString(indent + 2));
             }
         }

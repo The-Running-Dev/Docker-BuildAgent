@@ -6,7 +6,7 @@ set -eo pipefail
 SCRIPT_DIR=$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)
 
 ARTIFACTS_DIR="${SCRIPT_DIR}/artifacts"
-BUILD_PROJECT_FILE="$SCRIPT_DIR/forge/Forge.csproj"
+BUILD_PROJECT_FILE="$SCRIPT_DIR/forge/Forge.sln"
 TEMP_DIRECTORY="$SCRIPT_DIR//.nuke/temp"
 
 DOTNET_GLOBAL_FILE="$SCRIPT_DIR//global.json"
@@ -58,4 +58,4 @@ if [[ ! -z ${NUKE_ENTERPRISE_TOKEN+x} && "$NUKE_ENTERPRISE_TOKEN" != "" ]]; then
 fi
 
 "$DOTNET_EXE" build "$BUILD_PROJECT_FILE" -o $ARTIFACTS_DIR -c Release /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet
-"$DOTNET_EXE" "$ARTIFACTS_DIR/Forge.dll" --no-logo --type docker -- "$@"
+"$DOTNET_EXE" "$ARTIFACTS_DIR/Docker.dll" --no-logo -- "$@"

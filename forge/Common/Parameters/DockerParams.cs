@@ -3,11 +3,11 @@
 namespace Parameters;
 
 /// <summary>
-/// Represents the parameters required for configuring Docker operations, such as building and pushing Docker images.
+/// Represents the parameters required for building and managing Docker images.
 /// </summary>
-/// <remarks>This class provides properties to specify paths, tags, and credentials necessary for Docker image
-/// management. It includes options for setting the Dockerfile path, image tags, and registry credentials, as well as a
-/// flag for creating a GitHub release.</remarks>
+/// <remarks>This class provides properties to specify various settings related to Docker image creation, such as
+/// the Dockerfile path, image tags, and registry credentials. It also includes options for creating a GitHub release
+/// associated with the Docker image.</remarks>
 public class DockerParams : ForgeParams
 {
     /// <summary>
@@ -49,4 +49,9 @@ public class DockerParams : ForgeParams
     /// Gets or sets a value indicating whether a GitHub release should be created.
     /// </summary>
     public bool CreateGitHubRelease { get; set; } = false;
+
+    /// <summary>
+    /// Gets or sets the release tag for the current version.
+    /// </summary>
+    public string ReleaseTag { get; set; } = "v0.0.0";
 }

@@ -1,15 +1,41 @@
 
-# CI: Main continuous integration workflow for Docker images and Nuke builds. Ignores changes in the 'documentation' directory.
+# Continuous Integration Workflow
 #
-# Triggers:
-#   - On workflow_dispatch (manual)
-#   - On pull requests
-#   - On any branch push except main
+# This workflow provides automated testing and validation for the Docker Build Agent project.
+# It runs on pull requests and feature branch pushes to ensure code quality and build integrity
+# before changes are merged to the main branch.
 #
-# Steps:
-#   1. Checks out the repository
-#   2. Runs shared setup steps from .github/actions/common
-#   3. Runs the Nuke build in docker dry-run mode
+# Workflow Configuration:
+#   - Name: CI
+#   - Triggers: 
+#     * Manual dispatch (workflow_dispatch)
+#     * Pull requests to any branch
+#     * Pushes to any branch except main
+#   - Ignores: Changes only to documentation/ and .github/ directories
+#   - Permissions: packages:write, contents:write for registry and release operations
+#
+# Build Process:
+#   1. Skip duplicate actions to optimize CI resources
+#   2. Checkout repository with full git history (fetch-depth: 0)
+#   3. Execute shared setup actions (.github/actions/common)
+#   4. Run Docker build in dry-run mode for validation
+#
+# Environment Variables:
+#   - GITHUB_TOKEN: GitHub authentication for API access
+#   - RegistryToken: Container registry authentication token  
+#   - NotificationsWebHookUrl: Discord webhook for build notifications
+#
+# Purpose:
+#   - Validate builds without publishing artifacts
+#   - Test Docker image creation and build processes
+#   - Ensure changes don't break existing functionality
+#   - Provide fast feedback on pull requests
+#
+# Notes:
+#   - Uses dry-run mode to prevent accidental deployments
+#   - Runs only for non-main branches and pull requests
+#   - Skips execution if only documentation files changed
+#   - Includes duplicate action prevention for resource optimization
 #
 name: CI
 
@@ -33,22 +59,36 @@ permissions:
 
 jobs:
   Build:
+    name: Build & Validate
     runs-on: ubuntu-latest
 
-    # Run on PR events and workflow_dispatch always, run on push events for non-main branches
+    # Conditional execution: run on PR events and workflow_dispatch always, 
+    # run on push events for non-main branches only
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
 
     steps:
+      # Prevent duplicate workflow runs for the same content
+      - name: Skip Duplicate Actions
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          cancel_others: true
+          concurrent_skipping: same_content_newer
+          skip_after_successful_duplicate: true
+
+      # Checkout the repository with full git history for GitVersion
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/common
+      # Execute shared setup steps (Docker, .NET, GitVersion, etc.)
+      - name: Setup Build Environment
+        uses: ./.github/actions/common
 
-      - name: Build Image
+      # Run the Docker build in dry-run mode for validation
+      - name: Validate Build Process
+        run: nuke --type docker --dry-run true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
-        run: nuke --type docker --dry-run true

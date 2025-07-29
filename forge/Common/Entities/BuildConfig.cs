@@ -38,7 +38,7 @@ public class BuildConfig(AbsolutePath rootDirectory)
 
     public string AppEnvMapFilePath => Path.Combine(DirectoryPath, AppEnvMapFile);
 
-    // GitHub tokens
+    // GitHubService tokens
     // base URLs
     // rootDirectory\\
     public string[] StripForDisplay =>

@@ -11,7 +11,7 @@ This page describes the main build targets available in the Forge system for Doc
 ## 🛠️ Forge (Generic) Targets
 
 - 🏗️ **Build**: Runs the main build process for the selected project type (Docker, Node, etc.), depending on your command-line arguments.
-- 📝 **ChangeLog**: Generates or updates the project changelog based on recent commits.
+- 📝 **GenerateChangeLog**: Generates or updates the project changelog based on recent commits.
 
 ### 🗺️ Target Execution Order
 
@@ -19,7 +19,7 @@ This diagram shows the order in which the Forge (Generic) targets are executed:
 
 ```mermaid
 flowchart TD
-    Setup --> ChangeLog --> Build
+    Setup --> GenerateChangeLog --> Build
 ```
 
 ---
@@ -27,10 +27,10 @@ flowchart TD
 ## 🐳 Docker Targets
 
 - 🏗️ **Build**: Builds the Docker image, orchestrating all Docker-related steps.
-- 🚀 **CreateRelease**: Creates a GitHub release for the built Docker image (if enabled and configured).
-- 📤 **Push**: Pushes the built Docker image(s) to the configured container registry.
-- 🏷️ **Tag**: Tags the Docker image with the appropriate version and latest tags.
-- 🖼️ **Image**: Runs the actual Docker build command to produce the image.
+- 🚀 **PublishToGitHub**: Creates a GitHub release for the built Docker image (if enabled and configured).
+- 📤 **PushToRegistry**: Pushes the built Docker image(s) to the configured container registry.
+- 🏷️ **CreateGitTag**: Creates a Git tag for the release version (not Docker image tags).
+- 🖼️ **BuildDockerImage**: Runs the actual Docker build command to produce the image.
 
 ### 🗺️ Target Execution Order
 
@@ -38,7 +38,7 @@ This diagram shows the order in which the Docker build targets are executed:
 
 ```mermaid
 flowchart TD
-    Setup --> Image --> Tag --> Push --> CreateRelease --> Build
+    Setup --> BuildDockerImage --> CreateGitTag --> PushToRegistry --> PublishToGitHub --> Build
 ```
 
 ---
@@ -58,4 +58,29 @@ This diagram shows the order in which the Node.js build targets are executed:
 ```mermaid
 flowchart TD
     Setup --> Clean --> GenerateEnvironment --> BuildApplication --> CopyToArtifacts --> Build
+```
+
+---
+
+## 🟩🐳 NodeInDocker Targets
+
+The NodeInDocker build combines Node.js application building with Docker image creation:
+
+- 🏗️ **Build**: Executes the complete pipeline from Node.js build to Docker image push and GitHub release.
+- 🚀 **PublishToGitHub**: Creates a GitHub release for the built Docker image (if enabled and configured).
+- 📤 **PushToRegistry**: Pushes the built Docker image(s) to the configured container registry.
+- 🏷️ **CreateGitTag**: Creates a Git tag for the release version.
+- 🖼️ **BuildDockerImage**: Builds the Docker image from the Node.js artifacts.
+- 📦 **CopyToArtifacts**: Copies the built Node.js application to the artifacts directory.
+- 🛠️ **BuildApplication**: Executes the Node.js build process.
+- 🌱 **GenerateEnvironment**: Generates the environment file from your mapping configuration.
+- 🧹 **Clean**: Cleans the artifacts directory and prepares the workspace for a fresh build.
+
+### 🗺️ Target Execution Order
+
+This diagram shows the order in which the NodeInDocker build targets are executed:
+
+```mermaid
+flowchart TD
+    Setup --> Clean --> GenerateEnvironment --> BuildApplication --> CopyToArtifacts --> BuildDockerImage --> CreateGitTag --> PushToRegistry --> PublishToGitHub --> Build
 ```
