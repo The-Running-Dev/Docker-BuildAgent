@@ -1,7 +1,5 @@
-using System;
-using System.IO;
-
 using Nuke.Common;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
 using Services;
@@ -132,7 +130,7 @@ public class Docker : Base<DockerParams, DiscordNotifications>
             }
             catch (Exception ex)
             {
-                Logger.ErrorStatus(ex, "Failed to Create GitHub Release");
+                Logger.LogError(ex, "Failed to Create GitHub Release");
                 
                 Assert.Fail($"Failed to Create GitHub Release: {ex.Message}");
             }
@@ -146,7 +144,7 @@ public class Docker : Base<DockerParams, DiscordNotifications>
             }
             catch (Exception ex)
             {
-                Logger.ErrorStatus(ex, "Failed to Create Git Tag");
+                Logger.LogError(ex, "Failed to Create Git Tag");
 
                 Assert.Fail($"Failed to Create Git Tag: {ex.Message}");
             }

@@ -12,30 +12,43 @@
 #     * Pull requests to any branch
 #     * Pushes to any branch except main
 #   - Ignores: Changes only to documentation/ and .github/ directories
-#   - Permissions: packages:write, contents:write for registry and release operations
+#   - Permissions: packages:write, contents:write, checks:write, pull-requests:write
 #
 # Build Process:
 #   1. Skip duplicate actions to optimize CI resources
 #   2. Checkout repository with full git history (fetch-depth: 0)
 #   3. Execute shared setup actions (.github/actions/common)
-#   4. Run Docker build in dry-run mode for validation
+#   4. Run all tests with coverage collection and inline reporting
+#   5. Generate and publish coverage reports to PRs and workflow summary
+#   6. Run Docker build in dry-run mode for validation
+#
+# Testing & Coverage:
+#   - Executes all test projects using dotnet test with XPlat Code Coverage
+#   - Generates TRX test result files for inline display
+#   - Creates HTML and Cobertura coverage reports
+#   - Publishes test results as GitHub check runs
+#   - Posts coverage summaries as PR comments
+#   - Uploads detailed coverage reports as workflow artifacts
 #
 # Environment Variables:
-#   - GITHUB_TOKEN: GitHub authentication for API access
+#   - GITHUB_TOKEN: GitHub authentication for API access and check runs
 #   - RegistryToken: Container registry authentication token  
 #   - NotificationsWebHookUrl: Discord webhook for build notifications
 #
 # Purpose:
 #   - Validate builds without publishing artifacts
+#   - Run comprehensive test suites with coverage analysis
 #   - Test Docker image creation and build processes
 #   - Ensure changes don't break existing functionality
-#   - Provide fast feedback on pull requests
+#   - Provide fast feedback on pull requests with inline results
 #
 # Notes:
 #   - Uses dry-run mode to prevent accidental deployments
 #   - Runs only for non-main branches and pull requests
 #   - Skips execution if only documentation files changed
 #   - Includes duplicate action prevention for resource optimization
+#   - Test results appear directly in PR checks and workflow summary
+#   - Coverage reports are posted as sticky PR comments
 #
 name: CI
 
@@ -56,6 +69,8 @@ on:
 permissions:
   packages: write
   contents: write
+  checks: write
+  pull-requests: write
 
 jobs:
   Build:
@@ -85,8 +100,12 @@ jobs:
       - name: Setup Build Environment
         uses: ./.github/actions/common
 
+      # Execute tests steps
+      - name: Run Tests & Generate Coverage
+        uses: ./.github/actions/tests
+
       # Run the Docker build in dry-run mode for validation
-      - name: Validate Build Process
+      - name: Validate Build
         run: nuke --type docker --dry-run true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

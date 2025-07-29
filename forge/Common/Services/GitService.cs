@@ -323,7 +323,8 @@ public class GitService : IGitService
         }
         catch (Exception ex)
         {
-            _logger.ErrorStatus(ex, "Failed to Create Tag: {Tag}", tag);
+            _logger.LogError(ex, $"Failed to Create Tag: {tag}");
+
             throw;
         }
     }
@@ -419,7 +420,7 @@ public class GitService : IGitService
         }
         catch (Exception ex)
         {
-            _logger.ErrorStatus(ex, $"Failed to Set Git Safe Directory: {directoryPath}");
+            _logger.LogError(ex, $"Failed to Set Git Safe Directory: {directoryPath}");
 
             throw;
         }

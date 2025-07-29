@@ -16,9 +16,16 @@
 # Release Process:
 #   1. Checkout repository with full git history for proper versioning
 #   2. Execute shared setup actions (.github/actions/common)
-#   3. Build and publish Docker images to container registry
-#   4. Create GitHub release with auto-generated changelog
-#   5. Detect documentation changes and trigger docs rebuild if needed
+#   3. Run comprehensive test suite with coverage reporting
+#   4. Build and publish Docker images to container registry
+#   5. Create GitHub release with auto-generated changelog
+#   6. Detect documentation changes and trigger docs rebuild if needed
+#
+# Quality Assurance:
+#   - Executes all test projects before deployment
+#   - Generates coverage reports for release validation
+#   - Ensures only tested code reaches production
+#   - Validates build integrity before publishing artifacts
 #
 # Environment Variables:
 #   - GITHUB_TOKEN: GitHub authentication for releases and API access
@@ -30,12 +37,20 @@
 #   - GitHub release with semantic versioning and changelog
 #   - Git tags created automatically via GitVersion
 #   - Discord notifications for successful deployments
+#   - Test and coverage reports for release validation
+#
+# Documentation Integration:
+#   - Automatically detects documentation changes in commits
+#   - Triggers documentation site rebuild when docs are updated
+#   - Maintains documentation synchronization with releases
 #
 # Notes:
 #   - Only runs on main branch pushes or manual triggers
 #   - Creates production releases with --create-github-release flag
 #   - Automatically triggers documentation deployment if docs changed
 #   - Uses GitVersion for semantic versioning and changelog generation
+#   - Includes comprehensive testing before any deployment
+#   - Fails fast if tests don't pass, preventing broken releases
 #
 name: Release
 
@@ -67,6 +82,10 @@ jobs:
       # Execute shared setup steps (Docker, .NET, GitVersion, etc.)
       - name: Setup Build Environment
         uses: ./.github/actions/common
+
+      # Execute tests steps
+      - name: Run Tests & Generate Coverage
+        uses: ./.github/actions/tests
 
       # Build Docker image and create GitHub release with artifacts
       - name: Build and Publish Release
