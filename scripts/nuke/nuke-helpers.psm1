@@ -529,9 +529,9 @@ function Copy-Directory {
         }
 
         try {
-            Get-ChildItem -Path $sourceDir -Recurse | ForEach-Object {
+            Get-ChildItem -Path $SourceDir -Recurse | ForEach-Object {
                 if (-not $_.PSIsContainer) {
-                    $relativePath = $_.FullName.Substring($sourceDir.Length).TrimStart('\','/')
+                    $relativePath = $_.FullName.Substring($SourceDir.Length).TrimStart('\','/')
                     $fileName = $_.Name
                     
                     # Check if file should be ignored
@@ -555,9 +555,9 @@ function Copy-Directory {
                         New-Item -ItemType Directory -Path $destDir -Force | Out-Null
                     }
 
-                    if ($overwrite -or -not (Test-Path $destPath)) {
-                        Copy-Item -Path $_.FullName -Destination $destPath -Force:$overwrite
-                        
+                    if ($Overwrite -or -not (Test-Path $destPath)) {
+                        Copy-Item -Path $_.FullName -Destination $destPath -Force:$Overwrite
+
                         Write-Host "  [OK] Copied: $relativePath" -ForegroundColor Green
                     } else {
                         Write-Host "  [SKIP] Skipped (Exists): $relativePath" -ForegroundColor Gray

@@ -1,23 +1,17 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-
-using Entities;
-
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 
 using Octokit;
+using Microsoft.Extensions.Logging;
 
-using Parameters;
-
-using Serilog;
-
+using Entities;
 using Utilities;
+using Parameters;
 
 namespace Services;
 

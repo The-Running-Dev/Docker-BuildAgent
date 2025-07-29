@@ -1,23 +1,18 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-
-using Entities;
-
-using Extensions;
-
-using Microsoft.Extensions.Logging;
-//using Serilog;
+using System.Collections.Generic;
 
 using Nuke.Common.Tooling;
 using Nuke.Common.Tools.Git;
 using Nuke.Common.Utilities;
+using Microsoft.Extensions.Logging;
 
+using Entities;
 using Utilities;
+using Extensions;
 
 namespace Services;
 

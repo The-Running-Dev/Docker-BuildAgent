@@ -205,7 +205,7 @@ if (Test-Path $templateSetupFilePath) {
 #region Package Manager Setup and Installation
 # Change to the app directory for package manager operations
 Write-Host "[SETUP] Preparing Package Management..." -ForegroundColor Cyan
-Set-Location $AppDirPath
+Set-Location $appDirPath
 
 # Auto-detect package manager if not explicitly specified
 # Detection is based on lock files: pnpm-lock.yaml > yarn.lock > defaults to npm

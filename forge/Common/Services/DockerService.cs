@@ -2,13 +2,14 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
-using Extensions;
-using Nuke.Common.Tools.Docker;
-using Microsoft.Extensions.Logging;
+
 using Nuke.Common;
 using Nuke.Common.Tooling;
+using Nuke.Common.Tools.Docker;
+using Microsoft.Extensions.Logging;
+
+using Extensions;
 using Parameters;
-using Serilog;
 
 namespace Services;
 
