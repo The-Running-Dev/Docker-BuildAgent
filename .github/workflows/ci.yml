@@ -87,8 +87,9 @@ jobs:
 
       # Run the Docker build in dry-run mode for validation
       - name: 🔍 Validate Build Process
+        run: nuke --type docker --dry-run true
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
-        run: nuke --type docker --dry-run true

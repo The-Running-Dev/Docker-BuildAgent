@@ -70,11 +70,12 @@ jobs:
 
       # Build Docker image and create GitHub release with artifacts
       - name: 🚀 Build and Publish Release
+        run: nuke --type docker --create-github-release true
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
-        run: nuke --type docker --create-github-release true
 
       # Check if documentation files were modified in this commit
       - name: 📋 Check for Documentation Changes
