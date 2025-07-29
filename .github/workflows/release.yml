@@ -68,6 +68,10 @@ jobs:
       - name: Setup Build Environment
         uses: ./.github/actions/common
 
+      # Execute tests steps
+      - name: Run Tests & Generate Coverage
+        uses: ./.github/actions/tests
+
       # Build Docker image and create GitHub release with artifacts
       - name: Build and Publish Release
         run: nuke --type docker --create-github-release true

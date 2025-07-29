@@ -2,8 +2,6 @@ using System;
 
 using Microsoft.Extensions.Logging;
 
-using Nuke.Common;
-
 namespace Extensions;
 
 /// <summary>
@@ -24,18 +22,6 @@ public static class LoggerExtensions
     }
 
     /// <summary>
-    /// Logs an error message with the [ERROR] status indicator.
-    /// </summary>
-    /// <typeparam name="T">The type of the logger.</typeparam>
-    /// <param name="logger">The logger instance.</param>
-    /// <param name="message">The message to log.</param>
-    /// <param name="args">Optional message formatting arguments.</param>
-    public static void ErrorStatus<T>(this ILogger<T> logger, string message, params object[] args)
-    {
-        logger.LogError($"[ERROR] {message}", args);
-    }
-
-    /// <summary>
     /// Logs an error message with the [ERROR] status indicator and exception.
     /// </summary>
     /// <typeparam name="T">The type of the logger.</typeparam>
@@ -45,21 +31,9 @@ public static class LoggerExtensions
     /// <param name="args">Optional message formatting arguments.</param>
     public static void ErrorStatus<T>(this ILogger<T> logger, Exception exception, string message, params object[] args)
     {
-        logger.LogError(exception, $"[ERROR] {message}", args);
+        logger.LogError(exception, $"{message}", args);
     }
-
-    /// <summary>
-    /// Logs a warning message with the [WARN] status indicator.
-    /// </summary>
-    /// <typeparam name="T">The type of the logger.</typeparam>
-    /// <param name="logger">The logger instance.</param>
-    /// <param name="message">The message to log.</param>
-    /// <param name="args">Optional message formatting arguments.</param>
-    public static void WarnStatus<T>(this ILogger<T> logger, string message, params object[] args)
-    {
-        logger.LogWarning($"[WARN] {message}", args);
-    }
-
+    
     /// <summary>
     /// Logs an informational message with the [TAG] status indicator.
     /// </summary>

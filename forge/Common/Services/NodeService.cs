@@ -318,7 +318,7 @@ public class NodeService : INodeService
             }
             else
             {
-                _logger.WarnStatus("Path Not Found: {SourcePath}", sourcePath);
+                _logger.LogWarning($"Path Not Found: {sourcePath}");
             }
         }
     }

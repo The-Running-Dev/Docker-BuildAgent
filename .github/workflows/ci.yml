@@ -87,7 +87,7 @@ jobs:
       - name: Setup Build Environment
         uses: ./.github/actions/common
 
-       # Execute tests steps
+      # Execute tests steps
       - name: Run Tests & Generate Coverage
         uses: ./.github/actions/tests
 
