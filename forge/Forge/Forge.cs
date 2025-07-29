@@ -23,7 +23,7 @@ using Notifications;
 public class Forge : Base<ForgeParams, DiscordNotifications>
 {
     [Parameter("The source of the change log")]
-    public readonly string ChangeLogSource;
+    public readonly string? ChangeLogSource;
 
     /// <summary>
     /// Configures the current instance by hydrating parameters and setting up the change log configuration.

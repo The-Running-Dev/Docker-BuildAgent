@@ -30,8 +30,27 @@ using Notifications;
 public class Node : Base<NodeParams, DiscordNotifications>
 {
     [Parameter("The Artifacts directory")]
-    public readonly string ArtifactsDir;
-    
+    public readonly string? ArtifactsDir;
+
+    [Parameter("Templates Directory for Dockerfile templates")]
+    public readonly string? TemplatesDir;
+
+    [Parameter("Docker Registry for pushing images")]
+    public readonly string? RegistryUrl;
+
+    [Parameter("Registry user for pushing images")]
+    public readonly string? RegistryUser;
+
+    [Parameter("Registry token for pushing images")]
+    [Secret]
+    public readonly string? RegistryToken;
+
+    [Parameter("Tag for the Docker Image")]
+    public readonly string? ImageTag;
+
+    [Parameter("Dockerfile to use for building the image")]
+    public readonly string? DockerFile;
+
     // Injected services
     private INodeService NodeService => ServiceProvider.GetRequiredService<INodeService>();
 

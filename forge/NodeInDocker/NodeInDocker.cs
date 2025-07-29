@@ -33,27 +33,27 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
 {
     // Node-related parameters
     [Parameter("The Artifacts directory")]
-    public readonly string ArtifactsDir;
+    public readonly string? ArtifactsDir;
 
     // Docker-related parameters (inherited from DockerParams via NodeInDockerParams)
     [Parameter("Templates Directory for Dockerfile templates")]
-    public readonly string TemplatesDir;
+    public readonly string? TemplatesDir;
 
     [Parameter("Docker Registry for pushing images")]
-    public readonly string RegistryUrl;
+    public readonly string? RegistryUrl;
 
     [Parameter("Registry user for pushing images")]
-    public readonly string RegistryUser;
+    public readonly string? RegistryUser;
 
     [Parameter("Registry token for pushing images")]
     [Secret]
-    public readonly string RegistryToken;
+    public readonly string? RegistryToken;
 
     [Parameter("Tag for the Docker Image")]
-    public readonly string ImageTag;
+    public readonly string? ImageTag;
 
     [Parameter("Dockerfile to use for building the image")]
-    public readonly string DockerFile;
+    public readonly string? DockerFile;
 
     [Parameter("Should a GitHub release be created")]
     public readonly bool CreateGitHubRelease;
