@@ -67,6 +67,14 @@ jobs:
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
 
     steps:
+      # Prevent duplicate workflow runs for the same content
+      - name: Skip Duplicate Actions
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          cancel_others: true
+          concurrent_skipping: same_content_newer
+          skip_after_successful_duplicate: true
+
       # Checkout the repository with full git history for GitVersion
       - name: Checkout Repository
         uses: actions/checkout@v4
