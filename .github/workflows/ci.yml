@@ -85,8 +85,31 @@ jobs:
       - name: Setup Build Environment
         uses: ./.github/actions/common
 
+      # Run all tests with coverage collection
+      - name: 🧪 Run Tests & Generate Coverage
+        run: |
+          dotnet test forge/Common.Tests/Common.Tests.csproj \
+            --configuration Release \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage \
+            --logger trx \
+            --verbosity normal
+        shell: bash
+
+      # Upload coverage reports to GitHub
+      - name: 📊 Upload Coverage Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            ./coverage/**/*.coverage
+            ./coverage/**/*.xml
+            ./coverage/**/*.trx
+          retention-days: 30
+        if: always()
+
       # Run the Docker build in dry-run mode for validation
-      - name: Validate Build Process
+      - name: Validate Build
         run: nuke --type docker --dry-run true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
