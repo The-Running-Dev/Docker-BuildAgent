@@ -89,6 +89,7 @@ jobs:
       - name: 🔍 Validate Build Process
         run: nuke --type docker --dry-run true
         shell: pwsh
+        working-directory: ${{ github.workspace }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
