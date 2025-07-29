@@ -394,7 +394,7 @@ public class NodeServiceTests : IDisposable
         _nodeService.CopyToArtifacts(_testParams);
 
         var fullPath = Path.Combine(_testRootDirectory, nonExistentPath);
-        VerifyLoggerWarning($"[WARN] Path Not Found: {fullPath}");
+        VerifyLoggerWarning($"Path Not Found: {fullPath}");
     }
 
     [Fact]
