@@ -95,10 +95,9 @@ If no `.build.scripts` file exists, defaults to:
 4. `BuildApplication` - Execute Node.js build process
 5. `CopyToArtifacts` - Move built files to artifacts directory
 6. `BuildDockerImage` - Create Docker container image
-7. `CreateGitTag` - Tag the release in Git
-8. `PushToRegistry` - Push image to container registry
-9. `PublishToGitHub` - Create GitHub release
-10. `Build` - Final completion target
+7. `PushToRegistry` - Push image to container registry
+8. `PublishToGitHub` - Create GitHub release (includes Git tag creation)
+9. `Build` - Final completion target
 
 **Usage**:
 

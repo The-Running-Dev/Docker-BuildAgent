@@ -66,6 +66,8 @@ on:
 permissions:
   packages: write
   contents: write
+  checks: write
+  pull-requests: write
 
 jobs:
   Build:
