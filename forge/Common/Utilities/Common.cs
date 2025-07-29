@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
-using System.Text;
 
+using Serilog;
 using Nuke.Common;
 using Newtonsoft.Json;
 using Nuke.Common.Tooling;
@@ -11,7 +11,7 @@ using Entities;
 namespace Utilities;
 
 /// <summary>
-/// Provides common utility methods for versioning and changelog management.
+/// Retrieves the version information for a project located in the specified root directory.
 /// </summary>
 public static class Common
 {
@@ -38,38 +38,44 @@ public static class Common
             };
         }
 
-        var process = ProcessTasks.StartProcess("dotnet-gitversion", "/output json", rootDirectory, logOutput: false, logInvocation: false);
-        process.AssertZeroExitCode();
-
-        var output = process.Output.StdToText();
-        var versionInfo = JsonConvert.DeserializeObject<VersionInfo>(output);
-
-        if (string.IsNullOrWhiteSpace(versionInfo?.Version))
+        try
         {
-            Assert.Fail("❌ Failed to Get Version from GitVersion.");
+            var process = ProcessTasks.StartProcess("dotnet-gitversion", "/output json", rootDirectory, logOutput: false, logInvocation: false);
+            process.AssertZeroExitCode();
+
+            var output = process.Output.StdToText();
+            var versionInfo = JsonConvert.DeserializeObject<VersionInfo>(output);
+
+            if (string.IsNullOrWhiteSpace(versionInfo?.Version))
+            {
+                Assert.Fail("[ERROR] Failed to Get Version from GitVersion.");
+            }
+
+            return versionInfo;
         }
+        catch (Exception ex)
+        {
+            // Check if the error is related to GitVersion failing due to no commits
+            var errorMessage = ex.Message?.ToLower() ?? "";
 
-        return versionInfo;
-    }
-
-    /// <summary>
-    /// Appends the current date and the specified change log entry to the existing change log file.
-    /// </summary>
-    /// <remarks>If the specified change log file does not exist, a new file will be created. The current date
-    /// is formatted as "yyyy.MM.dd".</remarks>
-    /// <param name="changeLogPath">The file path of the change log to which the entry will be written. Must not be null or empty.</param>
-    /// <param name="changeLog">The change log entry to append. This entry will be prefixed with the current date.</param>
-    public static void WriteChangeLog(string changeLogPath, string changeLog)
-    {
-        var today = DateTime.UtcNow.ToString("yyyy.MM.dd");
-        var changelogBuilder = new StringBuilder();
-
-        changelogBuilder.AppendLine($"## {today}\n");
-
-        var oldChangelog = File.Exists(changeLogPath) ? File.ReadAllText(changeLogPath) : "";
-
-        changelogBuilder.AppendLine(oldChangelog);
-
-        File.WriteAllText(changeLogPath, changelogBuilder.ToString());
+            if (errorMessage.Contains("no commits found") || 
+                errorMessage.Contains("process 'dotnet-gitversion") || 
+                errorMessage.Contains("exited with code 1"))
+            {
+                Log.Warning("[WARN] GitVersion Failed (Likely no Commits Yet). Using Default Version 0.1.0-alpha.");
+                
+                // Return a default VersionInfo for repositories with no commits
+                return new VersionInfo
+                {
+                    Version = "0.1.0-alpha",
+                    FullVersion = "0.1.0-alpha.1+0",
+                    Date = DateTime.UtcNow.ToString("yyyy-MM-dd"),
+                    Hash = "0000000"
+                };
+            }
+            
+            // Re-throw if it's not a GitVersion no-commits issue
+            throw;
+        }
     }
 }

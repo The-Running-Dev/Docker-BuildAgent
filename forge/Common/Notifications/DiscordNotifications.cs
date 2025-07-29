@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using Serilog;
 using Nuke.Common.Tooling;
 
-using Utilities;
 using Parameters;
 
 namespace Notifications;
@@ -55,9 +54,8 @@ public class DiscordNotifications : INotifications
             ? $"{p.BuildDuration.TotalMinutes:N1}m"
             : $"{p.BuildDuration.TotalSeconds:N0}s";
 
-        var (repoUrl, branchUrl, commitUrl) = Git.Urls(p.Branch, p.Commit);
-        var branchLink = branchUrl != null ? $"[`{p.Branch}`]({branchUrl})" : $"`{p.Branch}`";
-        var commitLink = commitUrl != null ? $"[`{p.Commit}`]({commitUrl})" : $"`{p.Commit}`";
+        var branchLink = p.Urls?.Branch != null ? $"[`{p.Branch}`]({p.Urls?.Branch})" : $"`{p.Branch}`";
+        var commitLink = p.Urls?.Commit != null ? $"[`{p.Commit}`]({p.Urls?.Commit})" : $"`{p.Commit}`";
 
         var description =
             $"**Branch:** {branchLink}\n" +

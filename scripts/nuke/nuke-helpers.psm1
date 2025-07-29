@@ -13,112 +13,89 @@
     - Argument management for build tools
 
     All functions include robust parameter validation, error handling, and detailed logging
-    to support reliable build automation workflows.
+    to support reliable build automation workflows. All output messages use ASCII prefixes
+    in square brackets (e.g., [OK], [ERROR], [CONFIG]) for PowerShell 5.1 compatibility.
 
 .FUNCTIONS
     Copy-Directory              - Recursively copy directories with optional overwrite and ignore patterns
-    Initialize-BuildScript      - Initialize build scripts with startup information and error handling
     Invoke-Script              - Execute PowerShell scripts conditionally with custom messaging
     Add-RootArgument           - Add root directory arguments to command line argument arrays
     Invoke-DotNetCommand       - Execute .NET commands with automatic error checking
     Invoke-SafeCommand         - Execute commands with comprehensive error handling and exit code validation
     Initialize-DotNetEnvironment - Initialize .NET SDK environment with automatic installation and configuration
-    Initialize-BuildPaths      - Initialize and validate build paths with directory creation
-    Invoke-BuildProject        - Execute .NET builds with development/production mode support
-    Invoke-ForgeApplication    - Execute Forge application with type and argument management
-    Invoke-StandardBuild       - Execute standard build workflows with initialization and Forge execution
+    Initialize-Build           - Initialize and validate build paths with directory creation and .NET setup
+    Invoke-DotNetBuild         - Execute .NET builds with development/production mode support
+    Invoke-Forge               - Execute Forge application with type and argument management
     Get-PackageManager         - Detect Node.js package manager (npm, yarn, pnpm) from lock files
 
 .EXAMPLE
     # Copy a template directory with ignore patterns
-    Copy-Directory -sourceDir './template' -destinationDir './docs-ui' -overwrite
-    
-    # Initialize a build script with proper error handling
-    $workingDir = Initialize-BuildScript -scriptName "Docker Build" -arguments $args
-    
-    # Initialize and validate build paths
-    $paths = Initialize-BuildPaths -ProjectRoot $PSScriptRoot
-    
-    # Initialize .NET environment with automatic SDK management
-    Initialize-DotNetEnvironment -TempDirectory $paths.TempDir
+    Copy-Directory -SourceDir './template' -DestinationDir './docs-ui' -Overwrite
+        
+    # Initialize and validate build paths with .NET environment setup
+    Initialize-Build -ProjectRoot $PSScriptRoot
     
     # Execute a development or production build
-    Invoke-BuildProject -ProjectFile $paths.ProjectFile -OutputDirectory $paths.ArtifactsDir -IsDevelopment
+    Invoke-DotNetBuild -ProjectOrSolution "MyApp.sln" -OutputDirectory "artifacts" -IsProduction
     
-    # Execute the Forge application
-    Invoke-ForgeApplication -ArtifactsDir $paths.ArtifactsDir -Type "docker" -BuildArguments $args
+    # Execute the Forge application for multiple build types
+    Invoke-Forge -BuildTypes @("docker", "node") -Arguments $args
     
     # Load environment variables conditionally
-    Invoke-Script -projectDir $workingDir -scriptName "set-environment.ps1" -message "Loading environment..."
+    Invoke-Script -WorkingDir $workingDir -ScriptFile "set-environment.ps1" -Message "Loading environment..."
     
     # Execute a .NET build command with error checking
-    Invoke-DotNetCommand -dllPath "./artifacts/Forge.dll" -arguments @("Build", "--verbosity", "Normal")
+    Invoke-DotNetCommand -DllPath "./artifacts/Forge.dll" -Arguments @("Build", "--verbosity", "Normal")
     
     # Execute any command safely with automatic error handling
     Invoke-SafeCommand { & git clone $repoUrl }
     
-    # Execute standard build workflows with automatic initialization
-    Invoke-StandardBuild -ScriptName "Docker Build" -BuildTypes @("docker") -Arguments $args
-    Invoke-StandardBuild -ScriptName "Node-in-Docker Build" -BuildTypes @("node", "docker") -Arguments $args
-    
     # Detect package manager for Node.js projects
-    $packageManager = Get-PackageManager -projectDir "./frontend"
+    $packageManager = Get-PackageManager -ProjectDir "./frontend"
+    
+    # All output messages use ASCII prefixes for compatibility:
+    # [OK] - Successful operations
+    # [ERROR] - Error conditions
+    # [WARN] - Warning messages
+    # [CONFIG] - Configuration operations
+    # [COPY] - File/directory copying
+    # [BUILD] - Build operations
+    # [DETECT] - Detection operations
 
 .NOTES
-    Version: 2.1
+    Version: 2.2
     Author: Docker-BuildAgent Project
     Dependencies: PowerShell 5.1 or later
     
     All functions follow PowerShell best practices with:
-    - Comprehensive parameter validation
-    - Approved PowerShell verbs
-    - Detailed help documentation
-    - Consistent error handling
-    - Verbose logging capabilities
-    - Automatic .NET SDK management
-    - Safe command execution patterns
+    - Comprehensive parameter validation using ValidateScript and ValidateNotNullOrEmpty
+    - Approved PowerShell verbs (Initialize, Invoke, Get, Copy, Add)
+    - Detailed help documentation with examples and parameter descriptions
+    - Consistent error handling with automatic script termination on failures
+    - ASCII-based logging prefixes for PowerShell 5.1 compatibility
+    - Automatic .NET SDK management and environment configuration
+    - Safe command execution patterns with exit code validation
+    
+    ASCII Logging Prefixes Used:
+    - [OK] - Successful operations and completions
+    - [ERROR] - Error conditions and failures
+    - [WARN] - Warning messages and non-critical issues
+    - [CONFIG] - Configuration and environment setup
+    - [COPY] - File and directory copying operations
+    - [BUILD] - Build and compilation operations
+    - [DETECT] - Auto-detection and discovery operations
+    - [INSTALL] - Installation and setup operations
+    - [CHECK] - Validation and verification operations
+    - [SKIP] - Skipped operations and conditions
+    - [CLEAN] - Cleanup and maintenance operations
+    
+    PowerShell 5.1 Compatibility:
+    - All emoji characters have been replaced with ASCII prefixes
+    - Compatible with Windows PowerShell 5.1 and PowerShell Core 6+
+    - No Unicode dependencies that could cause display issues
 .LINK
     https://github.com/The-Running-Dev/Docker-BuildAgent
 #>
-
-function Initialize-BuildScript {
-<#
-.SYNOPSIS
-    Initialize common build script settings and display startup information.
-.PARAMETER ScriptName
-    The name of the script being executed (for display purposes).
-.PARAMETER WorkingDir
-    The working directory (defaults to current directory).
-.PARAMETER Arguments
-    The arguments passed to the script.
-.EXAMPLE
-    Initialize-BuildScript -Name "Docker Build" -Arguments $args
-#>
-    param(
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$Name,
-        
-        [Parameter(Mandatory = $false)]
-        [ValidateScript({Test-Path $_ -PathType Container})]
-        [string]$WorkingDir = (Convert-Path .),
-        
-        [Parameter(Mandatory = $false)]
-        [AllowEmptyCollection()]
-        [array]$Arguments = @()
-    )
-    
-    $script:ErrorActionPreference = "Stop"
-
-    Write-Host "🚀 Running $Name`: $WorkingDir"
-    Write-Host "🧾 Arguments: $Arguments"
-
-    # Load environment variables using helper function
-    Invoke-Script `
-        -WorkingDir $WorkingDir `
-        -ScriptFile "set-environment.ps1" `
-        -Message "Loading Environment Variables..."
-}
 
 function Invoke-Script {
 <#
@@ -147,7 +124,7 @@ function Invoke-Script {
 
 .EXAMPLE
     Invoke-Script -WorkingDir $workingDir -ScriptName "config.ps1" -Message "Loading Configuration..."
-    # Executes "config.ps1" and displays "🔧 Loading Configuration..." when found
+    # Executes "config.ps1" and displays "[CONFIG] Loading Configuration..." when found
 
 .EXAMPLE
     Invoke-Script -WorkingDir "." -ScriptName "dev-settings.ps1" -Message "Loading Development Settings..."
@@ -161,7 +138,7 @@ function Invoke-Script {
     - The function uses dot-sourcing (.) to execute the script in the current scope
     - This allows the executed script to modify variables and environment in the calling scope
     - No error is thrown if the script file doesn't exist - it simply skips execution
-    - The message parameter is prefixed with "🔧 " emoji when displayed
+    - The message parameter is prefixed with "[CONFIG] " when displayed
 
 .OUTPUTS
     None. The function executes the script but doesn't return any value.
@@ -183,7 +160,7 @@ function Invoke-Script {
 
     if (Test-Path $script) {
         if ($Message) {
-            Write-Host "🔧 $Message"
+            Write-Host "[CONFIG] $Message"
         }
 
         . $script
@@ -246,34 +223,51 @@ function Invoke-DotNetCommand {
     }
 }
 
-function Initialize-BuildPaths {
+function Initialize-Build {
 <#
 .SYNOPSIS
-    Initialize and validate build paths for a project.
+    Initialize and validate build paths for a project and set up the .NET environment.
+    
 .DESCRIPTION
-    Sets up standard build paths and validates that critical project files exist.
-    Creates necessary directories and returns a hashtable with all configured paths.
+    This function sets up standard build paths, validates that critical project files exist,
+    creates necessary directories, and initializes the .NET SDK environment. It's designed
+    to be a comprehensive initialization function for .NET build processes.
+    
 .PARAMETER ProjectRoot
     The root directory of the project. Defaults to current directory.
+    
 .PARAMETER ProjectFile
-    Relative path to the main project file from ProjectRoot. Defaults to "forge\Forge.csproj".
+    Relative path to the main project file from ProjectRoot. Defaults to "forge\Forge.sln".
+    
 .PARAMETER ArtifactsDir
     Relative path to artifacts directory from ProjectRoot. Defaults to "artifacts".
+    
 .PARAMETER TempDir
     Relative path to temporary directory from ProjectRoot. Defaults to ".nuke\temp".
+    
 .EXAMPLE
-    $paths = Initialize-BuildPaths
+    Initialize-Build
+    # Uses default paths and initializes build environment
+    
 .EXAMPLE
-    $paths = Initialize-BuildPaths -ProjectRoot "C:\MyProject" -ProjectFile "src\MyApp.csproj"
-.OUTPUTS
-    Hashtable containing: ProjectRoot, ProjectFile, ArtifactsDir, TempDir
+    Initialize-Build -ProjectRoot "C:\MyProject" -ProjectFile "src\MyApp.sln"
+    # Uses custom project root and solution file
+    
+.NOTES
+    This function will:
+    1. Validate that the specified project file exists
+    2. Create the artifacts directory if it doesn't exist
+    3. Initialize the .NET SDK environment
+    4. Validate that .NET is properly configured
+    
+    The function will exit with code 1 if critical validation fails.
 #>
     param(
         [Parameter(Mandatory = $false)]
         [string]$ProjectRoot = (Get-Location).Path,
         
         [Parameter(Mandatory = $false)]
-        [string]$ProjectFile = "forge\Forge.csproj",
+        [string]$ProjectFile = "forge\Forge.sln",
         
         [Parameter(Mandatory = $false)]
         [string]$ArtifactsDir = "artifacts",
@@ -292,7 +286,7 @@ function Initialize-BuildPaths {
     
     # Validate critical paths exist
     if (-not (Test-Path $paths.ProjectFile)) {
-        Write-Host "❌ Build Project Not Found: $($paths.ProjectFile)" -ForegroundColor Red
+        Write-Host "[ERROR] Project Not Found: $($paths.ProjectFile)" -ForegroundColor Red
         
         exit 1
     }
@@ -301,109 +295,180 @@ function Initialize-BuildPaths {
     if (-not (Test-Path $paths.ArtifactsDir)) {
         New-Item -ItemType Directory -Path $paths.ArtifactsDir -Force | Out-Null
         
-        Write-Host "📁 Created Artifacts Directory: $($paths.ArtifactsDir)" -ForegroundColor Green
+        Write-Host "[CREATE] Created Artifacts Directory: $($paths.ArtifactsDir)" -ForegroundColor Green
     }
-    
-    return $paths
+
+    # Initialize .NET SDK environment
+    Initialize-DotNetEnvironment -TempDirectory $tempDir
+
+    # # Validate .NET environment is properly configured
+    if (-not $env:DOTNET_EXE) {
+        Write-Error "[ERROR] Failed to Configure .NET Environment. DOTNET_EXE Not Set."
+        
+        exit 1
+    }
 }
 
-function Invoke-BuildProject {
+function Invoke-DotNetBuild {
 <#
 .SYNOPSIS
     Execute a .NET build with development or production configuration.
+    
 .DESCRIPTION
-    Performs either a fast development build (no restore) or a full production build
-    with optimizations based on the specified mode.
-.PARAMETER ProjectFile
-    Path to the .NET project file to build.
+    Performs either a fast development build or a full production build with optimizations
+    based on the specified mode. Uses the configured .NET CLI from the environment.
+    
+.PARAMETER ProjectOrSolution
+    Path to the .NET project file (.csproj) or solution file (.sln) to build.
+    Must be a valid file path that exists.
+    
 .PARAMETER OutputDirectory
-    Directory where build artifacts will be placed.
-.PARAMETER IsDevelopment
-    If true, performs a fast development build. If false, performs a production build.
+    Directory where build artifacts will be placed. Will be created if it doesn't exist.
+    
+.PARAMETER IsProduction
+    Switch parameter. If specified, performs a production build (Release configuration).
+    If not specified, performs a development build (Debug configuration with minimal verbosity).
+    
 .EXAMPLE
-    Invoke-BuildProject -ProjectFile "src\MyApp.csproj" -OutputDirectory "artifacts"
+    Invoke-DotNetBuild -ProjectOrSolution "src\MyApp.csproj" -OutputDirectory "artifacts"
+    # Performs a development build (Debug configuration)
+    
 .EXAMPLE
-    Invoke-BuildProject -ProjectFile "src\MyApp.csproj" -OutputDirectory "artifacts" -IsDevelopment
+    Invoke-DotNetBuild -ProjectOrSolution "MyApp.sln" -OutputDirectory "dist" -IsProduction
+    # Performs a production build (Release configuration)
+    
+.NOTES
+    Development builds use:
+    - Debug configuration
+    - --no-restore flag for faster builds
+    - Minimal verbosity
+    - Disabled node reuse and shared compilation for isolation
+    
+    Production builds use:
+    - Release configuration  
+    - Quiet verbosity
+    - Disabled node reuse and shared compilation for reliability
+    
+    Requires $env:DOTNET_EXE to be set (usually done by Initialize-DotNetEnvironment).
 #>
     param(
         [Parameter(Mandatory = $true)]
         [ValidateScript({Test-Path $_ -PathType Leaf})]
-        [string]$ProjectFile,
+        [string]$ProjectOrSolution,
         
         [Parameter(Mandatory = $true)]
         [string]$OutputDirectory,
         
         [Parameter(Mandatory = $false)]
-        [switch]$IsDevelopment
+        [switch]$IsProduction
     )
-    
-    $buildMode = if ($IsDevelopment) { "Development" } else { "Production" }
-    
-    if ($IsDevelopment) {
-        Write-Host "⚡ Starting Development Build (Mode: $buildMode)..." -ForegroundColor Yellow
-        Write-Host "   $ProjectFile -o $OutputDirectory" -ForegroundColor Yellow
+
+    if (-not $IsProduction) {
+        Write-Host "[DEV] Starting Development Build..." -ForegroundColor Yellow
+        Write-Host "   $ProjectOrSolution -o $OutputDirectory" -ForegroundColor Yellow
 
         Invoke-SafeCommand {
-            & $env:DOTNET_EXE build $ProjectFile -o $OutputDirectory -c Debug --no-restore /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity minimal | Out-Null
+            & $env:DOTNET_EXE build $ProjectOrSolution -o $OutputDirectory -c Debug --no-restore /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity minimal | Out-Null
         }
         
-        Write-Host "✅ Development Build Completed" -ForegroundColor Green
+        Write-Host "[OK] Development Build Completed" -ForegroundColor Green
     }
     else {
-        Write-Host "🚀 Starting Production Build (Mode: $buildMode)..." -ForegroundColor Yellow
-        Write-Host "   $ProjectFile -o $OutputDirectory" -ForegroundColor Yellow
+        Write-Host "[BUILD] Starting Production Build..." -ForegroundColor Yellow
+        Write-Host "   $ProjectOrSolution -o $OutputDirectory" -ForegroundColor Yellow
 
         Invoke-SafeCommand {
-            & $env:DOTNET_EXE build $ProjectFile -o $OutputDirectory -c Release /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet | Out-Null
+            & $env:DOTNET_EXE build $ProjectOrSolution -o $OutputDirectory -c Release /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet | Out-Null
         }
         
-        Write-Host "✅ Production Build Completed" -ForegroundColor Green
+        Write-Host "[OK] Production Build Completed" -ForegroundColor Green
     }
 }
 
-function Invoke-ForgeApplication {
+function Invoke-Forge {
 <#
 .SYNOPSIS
-    Execute the Forge application with specified type and arguments.
+    Execute Forge applications for one or more build types with argument processing.
+    
 .DESCRIPTION
-    Runs the Forge.dll application with the provided build type and passes through
-    any additional arguments to the application.
+    This function executes Forge build applications by finding and running DLL files
+    that match the specified build types. It handles environment setup, argument
+    processing, and execution of multiple build types in sequence.
+    
+.PARAMETER BuildTypes
+    Array of build types to execute. Each type corresponds to a DLL file in the
+    artifacts directory (e.g., "docker" looks for docker.dll).
+    
+.PARAMETER Arguments
+    Optional array of arguments to pass to each Forge application.
+    Will be processed to add root path if not already present.
+    
+.PARAMETER WorkingDir
+    The working directory for the build operations. Defaults to current location.
+    Also used as the root path argument passed to Forge applications.
+    
 .PARAMETER ArtifactsDir
-    Directory containing the built Forge.dll file.
-.PARAMETER Type
-    The build type to execute (e.g., 'docker', 'node', etc.).
-.PARAMETER BuildArguments
-    Additional arguments to pass to the Forge application.
+    Directory containing the built Forge DLL files. Defaults to "/nuke/forge".
+    Each build type should have a corresponding DLL in this directory.
+    
 .EXAMPLE
-    Invoke-ForgeApplication -ArtifactsDir "artifacts" -Type "docker"
+    Invoke-Forge -BuildTypes @("docker")
+    # Executes docker.dll from the artifacts directory
+    
 .EXAMPLE
-    Invoke-ForgeApplication -ArtifactsDir "artifacts" -Type "node" -BuildArguments @("--verbose", "--force")
+    Invoke-Forge -BuildTypes @("node", "docker") -Arguments @("--verbose") -WorkingDir "C:\Project"
+    # Executes both node.dll and docker.dll with verbose flag and custom working directory
+    
+.NOTES
+    This function will:
+    1. Load environment variables from set-environment.ps1 if it exists
+    2. Add --root argument to the argument list if not already present
+    3. Find and execute each specified build type's DLL file
+    4. Pass processed arguments to each Forge application
+    
+    The function expects DLL files to be named after the build type (e.g., docker.dll for "docker").
 #>
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateScript({Test-Path $_ -PathType Container})]
-        [string]$ArtifactsDir,
-        
-        [Parameter(Mandatory = $true)]
-        [ValidateNotNullOrEmpty()]
-        [string]$Type,
+        [string[]]$BuildTypes,
         
         [Parameter(Mandatory = $false)]
-        [AllowEmptyCollection()]
-        [array]$BuildArguments = @()
+        [string[]]$Arguments = @(),
+        
+        [Parameter(Mandatory = $false)]
+        [string]$WorkingDir = $(Get-Location).Path,
+        
+        [Parameter(Mandatory = $false)]
+        [string]$ArtifactsDir = "/nuke/forge"
     )
-    
-    Write-Host "🔥 Executing Forge with Type: $Type" -ForegroundColor Magenta
-    
-    $forgeDll = Join-Path $ArtifactsDir 'Forge.dll'
-    $forgeArgs = @("--no-logo", "--type", $Type)
-    
-    if ($BuildArguments -and $BuildArguments.Count -gt 0) {
-        $forgeArgs += "--"
-        $forgeArgs += $BuildArguments
+
+    # Load environment variables using helper function
+    Invoke-Script `
+        -WorkingDir $WorkingDir `
+        -ScriptFile "set-environment.ps1" `
+        -Message "Loading Environment Variables..."
+
+    # Add root argument for proper path handling
+    $processedArgs = Add-RootArgument -Arguments $Arguments -RootPath $WorkingDir
+
+    # Execute the Forge application for each specified build type
+    foreach ($buildType in $BuildTypes) {
+        Write-Host "[BUILD] Executing Build: $buildType..." -ForegroundColor Cyan
+
+        $type = $buildType.ToLower() -replace '[-_]', ''
+        $dll = Get-ChildItem $ArtifactsDir -Recurse -Include *.dll | `
+            Where-Object { $_.BaseName.ToLower() -eq $type } | `
+            Select-Object -First 1 -ExpandProperty FullName
+        $dllArgs = @("--no-logo")
+        
+        if ($processedArgs -and $processedArgs.Count -gt 0) {
+            $dllArgs += "--"
+            $dllArgs += $processedArgs
+        }
+
+        Invoke-DotNetCommand -dllPath $dll -arguments $dllArgs
     }
-    
-    Invoke-DotNetCommand -dllPath $forgeDll -arguments $forgeArgs
 }
 
 function Copy-Directory {
@@ -442,14 +507,14 @@ function Copy-Directory {
 
     # Validate source directory exists
     if (-not (Test-Path $SourceDir -PathType Container)) {
-        Write-Host "❌ Source Directory Not Found: $SourceDir" -ForegroundColor Red
+        Write-Host "[ERROR] Source Directory Not Found: $SourceDir" -ForegroundColor Red
         
         return
     }
 
     Write-Host ""
     $mode = if ($Overwrite) { "Overwrite" } else { "No Overwrite" }
-    Write-Host "🔄 Copying: $SourceDir -> $DestinationDir ($mode)" -ForegroundColor Yellow
+    Write-Host "[COPY] Copying: $SourceDir -> $DestinationDir ($mode)" -ForegroundColor Yellow
 
         # Load ignore patterns from .copy.ignore file if it exists
         $ignorePatterns = @()
@@ -459,7 +524,7 @@ function Copy-Directory {
             $ignorePatterns = Get-Content $ignoreFile | Where-Object { $_.Trim() -and -not $_.StartsWith('#') }
         
             if ($ignorePatterns.Count -gt 0) {
-                Write-Host "📋 Loaded .copy.ignore with $($ignorePatterns.Count) Pattern(s)" -ForegroundColor Cyan
+                Write-Host "[IGNORE] Loaded .copy.ignore with $($ignorePatterns.Count) Pattern(s)" -ForegroundColor Cyan
             }
         }
 
@@ -479,7 +544,7 @@ function Copy-Directory {
                     }
                     
                     if ($shouldIgnore) {
-                        Write-Host "  🚫 Ignored: $relativePath" -ForegroundColor DarkYellow
+                        Write-Host "  [SKIP] Ignored: $relativePath" -ForegroundColor DarkYellow
                         return
                     }
                     
@@ -493,15 +558,15 @@ function Copy-Directory {
                     if ($overwrite -or -not (Test-Path $destPath)) {
                         Copy-Item -Path $_.FullName -Destination $destPath -Force:$overwrite
                         
-                        Write-Host "  ✓ Copied: $relativePath" -ForegroundColor Green
+                        Write-Host "  [OK] Copied: $relativePath" -ForegroundColor Green
                     } else {
-                        Write-Host "  ⏩ Skipped (Exists): $relativePath" -ForegroundColor Gray
+                        Write-Host "  [SKIP] Skipped (Exists): $relativePath" -ForegroundColor Gray
                     }
                 }
             }
         }
         catch {
-            Write-Error ("  ✗ Failed to Copy {0}: {1}" -f $sourceDir, $_.Exception.Message)
+            Write-Error ("  [ERROR] Failed to Copy {0}: {1}" -f $sourceDir, $_.Exception.Message)
         }
 
         Write-Host ""
@@ -538,7 +603,7 @@ function Get-PackageManager {
         $pm = "yarn"
     }
     
-    Write-Host "🔍 Detected Package Manager: $pm"
+    Write-Host "[DETECT] Detected Package Manager: $pm"
     
     return $pm
 }
@@ -567,13 +632,13 @@ function Invoke-SafeCommand {
         & $Command
 
         if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
-            Write-Host "❌ Command Failed with Exit Code: $LASTEXITCODE" -ForegroundColor Red
+            Write-Host "[ERROR] Command Failed with Exit Code: $LASTEXITCODE" -ForegroundColor Red
             
             exit $LASTEXITCODE
         }
     }
     catch {
-        Write-Host "❌ Command Failed with Exception: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[ERROR] Command Failed with Exception: $($_.Exception.Message)" -ForegroundColor Red
         
         exit 1
     }
@@ -618,7 +683,7 @@ function Initialize-DotNetEnvironment {
     $env:DOTNET_CLI_TELEMETRY_OPTOUT = 1
     $env:DOTNET_NOLOGO = 1
     
-    Write-Host "🔍 Checking .NET SDK Environment..." -ForegroundColor Cyan
+    Write-Host "[CHECK] Checking .NET SDK Environment..." -ForegroundColor Cyan
     
     # Try to use existing global dotnet CLI
     if ($null -ne (Get-Command "dotnet" -ErrorAction SilentlyContinue)) {
@@ -628,17 +693,17 @@ function Initialize-DotNetEnvironment {
             if ($LASTEXITCODE -eq 0 -and $version) {
                 $env:DOTNET_EXE = (Get-Command "dotnet").Path
             
-                Write-Host "✅ Using Global .NET CLI: $version" -ForegroundColor Green
+                Write-Host "[OK] Using Global .NET CLI: $version" -ForegroundColor Green
             
                 return
             }
         }
         catch {
-            Write-Host "⚠️ Global .NET CLI Check Failed, Will Install Locally" -ForegroundColor Yellow
+            Write-Host "[WARN] Global .NET CLI Check Failed, Will Install Locally" -ForegroundColor Yellow
         }
     }
 
-    Write-Host "📥 Installing .NET SDK Locally..." -ForegroundColor Yellow
+    Write-Host "[INSTALL] Installing .NET SDK Locally..." -ForegroundColor Yellow
 
     # Ensure temp directory exists
     if (-not (Test-Path $TempDirectory)) {
@@ -654,7 +719,7 @@ function Initialize-DotNetEnvironment {
         (New-Object System.Net.WebClient).DownloadFile($InstallUrl, $dotNetInstallFile)
     }
     catch {
-        Write-Host "❌ Failed to Download .NET installer: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[ERROR] Failed to Download .NET installer: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
     }
     
@@ -701,108 +766,26 @@ function Initialize-DotNetEnvironment {
     try {
         $installedVersion = & $env:DOTNET_EXE --version 2>$null
         if ($LASTEXITCODE -eq 0 -and $installedVersion) {
-            Write-Host "✅ .NET SDK Installed Successfully: $installedVersion" -ForegroundColor Green
+            Write-Host "[OK] .NET SDK Installed Successfully: $installedVersion" -ForegroundColor Green
         } else {
-            Write-Host "❌ .NET SDK Installation Verification Failed" -ForegroundColor Red
+            Write-Host "[ERROR] .NET SDK Installation Verification Failed" -ForegroundColor Red
             exit 1
         }
     }
     catch {
-        Write-Host "❌ .NET SDK Installation Verification Failed: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "[ERROR] .NET SDK Installation Verification Failed: $($_.Exception.Message)" -ForegroundColor Red
         exit 1
     }
 }
 
-function Invoke-ForgeBuild {
-<#
-.SYNOPSIS
-    Executes a standard build workflow with initialization and Forge application execution.
-
-.DESCRIPTION
-    This function encapsulates the common build pattern used across docker-build, node-build, 
-    and node-in-docker-build scripts. It handles script initialization, argument processing,
-    and Forge application execution for one or more build types.
-
-.PARAMETER ScriptName
-    The display name for the build script (e.g., "Docker Build", "Node Build").
-
-.PARAMETER BuildTypes
-    Array of build types to execute. Each type will result in a separate Forge application call.
-    Common values: "docker", "node".
-
-.PARAMETER Arguments
-    The arguments passed to the script, typically $args from the calling script.
-
-.PARAMETER WorkingDir
-    The working directory for the build. Defaults to current location.
-
-.PARAMETER ArtifactsDir
-    The directory where build artifacts will be placed. Defaults to "/nuke/forge".
-
-.EXAMPLE
-    # Single build type (docker-build pattern)
-    Invoke-ForgeBuild -ScriptName "Docker Build" -BuildTypes @("docker") -Arguments $args
-    
-.EXAMPLE
-    # Multiple build types (node-in-docker-build pattern)
-    Invoke-ForgeBuild -ScriptName "Node-in-Docker Build" -BuildTypes @("node", "docker") -Arguments $args
-
-.EXAMPLE
-    # With custom directories
-    Invoke-ForgeBuild -ScriptName "Custom Build" -BuildTypes @("node") -Arguments $args -WorkingDir "./src" -ArtifactsDir "./dist"
-#>
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$BuildName,
-        
-        [Parameter(Mandatory = $true)]
-        [string[]]$BuildTypes,
-        
-        [Parameter(Mandatory = $false)]
-        [string[]]$Arguments = @(),
-        
-        [Parameter(Mandatory = $false)]
-        [string]$WorkingDir = $(Get-Location).Path,
-        
-        [Parameter(Mandatory = $false)]
-        [string]$ArtifactsDir = "/nuke/forge"
-    )
-
-    Write-Host "🚀 Starting $BuildName..." -ForegroundColor Green
-
-    # Initialize the build script with common settings and load environment
-    Initialize-BuildScript `
-        -Name $BuildName `
-        -Arguments $Arguments `
-        -WorkingDir $WorkingDir
-
-    # Add root argument for proper path handling
-    $processedArgs = Add-RootArgument -Arguments $Arguments -RootPath $WorkingDir
-
-    # Execute the Forge application for each specified build type
-    foreach ($buildType in $BuildTypes) {
-        Write-Host "🔨 Executing $buildType Build..." -ForegroundColor Cyan
-        
-        Invoke-ForgeApplication `
-            -ArtifactsDir $ArtifactsDir `
-            -Type $buildType `
-            -BuildArguments $processedArgs
-    }
-    
-    Write-Host "✅ $BuildName Completed Successfully!" -ForegroundColor Green
-}
-
 Export-ModuleMember -Function `
     Copy-Directory, `
-    Initialize-BuildScript, `
+    Initialize-Build, `
     Invoke-Script, `
     Add-RootArgument, `
+    Invoke-DotNetBuild, `
     Invoke-DotNetCommand, `
     Get-PackageManager, `
     Invoke-SafeCommand, `
     Initialize-DotNetEnvironment, `
-    Initialize-BuildPaths, `
-    Invoke-BuildProject, `
-    Invoke-ForgeApplication, `
-    Invoke-ForgeBuild
+    Invoke-Forge

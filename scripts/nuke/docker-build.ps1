@@ -7,8 +7,7 @@ param(
 Import-Module (Join-Path $PSScriptRoot 'nuke-helpers.psm1') -Force
 
 # Execute standard build workflow for Docker
-Invoke-ForgeBuild `
-    -BuildName "Docker Build" `
+Invoke-Forge `
     -BuildTypes @("docker") `
     -Arguments $args `
     -WorkingDir $WorkingDir `

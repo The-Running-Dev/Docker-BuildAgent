@@ -1,16 +1,41 @@
 
-# Release:
-#  Publishes Docker images and creates a GitHub release on main branch push or manual trigger.
-#  Ignores changes in the 'documentation' directory.
+# 🚀 Release Workflow
 #
-# Triggers:
-#   - On workflow_dispatch (manual)
-#   - On push to main branch only
+# This workflow handles production deployments for the Docker Build Agent project.
+# It builds and publishes Docker images to the container registry, creates GitHub releases,
+# and triggers documentation updates when changes are detected.
 #
-# Steps:
-#   1. Checks out the repository
-#   2. Runs shared setup steps from .github/actions/common
-#   3. Runs the Nuke build with GitHub release creation enabled
+# 📋 Workflow Configuration:
+#   - Name: Release
+#   - Triggers:
+#     * Manual dispatch (workflow_dispatch) for on-demand releases
+#     * Automatic execution on pushes to the main branch
+#   - Ignores: Changes only to documentation/ and .github/ directories
+#   - Permissions: packages:write, contents:write for registry push and release creation
+#
+# 🛠️ Release Process:
+#   1. Checkout repository with full git history for proper versioning
+#   2. Execute shared setup actions (.github/actions/common)
+#   3. Build and publish Docker images to container registry
+#   4. Create GitHub release with auto-generated changelog
+#   5. Detect documentation changes and trigger docs rebuild if needed
+#
+# 🔧 Environment Variables:
+#   - GITHUB_TOKEN: GitHub authentication for releases and API access
+#   - RegistryToken: Container registry authentication token
+#   - NotificationsWebHookUrl: Discord webhook for deployment notifications
+#
+# 🎯 Release Artifacts:
+#   - Docker images pushed to GitHub Container Registry (ghcr.io)
+#   - GitHub release with semantic versioning and changelog
+#   - Git tags created automatically via GitVersion
+#   - Discord notifications for successful deployments
+#
+# 📝 Notes:
+#   - Only runs on main branch pushes or manual triggers
+#   - Creates production releases with --create-github-release flag
+#   - Automatically triggers documentation deployment if docs changed
+#   - Uses GitVersion for semantic versioning and changelog generation
 #
 name: Release
 
@@ -29,33 +54,42 @@ permissions:
 
 jobs:
   Build:
+    name: 🚀 Build & Release
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      # Checkout the repository with full git history for GitVersion and changelog generation
+      - name: 📥 Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: ./.github/actions/common
+      # Execute shared setup steps (Docker, .NET, GitVersion, etc.)
+      - name: ⚙️ Setup Build Environment
+        uses: ./.github/actions/common
 
-      - name: Build and Publish Image
+      # Build Docker image and create GitHub release with artifacts
+      - name: 🚀 Build and Publish Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
         run: nuke --type docker --create-github-release true
 
-      - name: Check for Documentation Changes
+      # Check if documentation files were modified in this commit
+      - name: 📋 Check for Documentation Changes
         id: docs-changed
         run: |
           if git diff --name-only HEAD~1 HEAD | grep -q '^documentation/'; then
+            echo "Documentation changes detected"
             echo "changed=true" >> $GITHUB_OUTPUT
           else
+            echo "No documentation changes found"
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Trigger Docs Build
+      # Trigger documentation site rebuild if docs were updated
+      - name: 📚 Trigger Documentation Build
         if: steps.docs-changed.outputs.changed == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:

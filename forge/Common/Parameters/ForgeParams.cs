@@ -56,12 +56,12 @@ public class ForgeParams
     public bool DryRun { get; set; }
 
     /// <summary>
+    /// Gets or sets the configuration settings for the change log.
+    /// </summary>
+    public ChangeLogConfig ChangeLogConfig { get; set; }
+
+    /// <summary>
     /// Gets or sets the verbosity level for logging output.
     /// </summary>
     public Verbosity Verbosity { get; set; }
-
-    /// <summary>
-    /// Gets or sets the changelog generation source. Can be a tag name (e.g., 'v0.1.0'), 'start' for entire history, or empty/null for last tag.
-    /// </summary>
-    public string ChangeLogFrom { get; set; }
 }

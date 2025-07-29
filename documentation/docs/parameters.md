@@ -73,6 +73,43 @@ These are the base parameters available to all builds. **NodeParams** and **Dock
 
 ---
 
+## 🔄 NodeInDocker
+
+**Inherits all settings from both Docker and Node.js (and therefore Forge).**
+
+The NodeInDocker build type combines parameters from both Docker and Node.js builds, giving you access to all configuration options from both parent types. This enables comprehensive control over the two-phase build process.
+
+<Tabs>
+<TabItem value="env" label="Environment" default>
+| Variable              | Description                                             | Default        | Source |
+|-----------------------|---------------------------------------------------------|----------------|--------|
+| `ArtifactsDir`        | Directory path for storing Node.js build artifacts.     | artifacts      | Node   |
+| `TemplatesDir`        | Directory path for Dockerfile templates.                | /nuke/templates| Docker |
+| `Dockerfile`          | Path to the Dockerfile.                                 | Dockerfile     | Docker |
+| `ImageTag`            | Tag for the container image.                            | container-app  | Docker |
+| `RegistryUrl`         | Registry URL for pushing the Docker image.              |                | Docker |
+| `RegistryUser`        | Registry user name.                                     |                | Docker |
+| `RegistryToken`       | Registry authentication token.                          |                | Docker |
+| `CreateGitHubRelease` | Whether to create a GitHub release after build (bool).  | false          | Docker |
+</TabItem>
+<TabItem value="nuke" label="NUKE Parameters">
+| Parameter                 | Description                                             | Default        | Source |
+|---------------------------|---------------------------------------------------------|----------------|--------|
+| `--artifacts-dir`         | Directory path for storing Node.js build artifacts.     | artifacts      | Node   |
+| `--templates-dir`         | Directory path for Dockerfile templates.                | /nuke/templates| Docker |
+| `--docker-file`           | Path to the Dockerfile.                                 | Dockerfile     | Docker |
+| `--image-tag`             | Tag for the container image.                            | container-app  | Docker |
+| `--registry-url`          | Registry URL for pushing the Docker image.              |                | Docker |
+| `--registry-user`         | Registry user name.                                     |                | Docker |
+| `--registry-token`        | Registry authentication token.                          |                | Docker |
+| `--create-github-release` | Whether to create a GitHub release after build (bool).  | false          | Docker |
+</TabItem>
+</Tabs>
+
+**Note**: NodeInDocker also inherits all Forge (common) parameters shown above, including notifications, verbosity, dry-run mode, and force-push options.
+
+---
+
 
 ## 🟩 Node.js
 

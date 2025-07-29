@@ -10,8 +10,12 @@ using Entities;
 namespace Utilities;
 
 /// <summary>
-/// Provides utility methods for file operations.
+/// Provides utility methods for file operations, including reading lines from a file, generating environment files,
+/// parsing map files, and escaping values for environment files.
 /// </summary>
+/// <remarks>This class contains static methods to facilitate common file-related tasks, such as reading and
+/// processing file contents, generating environment configuration files from map files, and ensuring values are safely
+/// formatted for use in environment files.</remarks>
 public static class Files
 {
     /// <summary>
@@ -58,7 +62,7 @@ public static class Files
         {
             if (string.IsNullOrEmpty(mapFileValue.Value))
             {
-                logWarning($"⚠️ {mapFileValue.Key} is Empty, Set {mapFileValue.Template}");
+                logWarning($"[WARN] {mapFileValue.Key} is Empty, Set {mapFileValue.Template}");
                 isSuccessful = false;
             }
         }
@@ -68,14 +72,14 @@ public static class Files
         {
             Directory.CreateDirectory(directory);
 
-            logInfo($"✅ Created Directory: {directory}");
+            logInfo($"[OK] Created Directory: {directory}");
         }
 
         File.WriteAllLines(outputPath, envVars
             .Where(kv => !string.IsNullOrEmpty(kv.Value))
             .Select(kv => $"{kv.Key}={EscapeValue(kv.Value)}"));
 
-        logInfo($"✅ Environment Written to {Path.GetFileName(outputPath)}");
+        logInfo($"[OK] Environment Written to {Path.GetFileName(outputPath)}");
 
         return isSuccessful;
     }

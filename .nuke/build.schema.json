@@ -25,7 +25,7 @@
       "type": "string",
       "enum": [
         "Build",
-        "BuildDocumentation",
+        "ChangeLog",
         "Setup"
       ]
     },
@@ -100,13 +100,8 @@
   "allOf": [
     {
       "properties": {
-        "AppDir": {
-          "type": "string",
-          "description": "Directory name for the documentation app"
-        },
-        "ArtifactsDir": {
-          "type": "string",
-          "description": "Directory where build artifacts are stored"
+        "ChangeLogSource": {
+          "type": "string"
         },
         "DryRun": {
           "type": "boolean",
@@ -120,18 +115,6 @@
           "type": "boolean",
           "description": "Force Push/Tag for Local Builds"
         },
-        "IsProduction": {
-          "type": "boolean",
-          "description": "Build for production deployment"
-        },
-        "NodeTemplateDirPath": {
-          "type": "string",
-          "description": "Local path where template will be cloned"
-        },
-        "NodeTemplateRepositoryUrl": {
-          "type": "string",
-          "description": "Git repository URL for the template"
-        },
         "Notifications": {
           "type": "boolean",
           "description": "Enable Notifications for the Build"
@@ -140,14 +123,6 @@
           "type": "string",
           "description": "WebHook URL for Notifications",
           "default": "Secrets must be entered via 'nuke :secrets [profile]'"
-        },
-        "PackageManager": {
-          "type": "string",
-          "description": "Package manager to use (npm, pnpm, yarn)"
-        },
-        "SkipInstall": {
-          "type": "boolean",
-          "description": "Skip package manager install step"
         }
       }
     },

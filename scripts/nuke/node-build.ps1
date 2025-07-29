@@ -7,8 +7,7 @@ param(
 Import-Module (Join-Path $PSScriptRoot 'nuke-helpers.psm1') -Force
 
 # Execute standard build workflow for Node
-Invoke-ForgeBuild `
-    -BuildName "Node Build" `
+Invoke-Forge `
     -BuildTypes @("node") `
     -Arguments $args `
     -WorkingDir $WorkingDir `
