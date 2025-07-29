@@ -17,38 +17,37 @@ using Notifications;
 /// This class extends the <see cref="Base{TParams, TNotifications}"/> class, providing specific
 /// parameters and targets for building and managing Docker images. It includes functionality for configuring Docker
 /// registry details, building Docker images, tagging, pushing to a registry, and optionally creating a GitHub
-/// release.
+/// release with associated Git tag.
 /// 
 /// <para><strong>Build Target Dependencies (in execution order):</strong></para>
 /// <list type="number">
 /// <item><description><c>Setup</c> - Base setup (from Base class)</description></item>
 /// <item><description><c>BuildDockerImage</c> - Build Docker image</description></item>
-/// <item><description><c>CreateGitTag</c> - Create Git tag (conditional)</description></item>
 /// <item><description><c>PushToRegistry</c> - Push Docker images to registry (conditional)</description></item>
-/// <item><description><c>PublishToGitHub</c> - Create GitHub release (conditional)</description></item>
+/// <item><description><c>PublishToGitHub</c> - Create GitHub release and Git tag (conditional)</description></item>
 /// <item><description><c>Build</c> - Final target that logs completion</description></item>
 /// </list>
 /// </remarks>
 public class Docker : Base<DockerParams, DiscordNotifications>
 {
     [Parameter("Templates Directory for Dockerfile templates")]
-    public readonly string TemplatesDir;
+    public readonly string? TemplatesDir;
 
     [Parameter("Docker Registry for pushing images")]
-    public readonly string RegistryUrl;
+    public readonly string? RegistryUrl;
 
     [Parameter("Registry user for pushing images")]
-    public readonly string RegistryUser;
+    public readonly string? RegistryUser;
 
     [Parameter("Registry Registry token for pushing images")]
     [Secret]
-    public readonly string RegistryToken;
+    public readonly string? RegistryToken;
 
     [Parameter("Tag for the Docker Image")]
-    public readonly string ImageTag;
+    public readonly string? ImageTag;
 
     [Parameter("Dockerfile to use for building the image")]
-    public readonly string DockerFile;
+    public readonly string? DockerFile;
 
     [Parameter("Should a GitHub release be created")]
     public readonly bool CreateGitHubRelease;
@@ -109,40 +108,57 @@ public class Docker : Base<DockerParams, DiscordNotifications>
         });
 
     /// <summary>
-    /// Gets the target that creates a GitHub release.
+    /// Gets the target that publishes a release to GitHub and creates the associated Git tag.
     /// </summary>
-    /// <remarks>This target depends on the successful execution of the <c>PushToRegistry</c> target and is only
-    /// executed under specific conditions: when creating a GitHub release is enabled, the build is not local, it is not
-    /// a dry run, and both the Git repository HTTPS URL and registry token are specified.</remarks>
+    /// <remarks>This target depends on the <see cref="PushToRegistry"/> target and executes only under
+    /// specific conditions: when creating a GitHub release, not during a local build, not in dry run mode, and when the
+    /// Git repository URL and registry token are specified. It also requires either a forced push or a non-local,
+    /// non-dry run build. This target creates both the GitHub release (with changelog) and the Git tag in sequence.</remarks>
     public Target PublishToGitHub => _ => _
         .DependsOn(PushToRegistry)
         .OnlyWhenDynamic(() =>
             Parameters.CreateGitHubRelease &&
-            !IsLocalBuild &&
-            !DryRun &&
+            (ForcePush || (!IsLocalBuild && !DryRun)) &&
             !string.IsNullOrWhiteSpace(GitRepository?.HttpsUrl) &&
             !string.IsNullOrWhiteSpace(RegistryToken))
         .Executes(async () =>
         {
             try
             {
+                // Create GitHub release first
                 await GitHubService.CreateRelease(Parameters);
+
+                Logger.Ok("GitHub Release Created Successfully");
             }
             catch (Exception ex)
             {
-                Logger.ErrorStatus(ex, "Failed to Create GitHub Release.");
-
+                Logger.ErrorStatus(ex, "Failed to Create GitHub Release");
+                
                 Assert.Fail($"Failed to Create GitHub Release: {ex.Message}");
+            }
+
+            try
+            {
+                // Create Git tag after successful release
+                GitService.CreateTag(Parameters.ReleaseTag);
+
+                Logger.Tag($"'{Parameters.ReleaseTag}' Created Successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.ErrorStatus(ex, "Failed to Create Git Tag");
+
+                Assert.Fail($"Failed to Create Git Tag: {ex.Message}");
             }
         });
 
     /// <summary>
     /// Gets the target that pushes Docker images to the specified registry.
     /// </summary>
-    /// <remarks>This target depends on the 'CreateGitTag' target and executes only when certain conditions are met, 
+    /// <remarks>This target depends on the <see cref="BuildDockerImage"/> target and executes only when certain conditions are met, 
     /// such as when a force push is requested or during a non-local build without a dry run.</remarks>
     public Target PushToRegistry => _ => _
-        .DependsOn(CreateGitTag)
+        .DependsOn(BuildDockerImage)
         .OnlyWhenDynamic(() => ForcePush || (!IsLocalBuild && !DryRun))
         .Executes(() =>
         {
@@ -154,19 +170,6 @@ public class Docker : Base<DockerParams, DiscordNotifications>
             DockerService.Push(Parameters);
 
             Logger.Push($"Docker Images: {Parameters.Version.Version}, latest");
-        });
-
-    /// <summary>
-    /// Gets the target that creates a Git tag for the release.
-    /// </summary>
-    /// <remarks>The target depends on the <see cref="BuildDockerImage"/> target and executes only when certain
-    /// conditions are met. It creates a Git tag using the release tag specified in the parameters.</remarks>
-    public Target CreateGitTag => _ => _
-        .DependsOn(BuildDockerImage)
-        .OnlyWhenDynamic(() => ForcePush || (!IsLocalBuild && !DryRun))
-        .Executes(() =>
-        {
-            GitService.CreateTag(Parameters.ReleaseTag);
         });
 
     /// <summary>
