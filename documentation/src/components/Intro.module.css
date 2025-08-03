@@ -1,0 +1,45 @@
+.overview-card {
+  background: var(--ifm-background-surface-color);
+  border-radius: 1.2rem;
+  box-shadow: 0 2px 16px 0 rgba(0,0,0,0.08);
+  padding: 2.5rem 2rem 2rem 2rem;
+  margin: 2rem auto 2.5rem auto;
+  max-width: 600px;
+  text-align: center;
+}
+
+.overview-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.overview-subtitle {
+  font-size: 1.15rem;
+  color: var(--ifm-color-secondary-darkest);
+  margin-bottom: 1.5rem;
+}
+
+.overview-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  align-items: center;
+  margin-top: 1.5rem;
+}
+
+.overview-link {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--ifm-link-color);
+  border-radius: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.overview-link:hover {
+  background: var(--ifm-color-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px 0 rgba(0,0,0,0.10);
+}

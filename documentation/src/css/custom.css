@@ -6,28 +6,28 @@
 
 /* You can override the default Infima variables here. */
 :root {
-  /* NUKE-inspired Primary Colors */
-  --ifm-color-primary: #32C832;        /* NUKE Success Green */
-  --ifm-color-primary-dark: #28A428;    /* Darker Green */
-  --ifm-color-primary-darker: #239623;  /* Even Darker */
-  --ifm-color-primary-darkest: #1A7A1A; /* Darkest Green */
-  --ifm-color-primary-light: #45D645;   /* Lighter Green */
-  --ifm-color-primary-lighter: #58E258; /* Even Lighter */
-  --ifm-color-primary-lightest: #7AFF7A; /* Lightest Green */
+  /* Subtle Primary Colors for Light Theme */
+  --ifm-color-primary: #4A7C59;        /* Muted Forest Green */
+  --ifm-color-primary-dark: #3F6B4D;    /* Darker Green */
+  --ifm-color-primary-darker: #3A6347;  /* Even Darker */
+  --ifm-color-primary-darkest: #2E4F39; /* Darkest Green */
+  --ifm-color-primary-light: #5A8F68;   /* Lighter Green */
+  --ifm-color-primary-lighter: #679973; /* Even Lighter */
+  --ifm-color-primary-lightest: #7DB087; /* Lightest Green */
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  /* NUKE-inspired Dark Mode */
-  --ifm-color-primary: #45CFFF;        /* NUKE Info Cyan */
-  --ifm-color-primary-dark: #32B8E8;    /* Darker Cyan */
-  --ifm-color-primary-darker: #28A3D1;  /* Even Darker */
-  --ifm-color-primary-darkest: #1E7FA1; /* Darkest Cyan */
-  --ifm-color-primary-light: #58D7FF;   /* Lighter Cyan */
-  --ifm-color-primary-lighter: #7AE3FF; /* Even Lighter */
-  --ifm-color-primary-lightest: #A3F0FF; /* Lightest Cyan */
+  /* Subtle Primary Colors for Dark Theme */
+  --ifm-color-primary: #7B9FB0;        /* Soft Blue-Gray */
+  --ifm-color-primary-dark: #6B8FA1;    /* Darker Blue-Gray */
+  --ifm-color-primary-darker: #628799;  /* Even Darker */
+  --ifm-color-primary-darkest: #506F7A; /* Darkest Blue-Gray */
+  --ifm-color-primary-light: #8BAFBF;   /* Lighter Blue-Gray */
+  --ifm-color-primary-lighter: #98B9C7; /* Even Lighter */
+  --ifm-color-primary-lightest: #AECAD6; /* Lightest Blue-Gray */
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
 

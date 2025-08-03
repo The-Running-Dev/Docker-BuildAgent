@@ -1,5 +1,5 @@
 ---
-id: usage
+id: fast-track
 title: 🚀 Fast Track
 sidebar_position: 1
 ---

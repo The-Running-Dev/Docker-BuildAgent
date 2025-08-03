@@ -63,7 +63,7 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
 
     public BuildConfig Config { get; protected set; } = new(RootDirectory);
 
-    protected IServiceProvider ServiceProvider { get; private set; } = null!;
+    public IServiceProvider ServiceProvider { get; private set; } = null!;
 
     /// <summary>
     /// Gets the primary logger instance for the current build class from the dependency injection container.

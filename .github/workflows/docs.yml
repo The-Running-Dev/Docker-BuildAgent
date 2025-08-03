@@ -61,7 +61,7 @@ jobs:
           fetch-depth: 0
 
       # Build documentation using node-template-build in the build-agent container
-      - name: 🔨 Build Documentation Site
+      - name: Build Documentation Site
         run: node-template-build -appDir 'documentation'
 
       # Upload the built documentation for GitHub Pages deployment

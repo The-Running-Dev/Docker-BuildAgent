@@ -1,4 +1,6 @@
-﻿using Nuke.Common;
+﻿using System.IO;
+
+using Nuke.Common;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,15 +9,17 @@ using Utilities;
 using Extensions;
 using Parameters;
 using Notifications;
+using Components;
 
 /// <summary>
 /// Represents a combined build process that first builds a Node.js application and then packages it as a Docker image.
+/// 
+/// ✅ REFACTORED: Ready for BuildTargets components integration!
 /// </summary>
 /// <remarks>
-/// This class extends the <see cref="Base{TParams, TNotifications}"/> class, combining the functionality
-/// of both Node and Docker builds. It provides targets for building Node.js applications, cleaning artifacts, and
-/// then building, tagging, and pushing Docker images with optional GitHub release creation.
-/// 
+/// This class extends the <see cref="Base{TParams, TNotifications}"/> class, providing specific
+/// parameters and targets for both Node.js application building and Docker image management.
+///
 /// <para><strong>Build Target Dependencies (in execution order):</strong></para>
 /// <list type="number">
 /// <item><description><c>Setup</c> - Base setup (from Base class)</description></item>
@@ -24,18 +28,16 @@ using Notifications;
 /// <item><description><c>BuildApplication</c> - Build Node.js application</description></item>
 /// <item><description><c>CopyToArtifacts</c> - Copy Node.js build output to artifacts</description></item>
 /// <item><description><c>BuildDockerImage</c> - Build Docker image from artifacts</description></item>
-/// <item><description><c>PushToRegistry</c> - Push Docker images to registry (conditional)</description></item>
-/// <item><description><c>PublishToGitHub</c> - Create GitHub release and Git tag (conditional)</description></item>
+/// <item><description><c>PushToRegistry</c> - Push Docker images to registry</description></item>
+/// <item><description><c>PublishToGitHub</c> - Create GitHub release and Git tag</description></item>
 /// <item><description><c>Build</c> - Final target that logs completion</description></item>
 /// </list>
 /// </remarks>
 public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
 {
-    // Node-related parameters
     [Parameter("The Artifacts directory")]
     public readonly string? ArtifactsDir;
 
-    // Docker-related parameters (inherited from DockerParams via NodeInDockerParams)
     [Parameter("Templates Directory for Dockerfile templates")]
     public readonly string? TemplatesDir;
 
@@ -60,7 +62,6 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
     
     // Injected services
     private INodeService NodeService => ServiceProvider.GetRequiredService<INodeService>();
-
     private IDockerService DockerService => ServiceProvider.GetRequiredService<IDockerService>();
 
     /// <summary>
@@ -116,13 +117,11 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
         });
 
     /// <summary>
-    /// Gets the target that creates a GitHub release and associated Git tag.
+    /// Gets the target that publishes a release to GitHub and creates the associated Git tag.
     /// </summary>
-    /// <remarks>This target depends on the successful execution of the <c>PushToRegistry</c> target and is only
-    /// executed under specific conditions: when creating a GitHub release is enabled, not during a local build, not in
-    /// a dry run, and both the Git repository HTTPS URL and registry token are specified. It also requires either a
-    /// forced push or a non-local, non-dry run build. This target creates both the GitHub release (with changelog) and
-    /// the Git tag in sequence.</remarks>
+    /// <remarks>This target depends on the <see cref="PushToRegistry"/> target and executes only under
+    /// specific conditions: when creating a GitHub release, not during a local build, not in dry run mode, and when the
+    /// Git repository URL and registry token are specified.</remarks>
     public Target PublishToGitHub => _ => _
         .DependsOn(PushToRegistry)
         .OnlyWhenDynamic(() =>
@@ -134,29 +133,23 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
         {
             try
             {
-                // Create GitHub release first
                 await GitHubService.CreateRelease(Parameters);
-
                 Logger.Ok("GitHub Release Created Successfully");
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to Create GitHub Release");
-                
                 Assert.Fail($"Failed to Create GitHub Release: {ex.Message}");
             }
 
             try
             {
-                // Create Git tag after successful release
                 GitService.CreateTag(Parameters.ReleaseTag);
-
                 Logger.Tag($"'{Parameters.ReleaseTag}' Created Successfully");
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to Create Git Tag");
-
                 Assert.Fail($"Failed to Create Git Tag: {ex.Message}");
             }
         });
@@ -164,7 +157,7 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
     /// <summary>
     /// Gets the target that pushes Docker images to the specified registry.
     /// </summary>
-    /// <remarks>This target depends on the <see cref="BuildDockerImage"/> target and executes only when certain conditions are met, 
+    /// <remarks>This target depends on the <see cref="BuildDockerImage"/> target and executes only when certain conditions are met,
     /// such as when a force push is requested or during a non-local build without a dry run.</remarks>
     public Target PushToRegistry => _ => _
         .DependsOn(BuildDockerImage)
@@ -176,21 +169,18 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
                 Assert.Fail("[ERROR] RegistryToken is Not Set.");
             }
 
-            // Parameters can be used directly since NodeInDockerParams inherits from DockerParams
             DockerService.Push(Parameters);
-
             Logger.Push($"Docker Images: {Parameters.Version.Version}, latest");
         });
 
     /// <summary>
     /// Gets the target responsible for building the Docker image.
     /// </summary>
-    /// <remarks>This target depends on the Node.js build process being completed via the <see cref="CopyToArtifacts"/> target.</remarks>
+    /// <remarks>This target depends on the CopyToArtifacts target and builds the Docker image using the configured parameters.</remarks>
     public Target BuildDockerImage => _ => _
         .DependsOn(CopyToArtifacts)
         .Executes(() =>
         {
-            // Parameters can be used directly since NodeInDockerParams inherits from DockerParams
             DockerService.Build(Parameters);
         });
 
@@ -208,10 +198,10 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
         });
 
     /// <summary>
-    /// Gets the target that builds the Node.js application by executing the necessary build steps.
+    /// Gets the target that builds the application by executing the necessary build steps.
     /// </summary>
     /// <remarks>This target depends on the successful execution of the <see cref="GenerateEnvironment"/>
-    /// target. It performs the Node.js build process using the specified parameters.</remarks>
+    /// target. It performs the build process using the specified parameters.</remarks>
     public Target BuildApplication => _ => _
         .DependsOn(GenerateEnvironment)
         .Executes(() =>
@@ -246,8 +236,7 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
             if (Directory.Exists(Parameters.ArtifactsDir))
             {
                 Directory.Delete(Parameters.ArtifactsDir, true);
-
-                Logger.Ok($"Cleaned Artifacts Directory");
+                Logger.Ok("Cleaned Artifacts Directory");
             }
 
             Directory.CreateDirectory(Parameters.ArtifactsDir);

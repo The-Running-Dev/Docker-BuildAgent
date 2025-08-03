@@ -29,7 +29,8 @@ RUN apt-get update && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install global npm tools
-RUN npm install -g @angular/cli typescript angular-cli-ghpages@latest \
+RUN npm install -g typescript tsx \
+    @angular/cli angular-cli-ghpages@latest \
     && npm cache clean --force \
     && rm -rf /root/.npm/_cacache
 

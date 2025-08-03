@@ -33,9 +33,9 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          routeBasePath: '/', // Serve the docs at the site's root
-          path: 'docs',
-          id: 'default',
+          //routeBasePath: '/', // Serve the docs at the site's root
+          //path: 'docs',
+          //id: 'default',
         },
         blog: false, // Disable blog since docs is now the root
         theme: {

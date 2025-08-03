@@ -1,0 +1,103 @@
+{
+  "project": {
+    "name": "Docker-BuildAgent",
+    "owner": "the-running-dev",
+    "repository": "Docker-BuildAgent"
+  },
+  "badges": {
+    "buildRelease": [
+      {
+        "name": "CI",
+        "type": "workflow",
+        "workflow": "ci.yml",
+        "branch": "main"
+      },
+      {
+        "name": "Release", 
+        "type": "workflow",
+        "workflow": "release.yml",
+        "branch": "main"
+      },
+      {
+        "name": "Tests",
+        "type": "custom",
+        "label": "Tests",
+        "message": "Passing",
+        "color": "brightgreen",
+        "logo": "github-actions",
+        "link": "/actions/workflows/ci.yml"
+      },
+      {
+        "name": "Coverage",
+        "type": "custom", 
+        "label": "Coverage",
+        "message": "Report",
+        "color": "green",
+        "logo": "codecov",
+        "link": "/actions/workflows/ci.yml"
+      }
+    ],
+    "distribution": [
+      {
+        "name": "Version",
+        "type": "github",
+        "metric": "release",
+        "logo": "semver"
+      },
+      {
+        "name": "Docker",
+        "type": "custom",
+        "label": "Docker", 
+        "message": "GHCR",
+        "color": "blue",
+        "logo": "docker",
+        "link": "/pkgs/container/build-agent"
+      },
+      {
+        "name": "Platform",
+        "type": "custom",
+        "label": "Platform",
+        "message": "Linux | Windows | macOS", 
+        "color": "lightgrey",
+        "logo": "linux"
+      }
+    ],
+    "quality": [
+      {
+        "name": "License",
+        "type": "custom",
+        "label": "License",
+        "message": "MIT",
+        "color": "blue", 
+        "logo": "opensourceinitiative",
+        "link": "/blob/main/LICENSE"
+      },
+      {
+        "name": "Security",
+        "type": "custom",
+        "label": "Security",
+        "message": "Scanned",
+        "color": "success",
+        "logo": "security",
+        "link": "/security"
+      }
+    ],
+    "community": [
+      {
+        "name": "Stars",
+        "type": "github",
+        "metric": "stars"
+      },
+      {
+        "name": "Forks", 
+        "type": "github",
+        "metric": "forks"
+      },
+      {
+        "name": "Issues",
+        "type": "github", 
+        "metric": "issues"
+      }
+    ]
+  }
+}
