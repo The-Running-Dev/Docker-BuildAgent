@@ -67,6 +67,10 @@ jobs:
       # Get the latest changelog for the documentation
       - name: Get Latest Changelog
         run: forge-build --change-log-source 'all'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
 
       # Build documentation using node-template-build in the build-agent container
       - name: Build Documentation Site
