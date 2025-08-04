@@ -105,6 +105,6 @@ public class Node : Base<NodeParams, DiscordNotifications>, ICleanComponent, INo
         .DependsOn<INodeComponent>(x => x.CopyToArtifacts)
         .Executes(() =>
         {
-            Logger.LogInformation($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");
+            Logger.Ok($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");
         });
 }

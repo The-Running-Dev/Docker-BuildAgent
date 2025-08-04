@@ -127,6 +127,7 @@ public class NodeService : INodeService
         if (string.IsNullOrWhiteSpace(rootDirectory))
         {
             _logger.LogWarning("Root directory is empty or whitespace — Unable to Detect Node App Type.");
+            
             return "unknown";
         }
 
@@ -231,7 +232,7 @@ public class NodeService : INodeService
             var pm = DetectPackageManager(parameters);
 
             scripts = [
-                $"{pm} install",
+                $"{pm} install -f",
                 $"{pm} run build:prod"
             ];
         }
@@ -346,31 +347,31 @@ public class NodeService : INodeService
             .StartProcess(command, args, workingDirectory: workingDirectory, logOutput: false, logInvocation: false)
             .AssertZeroExitCode()
             .Output.ForEach(x =>
+        {
+            var text = x.Text?.Trim();
+
+            // Skip all empty or whitespace lines regardless of OutputType
+            if (string.IsNullOrWhiteSpace(text))
             {
-                var text = x.Text?.Trim();
+                return;
+            }
 
-                // Skip all empty or whitespace lines regardless of OutputType
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    return;
-                }
+            var lower = text.ToLowerInvariant();
 
-                var lower = text.ToLowerInvariant();
-
-                // Known warning patterns
-                if (lower.Contains("warn"))
-                {
-                    _logger.LogWarning("{OutputText}", text);
-                }
-                // Only log as error if it's stderr and it's meaningful
-                else if (x.Type == OutputType.Err)
-                {
-                    _logger.LogDebug("{OutputText}", text);
-                }
-                else
-                {
-                    _logger.LogInformation("{OutputText}", text);
-                }
-            });
+            // Known warning patterns
+            if (lower.Contains("warn"))
+            {
+                _logger.LogWarning("{OutputText}", text);
+            }
+            // Only log as error if it's stderr and it's meaningful
+            else if (x.Type == OutputType.Err)
+            {
+                _logger.LogDebug("{OutputText}", text);
+            }
+            else
+            {
+                _logger.LogInformation("{OutputText}", text);
+            }
+        });
     }
 }

@@ -133,6 +133,6 @@ public class Docker : Base<DockerParams, DiscordNotifications>, IDockerComponent
         .DependsOn<IGitHubComponent>(x => x.PublishToGitHub)
         .Executes(() =>
         {
-            Logger.LogInformation($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");
+            Logger.Ok($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");
         });
 }

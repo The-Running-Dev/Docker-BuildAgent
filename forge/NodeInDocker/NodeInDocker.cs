@@ -152,6 +152,6 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>, ICle
         .DependsOn<IGitHubComponent>(x => x.PublishToGitHub)
         .Executes(() =>
         {
-            Logger.LogInformation($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");        
+            Logger.Ok($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");        
         });
 }
