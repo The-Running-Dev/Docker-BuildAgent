@@ -1,39 +1,46 @@
-﻿using System.IO;
-
-using Nuke.Common;
+﻿using Nuke.Common;
+using Nuke.Common.Git;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
-using Services;
-using Utilities;
+using Components;
 using Extensions;
 using Parameters;
 using Notifications;
-using Components;
 
 /// <summary>
 /// Represents a combined build process that first builds a Node.js application and then packages it as a Docker image.
 /// 
-/// ✅ REFACTORED: Ready for BuildTargets components integration!
+/// ✅ REFACTORED: Now uses multiple Nuke Build Components for maximum abstraction!
 /// </summary>
 /// <remarks>
-/// This class extends the <see cref="Base{TParams, TNotifications}"/> class, providing specific
-/// parameters and targets for both Node.js application building and Docker image management.
-///
-/// <para><strong>Build Target Dependencies (in execution order):</strong></para>
+/// The <c>NodeInDocker</c> class now implements the modern Nuke Build Components pattern by inheriting
+/// from multiple component interfaces, achieving maximum code reuse and minimal duplication.
+/// 
+/// <para><strong>🎉 MAXIMUM ABSTRACTION ACHIEVED:</strong></para>
+/// <list type="bullet">
+/// <item><description>ICleanComponent - Provides Clean target automatically</description></item>
+/// <item><description>INodeComponent - Provides all Node.js build targets</description></item>
+/// <item><description>IDockerComponent - Provides Docker build and push targets</description></item>
+/// <item><description>IGitHubComponent - Provides GitHub release and Git tag targets</description></item>
+/// <item><description>Zero target implementations needed in this class</description></item>
+/// <item><description>Loose dependencies automatically wire up the complete build chain</description></item>
+/// </list>
+/// 
+/// <para><strong>Build Target Dependencies (all inherited):</strong></para>
 /// <list type="number">
 /// <item><description><c>Setup</c> - Base setup (from Base class)</description></item>
-/// <item><description><c>Clean</c> - Clean artifacts directory</description></item>
-/// <item><description><c>GenerateEnvironment</c> - Generate environment files</description></item>
-/// <item><description><c>BuildApplication</c> - Build Node.js application</description></item>
-/// <item><description><c>CopyToArtifacts</c> - Copy Node.js build output to artifacts</description></item>
-/// <item><description><c>BuildDockerImage</c> - Build Docker image from artifacts</description></item>
-/// <item><description><c>PushToRegistry</c> - Push Docker images to registry</description></item>
-/// <item><description><c>PublishToGitHub</c> - Create GitHub release and Git tag</description></item>
-/// <item><description><c>Build</c> - Final target that logs completion</description></item>
+/// <item><description><c>Clean</c> - Clean artifacts directory (from ICleanComponent)</description></item>
+/// <item><description><c>GenerateEnvironment</c> - Generate environment files (from INodeComponent)</description></item>
+/// <item><description><c>BuildApplication</c> - Build Node.js application (from INodeComponent)</description></item>
+/// <item><description><c>CopyToArtifacts</c> - Copy Node.js build output to artifacts (from INodeComponent)</description></item>
+/// <item><description><c>BuildDockerImage</c> - Build Docker image from artifacts (from IDockerComponent)</description></item>
+/// <item><description><c>PushToRegistry</c> - Push Docker images to registry (from IDockerComponent)</description></item>
+/// <item><description><c>PublishToGitHub</c> - Create GitHub release and Git tag (from IGitHubComponent)</description></item>
+/// <item><description><c>Build</c> - Final target that logs completion (local)</description></item>
 /// </list>
 /// </remarks>
-public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
+public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>, ICleanComponent, INodeComponent, IDockerComponent, IGitHubComponent
 {
     [Parameter("The Artifacts directory")]
     public readonly string? ArtifactsDir;
@@ -60,9 +67,38 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
     [Parameter("Should a GitHub release be created")]
     public readonly bool CreateGitHubRelease;
     
-    // Injected services
-    private INodeService NodeService => ServiceProvider.GetRequiredService<INodeService>();
-    private IDockerService DockerService => ServiceProvider.GetRequiredService<IDockerService>();
+    // Component interface implementations
+    string ICleanComponent.ArtifactsDir => Parameters.ArtifactsDir;
+    
+    ILogger<NukeBuild> ICleanComponent.Logger => ServiceProvider.GetRequiredService<ILogger<NukeBuild>>();
+    
+    NodeParams INodeComponent.Parameters => Parameters.ToNodeParams();
+    
+    ILogger<NukeBuild> INodeComponent.Logger => ServiceProvider.GetRequiredService<ILogger<NukeBuild>>();
+    
+    DockerParams IDockerComponent.Parameters => Parameters;
+    
+    string? IDockerComponent.RegistryToken => RegistryToken;
+    
+    bool IDockerComponent.ForcePush => ForcePush;
+    
+    bool IDockerComponent.DryRun => DryRun;
+    
+    ILogger<NukeBuild> IDockerComponent.Logger => ServiceProvider.GetRequiredService<ILogger<NukeBuild>>();
+    
+    DockerParams IGitHubComponent.Parameters => Parameters;
+    
+    string? IGitHubComponent.RegistryToken => RegistryToken;
+    
+    GitRepository? IGitHubComponent.GitRepository => GitRepository;
+    
+    bool IGitHubComponent.ForcePush => ForcePush;
+    
+    bool IGitHubComponent.DryRun => DryRun;
+    
+    ILogger<NukeBuild> IGitHubComponent.Logger => ServiceProvider.GetRequiredService<ILogger<NukeBuild>>();
+
+    // All services are now provided automatically by component interfaces
 
     /// <summary>
     /// Configures the parameters for the current operation by setting up directory paths, registry URLs, and image tags.
@@ -105,140 +141,17 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>
     }
 
     /// <summary>
-    /// Gets the build target that depends on the PublishToGitHub target and executes the complete build process.
+    /// Gets the build target that depends on the GitHub publishing process and executes the complete build process.
     /// </summary>
-    /// <remarks>This target logs a message indicating the completion of the entire build process, including both
-    /// Node.js application building and Docker image creation.</remarks>
+    /// <remarks>
+    /// This target logs a message indicating the completion of the entire build process. All other targets
+    /// (Clean, GenerateEnvironment, BuildApplication, CopyToArtifacts, BuildDockerImage, PushToRegistry, PublishToGitHub)
+    /// are now inherited from component interfaces and automatically wired together using loose dependencies.
+    /// </remarks>
     public Target Build => _ => _
-        .DependsOn(PublishToGitHub)
+        .DependsOn<IGitHubComponent>(x => x.PublishToGitHub)
         .Executes(() =>
         {
-            Logger.Ok($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");        
-        });
-
-    /// <summary>
-    /// Gets the target that publishes a release to GitHub and creates the associated Git tag.
-    /// </summary>
-    /// <remarks>This target depends on the <see cref="PushToRegistry"/> target and executes only under
-    /// specific conditions: when creating a GitHub release, not during a local build, not in dry run mode, and when the
-    /// Git repository URL and registry token are specified.</remarks>
-    public Target PublishToGitHub => _ => _
-        .DependsOn(PushToRegistry)
-        .OnlyWhenDynamic(() =>
-            Parameters.CreateGitHubRelease &&
-            (ForcePush || (!IsLocalBuild && !DryRun)) &&
-            !string.IsNullOrWhiteSpace(GitRepository?.HttpsUrl) &&
-            !string.IsNullOrWhiteSpace(RegistryToken))
-        .Executes(async () =>
-        {
-            try
-            {
-                await GitHubService.CreateRelease(Parameters);
-                Logger.Ok("GitHub Release Created Successfully");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to Create GitHub Release");
-                Assert.Fail($"Failed to Create GitHub Release: {ex.Message}");
-            }
-
-            try
-            {
-                GitService.CreateTag(Parameters.ReleaseTag);
-                Logger.Tag($"'{Parameters.ReleaseTag}' Created Successfully");
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Failed to Create Git Tag");
-                Assert.Fail($"Failed to Create Git Tag: {ex.Message}");
-            }
-        });
-
-    /// <summary>
-    /// Gets the target that pushes Docker images to the specified registry.
-    /// </summary>
-    /// <remarks>This target depends on the <see cref="BuildDockerImage"/> target and executes only when certain conditions are met,
-    /// such as when a force push is requested or during a non-local build without a dry run.</remarks>
-    public Target PushToRegistry => _ => _
-        .DependsOn(BuildDockerImage)
-        .OnlyWhenDynamic(() => ForcePush || (!IsLocalBuild && !DryRun))
-        .Executes(() =>
-        {
-            if (string.IsNullOrWhiteSpace(RegistryToken))
-            {
-                Assert.Fail("[ERROR] RegistryToken is Not Set.");
-            }
-
-            DockerService.Push(Parameters);
-            Logger.Push($"Docker Images: {Parameters.Version.Version}, latest");
-        });
-
-    /// <summary>
-    /// Gets the target responsible for building the Docker image.
-    /// </summary>
-    /// <remarks>This target depends on the CopyToArtifacts target and builds the Docker image using the configured parameters.</remarks>
-    public Target BuildDockerImage => _ => _
-        .DependsOn(CopyToArtifacts)
-        .Executes(() =>
-        {
-            DockerService.Build(Parameters);
-        });
-
-    /// <summary>
-    /// Gets the target that copies the build output to the artifacts directory.
-    /// </summary>
-    /// <remarks>This target depends on the successful completion of the <see cref="BuildApplication"/>
-    /// target. It executes the process of copying files to the specified artifacts location using the provided
-    /// parameters.</remarks>
-    public Target CopyToArtifacts => _ => _
-        .DependsOn(BuildApplication)
-        .Executes(() =>
-        {
-            NodeService.CopyToArtifacts(Parameters.ToNodeParams());
-        });
-
-    /// <summary>
-    /// Gets the target that builds the application by executing the necessary build steps.
-    /// </summary>
-    /// <remarks>This target depends on the successful execution of the <see cref="GenerateEnvironment"/>
-    /// target. It performs the build process using the specified parameters.</remarks>
-    public Target BuildApplication => _ => _
-        .DependsOn(GenerateEnvironment)
-        .Executes(() =>
-        {
-            NodeService.Build(Parameters.ToNodeParams());
-        });
-
-    /// <summary>
-    /// Gets the target that generates the environment configuration file.
-    /// </summary>
-    /// <remarks>This target depends on the <c>Clean</c> target and executes the generation of the environment
-    /// file. If the environment file is missing values, the process will fail with an assertion error.</remarks>
-    public Target GenerateEnvironment => _ => _
-        .DependsOn(Clean)
-        .Executes(() =>
-        {
-            if (!Files.GenerateEnvironmentFile(Parameters.Config.AppEnvMapFilePath, Parameters.Config.AppEnvFilePath))
-            {
-                Assert.Fail($"[ERROR] App Env File Missing Values, Check {Parameters.Config.AppEnvMapFile}");
-            }
-        });
-
-    /// <summary>
-    /// Gets the target that cleans the artifacts directory.
-    /// </summary>
-    /// <remarks>This target depends on the <see cref="Setup"/> target and ensures that the artifacts
-    /// directory is deleted and recreated.</remarks>
-    public Target Clean => _ => _
-        .DependsOn(Setup)
-        .Executes(() =>
-        {
-            if (Directory.Exists(Parameters.ArtifactsDir))
-            {
-                Directory.Delete(Parameters.ArtifactsDir, true);
-                Logger.Ok("Cleaned Artifacts Directory");
-            }
-
-            Directory.CreateDirectory(Parameters.ArtifactsDir);
+            Logger.LogInformation($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");        
         });
 }

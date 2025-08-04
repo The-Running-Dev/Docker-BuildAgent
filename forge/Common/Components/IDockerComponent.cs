@@ -1,3 +1,5 @@
+#nullable enable
+
 using System;
 
 using Nuke.Common;
@@ -5,8 +7,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
 using Services;
-using Parameters;
 using Extensions;
+using Parameters;
 
 namespace Components;
 
@@ -26,24 +28,24 @@ public interface IDockerComponent : INukeBuild
     DockerParams Parameters { get; }
 
     /// <summary>
-    /// Gets whether this is a local build
+    /// Gets the registry token
     /// </summary>
-    bool IsLocalBuild { get; }
+    string? RegistryToken { get; }
 
     /// <summary>
-    /// Gets whether this is a dry run
-    /// </summary>
-    bool DryRun { get; }
-
-    /// <summary>
-    /// Gets whether force push is enabled
+    /// Gets the force push setting
     /// </summary>
     bool ForcePush { get; }
 
     /// <summary>
-    /// Gets the registry token
+    /// Gets the dry run setting
     /// </summary>
-    string? RegistryToken { get; }
+    bool DryRun { get; }
+
+    /// <summary>
+    /// Gets the logger instance
+    /// </summary>
+    ILogger<NukeBuild> Logger { get; }
 
     /// <summary>
     /// Docker service instance
@@ -51,14 +53,10 @@ public interface IDockerComponent : INukeBuild
     IDockerService DockerService => ServiceProvider.GetRequiredService<IDockerService>();
 
     /// <summary>
-    /// Logger instance
-    /// </summary>
-    ILogger<NukeBuild> Logger => ServiceProvider.GetRequiredService<ILogger<NukeBuild>>();
-
-    /// <summary>
     /// Target for building Docker image
     /// </summary>
     Target BuildDockerImage => _ => _
+        .TryDependsOn<INodeComponent>(x => x.CopyToArtifacts)
         .Executes(() =>
         {
             DockerService.Build(Parameters);
@@ -78,6 +76,7 @@ public interface IDockerComponent : INukeBuild
             }
 
             DockerService.Push(Parameters);
-            Logger.Push($"Docker Images: {Parameters.Version.Version}, latest");
+
+            Logger.Push($"{Parameters.Version.Version}, latest");
         });
 }

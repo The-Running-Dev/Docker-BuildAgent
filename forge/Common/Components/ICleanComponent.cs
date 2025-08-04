@@ -1,5 +1,9 @@
-using System;
 using System.IO;
+
+using Extensions;
+
+using Microsoft.Extensions.Logging;
+
 using Nuke.Common;
 
 namespace Components;
@@ -15,6 +19,11 @@ public interface ICleanComponent : INukeBuild
     string ArtifactsDir { get; }
 
     /// <summary>
+    /// Gets the logger instance
+    /// </summary>
+    ILogger<NukeBuild> Logger { get; }
+
+    /// <summary>
     /// Target for cleaning the artifacts directory
     /// </summary>
     Target Clean => _ => _
@@ -23,7 +32,8 @@ public interface ICleanComponent : INukeBuild
             if (Directory.Exists(ArtifactsDir))
             {
                 Directory.Delete(ArtifactsDir, true);
-                Console.WriteLine("[OK] Cleaned Artifacts Directory");
+                
+                Logger.Ok("Cleaned Artifacts Directory");
             }
 
             Directory.CreateDirectory(ArtifactsDir);

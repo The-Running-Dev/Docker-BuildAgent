@@ -1,11 +1,15 @@
+#nullable enable
+
 using System;
+
+using Extensions;
 using Nuke.Common;
 using Nuke.Common.Git;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+
 using Services;
 using Parameters;
-using Extensions;
 
 namespace Components;
 
@@ -25,29 +29,29 @@ public interface IGitHubComponent : INukeBuild
     DockerParams Parameters { get; }
 
     /// <summary>
-    /// Gets the Git repository
+    /// Gets the registry token
+    /// </summary>
+    string? RegistryToken { get; }
+
+    /// <summary>
+    /// Gets the git repository information
     /// </summary>
     GitRepository? GitRepository { get; }
 
     /// <summary>
-    /// Gets whether this is a local build
-    /// </summary>
-    bool IsLocalBuild { get; }
-
-    /// <summary>
-    /// Gets whether this is a dry run
-    /// </summary>
-    bool DryRun { get; }
-
-    /// <summary>
-    /// Gets whether force push is enabled
+    /// Gets the force push setting
     /// </summary>
     bool ForcePush { get; }
 
     /// <summary>
-    /// Gets the registry token
+    /// Gets the dry run setting
     /// </summary>
-    string? RegistryToken { get; }
+    bool DryRun { get; }
+
+    /// <summary>
+    /// Gets the logger instance
+    /// </summary>
+    ILogger<NukeBuild> Logger { get; }
 
     /// <summary>
     /// GitHub service instance
@@ -60,14 +64,10 @@ public interface IGitHubComponent : INukeBuild
     GitService GitService => ServiceProvider.GetRequiredService<GitService>();
 
     /// <summary>
-    /// Logger instance
-    /// </summary>
-    ILogger<NukeBuild> Logger => ServiceProvider.GetRequiredService<ILogger<NukeBuild>>();
-
-    /// <summary>
     /// Target for publishing to GitHub and creating releases
     /// </summary>
     Target PublishToGitHub => _ => _
+        .TryDependsOn<IDockerComponent>(x => x.PushToRegistry)
         .OnlyWhenDynamic(() =>
             Parameters.CreateGitHubRelease &&
             (ForcePush || (!IsLocalBuild && !DryRun)) &&
@@ -79,11 +79,13 @@ public interface IGitHubComponent : INukeBuild
             {
                 // Create GitHub release first
                 await GitHubService.CreateRelease(Parameters);
+                
                 Logger.Ok("GitHub Release Created Successfully");
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to Create GitHub Release");
+
                 Assert.Fail($"Failed to Create GitHub Release: {ex.Message}");
             }
 
@@ -91,11 +93,13 @@ public interface IGitHubComponent : INukeBuild
             {
                 // Create Git tag after successful release
                 GitService.CreateTag(Parameters.ReleaseTag);
-                Logger.Tag($"'{Parameters.ReleaseTag}' Created Successfully");
+
+                Logger.Ok($"'{Parameters.ReleaseTag}' Created Successfully");
             }
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to Create Git Tag");
+
                 Assert.Fail($"Failed to Create Git Tag: {ex.Message}");
             }
         });

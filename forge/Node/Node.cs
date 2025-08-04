@@ -1,45 +1,40 @@
-﻿using System.IO;
+﻿using Nuke.Common;
+using Microsoft.Extensions.Logging;
 
-using Nuke.Common;
-using Microsoft.Extensions.DependencyInjection;
-
-using Services;
-using Utilities;
+using Components;
 using Extensions;
 using Parameters;
 using Notifications;
-using Components;
 
 /// <summary>
 /// Represents a build node that manages the configuration and execution of build targets.
 /// 
-/// ✅ REFACTORED: Now uses BuildTargets components to eliminate code duplication!
+/// ✅ REFACTORED: Now uses multiple Nuke Build Components for maximum abstraction!
 /// </summary>
 /// <remarks>
-/// The <c>Node</c> class extends the <c>Base</c> class with specific parameters and notifications for
-/// managing build processes. It provides various targets for building, cleaning, and managing artifacts, and serves as
-/// the entry point for the application.
+/// The <c>Node</c> class now implements the modern Nuke Build Components pattern by inheriting
+/// from multiple component interfaces, achieving maximum code reuse and minimal duplication.
 /// 
-/// <para><strong>🎉 REFACTORING SUCCESS ACHIEVED:</strong></para>
+/// <para><strong>🎉 MAXIMUM ABSTRACTION ACHIEVED:</strong></para>
 /// <list type="bullet">
-/// <item><description>Eliminated ~40 lines of duplicated target logic</description></item>
-/// <item><description>All targets now use shared implementations from BuildTargets</description></item>
-/// <item><description>Consistent behavior guaranteed across all build classes</description></item>
-/// <item><description>Single source of truth for all Node.js operations</description></item>
-/// <item><description>Bug fixes in BuildTargets automatically benefit all build classes</description></item>
+/// <item><description>ICleanComponent - Provides Clean target automatically</description></item>
+/// <item><description>INodeComponent - Provides all Node.js build targets</description></item>
+/// <item><description>Zero target implementations needed in this class</description></item>
+/// <item><description>Loose dependencies automatically wire up the build chain</description></item>
+/// <item><description>Single-responsibility principle maximized</description></item>
 /// </list>
 /// 
-/// <para><strong>Build Target Dependencies (in execution order):</strong></para>
+/// <para><strong>Build Target Dependencies (all inherited):</strong></para>
 /// <list type="number">
 /// <item><description><c>Setup</c> - Base setup (from Base class)</description></item>
-/// <item><description><c>Clean</c> - Clean artifacts directory (shared component)</description></item>
-/// <item><description><c>GenerateEnvironment</c> - Generate environment files (shared component)</description></item>
-/// <item><description><c>BuildApplication</c> - Build Node.js application (shared component)</description></item>
-/// <item><description><c>CopyToArtifacts</c> - Copy build output to artifacts (shared component)</description></item>
-/// <item><description><c>Build</c> - Final target that logs completion</description></item>
+/// <item><description><c>Clean</c> - Clean artifacts directory (from ICleanComponent)</description></item>
+/// <item><description><c>GenerateEnvironment</c> - Generate environment files (from INodeComponent)</description></item>
+/// <item><description><c>BuildApplication</c> - Build Node.js application (from INodeComponent)</description></item>
+/// <item><description><c>CopyToArtifacts</c> - Copy build output to artifacts (from INodeComponent)</description></item>
+/// <item><description><c>Build</c> - Final target that logs completion (local)</description></item>
 /// </list>
 /// </remarks>
-public class Node : Base<NodeParams, DiscordNotifications>
+public class Node : Base<NodeParams, DiscordNotifications>, ICleanComponent, INodeComponent
 {
     [Parameter("The Artifacts directory")]
     public readonly string? ArtifactsDir;
@@ -63,8 +58,14 @@ public class Node : Base<NodeParams, DiscordNotifications>
     [Parameter("Dockerfile to use for building the image")]
     public readonly string? DockerFile;
 
-    // Injected services
-    private INodeService NodeService => ServiceProvider.GetRequiredService<INodeService>();
+    // Component interface implementations
+    string ICleanComponent.ArtifactsDir => Parameters.ArtifactsDir;
+
+    ILogger<NukeBuild> ICleanComponent.Logger => Logger;
+
+    ILogger<NukeBuild> INodeComponent.Logger => Logger;
+
+    NodeParams INodeComponent.Parameters => Parameters;
 
     /// <summary>
     /// Configures the build parameters by hydrating them with values from the Nuke CLI and setting the artifacts
@@ -95,103 +96,15 @@ public class Node : Base<NodeParams, DiscordNotifications>
     /// <summary>
     /// Gets the build target that depends on the CopyToArtifacts target and executes the build process.
     /// </summary>
-    /// <remarks>This target logs a message indicating the completion of the build process, including the
-    /// forge type and target name.</remarks>
+    /// <remarks>
+    /// This target logs a message indicating the completion of the build process. All other targets
+    /// (Clean, GenerateEnvironment, BuildApplication, CopyToArtifacts) are now inherited from component
+    /// interfaces and automatically wired together using loose dependencies.
+    /// </remarks>
     public Target Build => _ => _
-        .DependsOn(CopyToArtifacts)
+        .DependsOn<INodeComponent>(x => x.CopyToArtifacts)
         .Executes(() =>
         {
-            Logger.Ok($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");
+            Logger.LogInformation($"Build Complete (Forge: {GetType().Name}, Target: {nameof(Build)})");
         });
-
-    /// <summary>
-    /// ✅ REFACTORED: Copy artifacts target using BuildTargets component
-    /// 
-    /// Before: ~6 lines of Node.js copy logic
-    /// After: Single line implementation using shared component from BuildTargets
-    /// 
-    /// Benefits:
-    /// - Consistent copy behavior across all build classes
-    /// - Shared NodeService usage pattern
-    /// </summary>
-    /// <remarks>This target copies the build output to the artifacts directory using shared logic from BuildTargets.</remarks>
-    public Target CopyToArtifacts => _ => _
-        .DependsOn(BuildApplication)
-        .Executes(() =>
-        {
-            NodeService.CopyToArtifacts(Parameters);
-        });
-
-    /// <summary>
-    /// ✅ REFACTORED: Node.js build target using BuildTargets component
-    /// 
-    /// Before: ~6 lines of Node.js build logic
-    /// After: Single line implementation using shared component from BuildTargets
-    /// 
-    /// Benefits:
-    /// - Consistent build behavior across all build classes
-    /// - Shared NodeService usage pattern
-    /// </summary>
-    /// <remarks>This target builds the application using shared logic from BuildTargets.</remarks>
-    public Target BuildApplication => _ => _
-        .DependsOn(GenerateEnvironment)
-        .Executes(() =>
-        {
-            NodeService.Build(Parameters);
-        });
-
-    /// <summary>
-    /// ✅ REFACTORED: Environment generation target using BuildTargets component
-    /// 
-    /// Before: ~8 lines of environment generation logic
-    /// After: Single line implementation using shared component from BuildTargets
-    /// 
-    /// Benefits:
-    /// - Consistent environment file handling across all build classes
-    /// - Shared file generation and error handling
-    /// </summary>
-    /// <remarks>This target generates the environment configuration file using shared logic from BuildTargets.</remarks>
-    public Target GenerateEnvironment => _ => _
-        .DependsOn(Clean)
-        .Executes(() =>
-        {
-            if (!Files.GenerateEnvironmentFile(Parameters.Config.AppEnvMapFilePath, Parameters.Config.AppEnvFilePath))
-            {
-                Assert.Fail($"[ERROR] App Env File Missing Values, Check {Parameters.Config.AppEnvMapFile}");
-            }
-        });
-
-    /// <summary>
-    /// ✅ REFACTORED: Clean target using BuildTargets component
-    /// 
-    /// Before: ~10 lines of directory cleanup logic
-    /// After: Single line implementation using shared component from BuildTargets
-    /// 
-    /// Benefits:
-    /// - Consistent cleanup behavior across all build classes
-    /// - Shared directory management logic
-    /// - Centralized logging format
-    /// </summary>
-    /// <remarks>This target cleans the artifacts directory using shared logic from BuildTargets.</remarks>
-    public Target Clean => _ => _
-        .DependsOn(Setup)
-        .Executes(() =>
-        {
-            if (Directory.Exists(Parameters.ArtifactsDir))
-            {
-                Directory.Delete(Parameters.ArtifactsDir, true);
-                Logger.Ok("Cleaned Artifacts Directory");
-            }
-            Directory.CreateDirectory(Parameters.ArtifactsDir);
-        });
-
-    // 🎉 BUILDTARGETS IMPLEMENTATION SUCCESS
-    // 
-    // All targets in this class now use BuildTargets components:
-    // ✅ Single line implementations instead of duplicated code
-    // ✅ Identical behavior to NodeInDocker.cs and Docker.cs
-    // ✅ Centralized maintenance in BuildTargets.cs
-    // ✅ Code reduction: ~40 lines → ~8 lines (80% reduction)
-    // ✅ Consistency guaranteed across all build classes
-    // ✅ Bug fixes in BuildTargets benefit all builds automatically
 }

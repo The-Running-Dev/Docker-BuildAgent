@@ -1,11 +1,15 @@
 using System;
 
-using Nuke.Common;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using Nuke.Common;
+
+using Parameters;
 
 using Services;
+
 using Utilities;
-using Parameters;
 
 namespace Components;
 
@@ -25,6 +29,11 @@ public interface INodeComponent : INukeBuild
     NodeParams Parameters { get; }
 
     /// <summary>
+    /// Gets the logger instance
+    /// </summary>
+    ILogger<NukeBuild> Logger { get; }
+
+    /// <summary>
     /// Node service instance
     /// </summary>
     INodeService NodeService => ServiceProvider.GetRequiredService<INodeService>();
@@ -33,6 +42,7 @@ public interface INodeComponent : INukeBuild
     /// Target for generating environment configuration
     /// </summary>
     Target GenerateEnvironment => _ => _
+        .TryDependsOn<ICleanComponent>()
         .Executes(() =>
         {
             if (!Files.GenerateEnvironmentFile(Parameters.Config.AppEnvMapFilePath, Parameters.Config.AppEnvFilePath))
