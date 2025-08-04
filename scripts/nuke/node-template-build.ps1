@@ -146,7 +146,22 @@ Write-Host "   Destination: $NodeTemplateDirPath" -ForegroundColor Gray
 # Clone the template repository with minimal history for faster download
 # --depth 1 creates a shallow clone with only the latest commit
 Invoke-SafeCommand {
-    & git clone --depth 1 $NodeTemplateRepositoryUrl $NodeTemplateDirPath 2>&1 | Out-Null
+    # Parse repository URL and branch if specified with #branch format
+    if ($NodeTemplateRepositoryUrl -match '^(.*?)(?:#(.+))?$') {
+        $repoUrl = $Matches[1]
+        $branch = $Matches[2]
+        
+        if ($branch) {
+            # Clone with specific branch
+            & git clone --depth 1 -b $branch $repoUrl $NodeTemplateDirPath 2>&1 | Out-Null
+        } else {
+            # Regular clone without branch specification
+            & git clone --depth 1 $repoUrl $NodeTemplateDirPath 2>&1 | Out-Null
+        }
+    } else {
+        # Fallback to direct clone if URL parsing fails
+        & git clone --depth 1 $NodeTemplateRepositoryUrl $NodeTemplateDirPath 2>&1 | Out-Null
+    }
 }
 
 Write-Host "[OK] Template Repository Cloned Successfully" -ForegroundColor Green
