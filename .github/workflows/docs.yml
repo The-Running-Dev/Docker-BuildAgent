@@ -62,7 +62,10 @@ jobs:
 
       # Build documentation using node-template-build in the build-agent container
       - name: Build Documentation Site
-        run: node-template-build -appDir 'documentation'
+        run: |
+          node-template-build \
+            -AppDir 'documentation' \
+            -NodeTemplateRepositoryUrl 'https://github.com/The-Running-Dev/Docusaurus-Template.git#feature/comments_badges'
 
       # Upload the built documentation for GitHub Pages deployment
       - name: Upload Documentation Artifact
