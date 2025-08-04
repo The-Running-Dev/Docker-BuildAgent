@@ -1,0 +1,58 @@
+/**
+ * Sunset Theme - Custom CSS for Docusaurus
+ * A warm orange/red color palette inspired by sunset colors
+ * Features warm oranges for light mode and soft corals for dark mode
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #ff5722;
+  --ifm-color-primary-dark: #f4511e;
+  --ifm-color-primary-darker: #e64a19;
+  --ifm-color-primary-darkest: #d84315;
+  --ifm-color-primary-light: #ff6f00;
+  --ifm-color-primary-lighter: #ff8a65;
+  --ifm-color-primary-lightest: #ffab91;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 87, 34, 0.1);
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #ff8a65;
+  --ifm-color-primary-dark: #ff7043;
+  --ifm-color-primary-darker: #ff5722;
+  --ifm-color-primary-darkest: #f4511e;
+  --ifm-color-primary-light: #ffab91;
+  --ifm-color-primary-lighter: #ffccbc;
+  --ifm-color-primary-lightest: #fbe9e7;
+  --docusaurus-highlighted-code-line-bg: rgba(255, 138, 101, 0.3);
+}
+
+.hero__title {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* Sunset theme specific enhancements */
+.navbar {
+  box-shadow: 0 2px 4px rgba(255, 87, 34, 0.1);
+}
+
+.card {
+  border: 1px solid rgba(255, 87, 34, 0.1);
+}
+
+[data-theme='dark'] .card {
+  border: 1px solid rgba(255, 138, 101, 0.2);
+}
+
+/* Add warm gradient background for hero section */
+.hero {
+  background: linear-gradient(135deg, rgba(255, 87, 34, 0.05) 0%, rgba(255, 183, 77, 0.05) 100%);
+}
+
+[data-theme='dark'] .hero {
+  background: linear-gradient(135deg, rgba(255, 138, 101, 0.1) 0%, rgba(255, 183, 77, 0.1) 100%);
+}

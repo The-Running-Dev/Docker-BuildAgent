@@ -1,12 +1,11 @@
 ---
-id: project-status
-title: 📊 Project Status
+title: 📊 Status
 sidebar_position: 999
 ---
 
-import DockerBuildAgentBadges from '@site/src/components/DockerBuildAgentBadges';
+import GitHubProjectBadges from '@site/src/components/GitHubProjectBadges';
 
-<DockerBuildAgentBadges />
+<GitHubProjectBadges />
 
 ---
 
@@ -59,4 +58,4 @@ This page displays real-time status information for the Docker BuildAgent projec
 
 ---
 
-*All badges are automatically updated in real-time and provide direct links to detailed information. This unified status system ensures consistency between the README and documentation.*
+_All badges are automatically updated in real-time and provide direct links to detailed information. This unified status system ensures consistency between the README and documentation._
