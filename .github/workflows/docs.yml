@@ -60,6 +60,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Get the latest changelog for the documentation
+      - name: Get Latest Changelog
+        run: forge-build --change-log-source 'all'
+
       # Build documentation using node-template-build in the build-agent container
       - name: Build Documentation Site
         run: |
