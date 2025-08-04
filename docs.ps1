@@ -41,7 +41,7 @@
 #>
 
 # Configuration
-$appDir = 'documentation'
+$appDir = '.\documentation\temp'
 
 # Phase 1: Template Build using Docker Build Agent
 # This phase prepares the documentation environment by:
@@ -59,6 +59,7 @@ Write-Host "🔨 Phase 1: Preparing Documentation Environment..." -ForegroundCol
     node-template-build `
         -appDir $appDir `
         -packageManager 'pnpm' `
+        -nodeTemplateRepositoryUrl 'https://github.com/The-Running-Dev/Docusaurus-Template.git#feature/comments_badges' `
         -skipInstall `
         -isProduction:$false
 
