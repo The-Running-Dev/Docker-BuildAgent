@@ -23,7 +23,7 @@
 #   - Create a GitHub release with auto-generated changelog
 #   - Tag the repository with the version number
 
-name: Create Release
+name: Release
 
 on:
   workflow_dispatch:
