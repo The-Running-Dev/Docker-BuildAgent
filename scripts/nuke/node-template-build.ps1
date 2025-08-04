@@ -147,20 +147,28 @@ Write-Host "   Destination: $NodeTemplateDirPath" -ForegroundColor Gray
 # --depth 1 creates a shallow clone with only the latest commit
 Invoke-SafeCommand {
     # Parse repository URL and branch if specified with #branch format
-    if ($NodeTemplateRepositoryUrl -match '^(.*?)(?:#(.+))?$') {
+    if ($NodeTemplateRepositoryUrl -match '^(.+?)#(.+)$') {
+        # URL contains a branch specification
         $repoUrl = $Matches[1]
         $branch = $Matches[2]
         
-        if ($branch) {
-            # Clone with specific branch
-            & git clone --depth 1 -b $branch $repoUrl $NodeTemplateDirPath 2>&1 | Out-Null
-        } else {
-            # Regular clone without branch specification
-            & git clone --depth 1 $repoUrl $NodeTemplateDirPath 2>&1 | Out-Null
+        Write-Host "   Using branch: $branch" -ForegroundColor Gray
+        
+        # Clone with specific branch - don't suppress errors
+        git clone --depth 1 -b $branch $repoUrl $NodeTemplateDirPath
+        
+        # Throw an error if git clone fails
+        if ($LASTEXITCODE -ne 0) {
+            throw "Git Clone Failed: $LASTEXITCODE"
         }
     } else {
-        # Fallback to direct clone if URL parsing fails
-        & git clone --depth 1 $NodeTemplateRepositoryUrl $NodeTemplateDirPath 2>&1 | Out-Null
+        # Regular clone without branch specification - don't suppress errors
+        git clone --depth 1 $NodeTemplateRepositoryUrl $NodeTemplateDirPath
+        
+        # Throw an error if git clone fails
+        if ($LASTEXITCODE -ne 0) {
+            throw "Git Clone Failed: $LASTEXITCODE"
+        }
     }
 }
 
