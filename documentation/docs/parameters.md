@@ -110,8 +110,39 @@ The NodeInDocker build type combines parameters from both Docker and Node.js bui
 
 ---
 
+## � Forge (Changelog Generation)
 
-## 🟩 Node.js
+**Inherits all common settings from Forge base parameters.**
+
+<Tabs>
+<TabItem value="env" label="Environment" default>
+| Variable            | Description                                                    | Default      |
+|---------------------|----------------------------------------------------------------|--------------|
+| `ChangeLogSource`   | Source for changelog generation (null/""/tag/"all").          | null (last tag) |
+</TabItem>
+<TabItem value="nuke" label="NUKE Parameters">
+| Parameter            | Description                                                    | Default      |
+|----------------------|----------------------------------------------------------------|--------------|
+| `--change-log-source`| Source for changelog generation (null/""/tag/"all").          | null (last tag) |
+</TabItem>
+</Tabs>
+
+**ChangeLogSource Options**:
+
+- `null` or `""` (empty): Generate changelog since the last Git tag
+- `all`: Generate complete commit history
+- `specific-tag`: Generate changelog since the specified tag (e.g., "v1.0.0")
+
+**Output Configuration**:
+
+- **File**: Saves to `CHANGELOG.md` in the project root
+- **Format**: Prepends new content to existing changelog
+- **Date Format**: Uses `yyyy.MM.dd` format for all dates
+- **Grouping**: Groups commits by date in descending order (latest first)
+
+---
+
+## 🔄 NodeInDocker
 
 **Inherits all settings from Forge.**
 

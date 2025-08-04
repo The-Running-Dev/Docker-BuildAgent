@@ -1,7 +1,7 @@
 // documentation/src/components/GitHubProjectBadges/index.tsx - GitHubProjectBadges component
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { Badge, BadgeSection, GitHubProjectBadgesProps } from './models';
+import { Badge, BadgeGroupProps, GitHubProjectBadgesProps } from './models';
 import useConfig from './useConfig';
 
 const GitHubProjectBadges: React.FC<GitHubProjectBadgesProps> = ({
@@ -20,7 +20,7 @@ const GitHubProjectBadges: React.FC<GitHubProjectBadgesProps> = ({
     );
   }
 
-  const BadgeSection: React.FC<BadgeSection> = ({ title, badges, icon }) => (
+  const BadgeGroup: React.FC<BadgeGroupProps> = ({ title, badges, icon }) => (
     <div style={{ marginBottom: '2rem' }}>
       <h3
         style={{
@@ -77,7 +77,7 @@ const GitHubProjectBadges: React.FC<GitHubProjectBadgesProps> = ({
   return (
     <div style={{ padding: '1rem 0' }}>
       {badgeSections.map((section) => (
-        <BadgeSection
+        <BadgeGroup
           key={section.key}
           title={section.title}
           badges={section.badges}

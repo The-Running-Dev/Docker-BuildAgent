@@ -6,7 +6,7 @@ sidebar_position: 1
 
 ## Quick Start Examples
 
-The Build Agent supports 4 different build types. Here are the most common scenarios to get you started quickly:
+The Build Agent supports 5 different build types. Here are the most common scenarios to get you started quickly:
 
 > 💡 **Need help choosing?** Check out our comprehensive [Build Types Reference](build-types) for detailed comparisons, parameters, and decision guidance.
 
@@ -78,10 +78,31 @@ You can customize this by specifying your own `.build.scripts`, see [customizati
 
 This will run the `Node` forge with all it's [targets](targets#-node-targets) and default [parameters](parameters#-nodejs), and build your Node application. And after that, it will run the `Docker` forge with all it's [targets](targets#-docker-targets) and default [parameters](parameters#-docker), and build your Docker image.
 
+### 📝 Changelog Generation
+
+1. Map your project directory (`./`) to `/workspace`
+2. Execute `forge` with the `GenerateChangeLog` target
+
+```pwsh
+# Generate changelog since last tag (default)
+& docker run `
+    -v ./:/workspace `
+    -it ghcr.io/the-running-dev/build-agent:latest `
+    forge --target GenerateChangeLog
+
+# Generate complete commit history
+& docker run `
+    -v ./:/workspace `
+    -it ghcr.io/the-running-dev/build-agent:latest `
+    forge --target GenerateChangeLog --change-log-source all
+```
+
+This will generate a formatted changelog from Git commit history and save it to `CHANGELOG.md`. The changelog uses the format `yyyy.MM.dd` for dates and groups commits by date in descending order.
+
 ## 📚 Learn More
 
 These examples show the most common use cases. For complete information about all build types, parameters, and advanced scenarios:
 
-- **[Build Types Reference](build-types)** - Comprehensive guide to all 4 build commands
+- **[Build Types Reference](build-types)** - Comprehensive guide to all 5 build commands
 - **[Parameters](parameters)** - Detailed parameter documentation  
 - **[Customization](customization)** - Advanced configuration options

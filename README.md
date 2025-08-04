@@ -67,6 +67,11 @@ Docker-BuildAgent is a pre-configured Docker image and build environment designe
 - **Git** for source control
 - **GitVersion** for semantic versioning in CI/CD
 - **Nuke Build** support for advanced .NET build automation
+- **Forge Build System** with multiple specialized build types:
+  - **Docker builds** with automated image creation and registry push
+  - **Node.js builds** with package manager detection and custom scripts
+  - **Combined Node+Docker builds** for full-stack applications
+  - **Changelog generation** with Git integration and customizable formatting
 - **Cross-platform build scripts** (`build.sh`, `build.ps1`, `build.cmd`)
 - **Ready-to-use in CI/CD pipelines** (e.g., GitHub Actions)
 
@@ -78,7 +83,12 @@ README.md                 # Project documentation
 build.sh                  # Bash build/push script (Linux/macOS/CI)
 build.ps1                 # PowerShell build script (Windows)
 GitVersion.yml            # GitVersion configuration for semantic versioning
-docker/                   # .NET build project (Nuke, custom build logic)
+forge/                    # Forge build system with multiple specialized builds:
+  ├── Common/             # Shared services, utilities, and base classes
+  ├── Docker/             # Docker image build automation
+  ├── Node/               # Node.js application builds
+  ├── NodeInDocker/       # Combined Node.js + Docker builds
+  └── Forge/              # Changelog generation and build orchestration
 .github/workflows/        # GitHub Actions workflow(s)
 ```
 
@@ -175,19 +185,39 @@ The `.github/workflows/ci.yml` workflow automates building, linting, scanning, a
 - **Default Shell:** PowerShell (`pwsh`)
 - **Default Working Directory:** `/workspace`
 - **How to update tool versions:** Edit the `Dockerfile` to specify desired versions.
-- **Build Automation:** The `Forge/` directory contains a .NET (Nuke) build project for advanced automation. The `nuke/docker-ci` script enables containerized builds.
+- **Build Automation:** The `forge/` directory contains a comprehensive .NET (Nuke) build system with multiple specialized builds for different project types. Each build provides specific commands like `docker-build`, `node-build`, `node-in-docker-build`, and `forge` for changelog generation.
+- **Changelog Generation:** Built-in changelog generation with customizable date formatting (yyyy.MM.dd), tag-based filtering, and automatic prepending to existing changelogs.
 
-## Example: Run Nuke Build in Your Container Project
+## Example: Build Commands
+
+The build agent provides specialized commands for different project types:
 
 ```pwsh
-# Run from the project root, mounting the workspace
-# (adjust the path as needed for your environment)
+# Build a Docker image from your project
 docker run --rm -it \
     -v "${PWD}:/workspace" \
-    -w "/workspace" \
-    ghcr.io/the-running-dev/build-agent:latest pwsh -Command "nuke --target Build"
-    # or through a predefined command
-    # -Command "docker-build"
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    ghcr.io/the-running-dev/build-agent:latest \
+    docker-build
+
+# Build a Node.js application  
+docker run --rm -it \
+    -v "${PWD}:/workspace" \
+    ghcr.io/the-running-dev/build-agent:latest \
+    node-build
+
+# Build Node.js app and create Docker image
+docker run --rm -it \
+    -v "${PWD}:/workspace" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    ghcr.io/the-running-dev/build-agent:latest \
+    node-in-docker-build
+
+# Generate changelog from Git history
+docker run --rm -it \
+    -v "${PWD}:/workspace" \
+    ghcr.io/the-running-dev/build-agent:latest \
+    forge --target GenerateChangeLog
 ```
 
 ## Example GitHub Action: Run Nuke Build in Your Container Project

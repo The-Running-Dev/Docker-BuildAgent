@@ -77,6 +77,6 @@ public interface IDockerComponent : INukeBuild
 
             DockerService.Push(Parameters);
 
-            Logger.Push($"{Parameters.Version.Version}, latest");
+            Logger.Push($"Docker Images: {Parameters.Version.Version}, latest");
         });
 }

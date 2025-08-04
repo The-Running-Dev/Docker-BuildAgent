@@ -94,7 +94,7 @@ public interface IGitHubComponent : INukeBuild
                 // Create Git tag after successful release
                 GitService.CreateTag(Parameters.ReleaseTag);
 
-                Logger.Ok($"'{Parameters.ReleaseTag}' Created Successfully");
+                Logger.Tag($"'{Parameters.ReleaseTag}' Created Successfully");
             }
             catch (Exception ex)
             {

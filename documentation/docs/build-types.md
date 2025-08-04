@@ -254,7 +254,84 @@ node-template-build -nodeTemplateRepositoryUrl https://github.com/my-org/custom-
 
 ---
 
-## 🔧 Common Features
+## � forge
+
+**Purpose**: Provides build orchestration and changelog generation from Git history with advanced formatting options.
+
+**What it does**:
+
+- Generates formatted changelogs from Git commit history
+- Supports multiple changelog sources (all commits, since last tag, or specific tag)
+- Customizable date formatting (default: yyyy.MM.dd)
+- Automatically prepends new changelog content to existing files
+- Provides build orchestration for complex multi-stage processes
+
+**Usage**:
+
+```bash
+# Generate changelog since last tag
+docker run \
+  -v ./:/workspace \
+  -it ghcr.io/the-running-dev/build-agent:latest \
+  forge --target GenerateChangeLog
+
+# Generate complete history
+docker run \
+  -v ./:/workspace \
+  -it ghcr.io/the-running-dev/build-agent:latest \
+  forge --target GenerateChangeLog --change-log-source all
+
+# Generate changelog since specific tag
+docker run \
+  -v ./:/workspace \
+  -it ghcr.io/the-running-dev/build-agent:latest \
+  forge --target GenerateChangeLog --change-log-source v1.0.0
+```
+
+**Key Parameters**:
+
+- `--change-log-source` - Source for changelog generation:
+  - `null/empty` - Since last Git tag (default)
+  - `all` - Complete commit history
+  - `specific-tag` - Since specified tag (e.g., "v1.0.0")
+- `--target` - Build target to execute (GenerateChangeLog, Build)
+
+**Build Targets**:
+
+1. `Setup` - Initialize parameters and environment
+2. `GenerateChangeLog` - Create and save changelog to CHANGELOG.md
+3. `Build` - Complete build process (depends on GenerateChangeLog)
+
+**Output Format**:
+
+The generated changelog uses this format with customizable date formatting:
+
+```markdown
+## Since v1.4.0 (2025.08.04)
+
+### 2025.08.04
+
+- Update build script to include 'forge' as a build type option
+- Refactor NodeService to handle different shell commands
+- Update documentation directory path
+
+### 2025.08.03
+
+- Work in Progress
+```
+
+**Configuration**:
+
+The changelog formatter supports these options:
+
+- **Date Format**: `yyyy.MM.dd` (default), customizable via ChangeLogFormatOptions
+- **Include Hash**: Option to include commit hashes in output
+- **Include Author**: Option to include commit author names
+- **Grouping**: Commits grouped by date in descending order (latest first)
+
+---
+
+## �🔧 Common Features
 
 All build commands share these common capabilities:
 
@@ -293,6 +370,8 @@ All build commands share these common capabilities:
 | Node.js apps (no container) | `node-build` | Build and test Node.js applications |
 | Node.js apps (with container) | `node-in-docker-build` | Complete CI/CD pipeline with registry push |
 | Documentation sites | `node-template-build` | Docusaurus, GitBook, static sites |
+| Changelog generation | `forge` | Git history-based changelog creation |
+| Build orchestration | `forge` | Complex multi-stage build processes |
 
 ---
 

@@ -1,7 +1,24 @@
 ---
 hide_table_of_contents: false
 ---
-## Complete History (Generated 2025-07-27)
+## Since v1.4.0 (2025.08.04)
+
+### 2025.08.04
+
+- Update build script to include 'forge' as a build type option. Refactor NodeService to handle different shell commands for package managers and shells.
+- Update NodeService to include a force flag in package manager install, improve logging for warnings and errors. Update Docker, Node, and NodeInDocker classes to use 'Ok' log level for build completion message.
+- Update documentation directory path and Docker build configuration for template build phase. Standardize parameter names in the script for consistency.
+- Refactor build classes to use shared components for deduplication.
+- Cleanup, Updated Docs Template
+- Merge branch 'main' into feature/wip
+- WIP
+- Clean up in favor of new template
+
+### 2025.08.03
+
+- Work in Progress
+
+## History (Generated 2025-07-27)
 
 ### 2025-07-22
 
@@ -134,8 +151,7 @@ hide_table_of_contents: false
 - Adds build and push workflow for the agent
 - First Commit
 
-
-## Complete History (Generated 2025-07-27)
+## History (Generated 2025-07-27)
 
 ### 2025-07-22
 
@@ -268,8 +284,7 @@ hide_table_of_contents: false
 - Adds build and push workflow for the agent
 - First Commit
 
-
-## Changes Since 0.7.0 (Generated 2025-07-27)
+## Since 0.7.0 (Generated 2025-07-27)
 
 ### 2025-07-22
 

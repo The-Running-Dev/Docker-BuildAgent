@@ -6,7 +6,7 @@ export interface Badge {
   link: string;
 }
 
-export interface BadgeSection {
+export interface BadgeGroupProps {
   key: string;
   title: string;
   icon: IconDefinition;
