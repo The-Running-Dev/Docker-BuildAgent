@@ -1,6 +1,4 @@
----
-
-- [📚 Documentation Portal](#-documentation-portal)
+- [📚 Documentation](#-documentation)
   - [Key Documentation Pages](#key-documentation-pages)
 - [📊 Project Status](#-project-status)
 - [Overview](#overview)
@@ -16,14 +14,12 @@
 - [Environment Variables](#environment-variables)
 - [Customization](#customization)
 - [Image Details](#image-details)
-- [Example: Run Nuke Build in Your Container Project](#example-run-nuke-build-in-your-container-project)
+- [Example: Build Commands](#example-build-commands)
 - [Example GitHub Action: Run Nuke Build in Your Container Project](#example-github-action-run-nuke-build-in-your-container-project)
 - [Related Resources](#related-resources)
 - [Contributing](#contributing)
 
----
-
-## 📚 Documentation Portal
+## 📚 Documentation
 
 This repository includes a full documentation site at [build-agent.subzerodev.com](https://build-agent.subzerodev.com), covering all usage, customization, parameters, targets, advanced topics, and troubleshooting for the Build Agent and Forge system.
 
