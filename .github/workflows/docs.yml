@@ -60,6 +60,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Execute shared setup steps (Docker, .NET, GitVersion, etc.)
+      - name: Setup Environment
+        uses: ./.github/actions/common
+
       # Get the latest changelog for the documentation
       - name: Get Latest Changelog
         run: forge-build --change-log-source 'all'
