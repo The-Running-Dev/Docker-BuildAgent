@@ -49,8 +49,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  create-release:
-    name: Create Release
+  Release:
+    name: Release
     runs-on: ubuntu-latest
     
     steps:
@@ -61,11 +61,11 @@ jobs:
           fetch-depth: 0
 
       # Setup build environment
-      - name: Setup Build Environment
+      - name: Setup Environment
         uses: ./.github/actions/common
 
       # Run tests to ensure quality
-      - name: Run Tests & Generate Coverage
+      - name: Tests & Coverage
         uses: ./.github/actions/tests
 
       # Build and create release

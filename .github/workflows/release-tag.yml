@@ -12,7 +12,7 @@
 #   - Use semantic versioning: v1.2.3, v1.0.0-beta.1, etc.
 #   - Must start with 'v' (configured in GitVersion.yml)
 
-name: Tag Release
+name: Release-from-Tag
 
 on:
   push:
@@ -25,8 +25,8 @@ permissions:
   checks: write
 
 jobs:
-  tag-release:
-    name: Create Release from Tag
+  Release:
+    name: Release from Tag
     runs-on: ubuntu-latest
     
     steps:
