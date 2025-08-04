@@ -65,7 +65,7 @@
 [CmdletBinding()]
 Param(
     [Parameter(HelpMessage = "Build type to execute")]
-    [ValidateSet('docker', 'node', 'node-in-docker', 'node-template')]
+    [ValidateSet('docker', 'forge', 'node', 'node-in-docker', 'node-template')]
     [string]$type = 'docker',
 
     [Parameter(HelpMessage = "Build for production")]

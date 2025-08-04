@@ -230,23 +230,48 @@ public class NodeService : INodeService
                 parameters.Config.ScriptsConfigPath.StripDirectory(parameters.RootDirectory));
 
             var pm = DetectPackageManager(parameters);
+            var nodeModulesPath = Path.Combine(parameters.RootDirectory, "node_modules");
 
             scripts = [
-                $"{pm} install -f",
+                $"bash -c \"rm -rf {nodeModulesPath}\"",
+                $"{pm} install",
                 $"{pm} run build:prod"
             ];
         }
 
         foreach (var script in scripts)
         {
-            var match = Regex.Match(script, @"^(npm|pnpm|yarn)\s+(.*)", RegexOptions.IgnoreCase);
-
-            if (match.Success)
+            var npmMatch = Regex.Match(script, @"^(npm|pnpm|yarn)\s+(.*)", RegexOptions.IgnoreCase);
+            if (npmMatch.Success)
             {
-                var packageManager = match.Groups[1].Value;
-                var command = match.Groups[2].Value;
+                var packageManager = npmMatch.Groups[1].Value;
+                var command = npmMatch.Groups[2].Value;
 
                 Run(parameters.RootDirectory, packageManager, command);
+
+                continue;
+            }
+
+            var bashMatch = Regex.Match(script, @"^(bash|sh)\s+(.*)$", RegexOptions.IgnoreCase);
+            if (bashMatch.Success)
+            {
+                var shell = bashMatch.Groups[1].Value;
+                var command = bashMatch.Groups[2].Value;
+
+                // For bash/sh commands, pass the command directly
+                Run(parameters.RootDirectory, shell, command);
+
+                continue;
+            }
+
+            var pwshMatch = Regex.Match(script, @"^(pwsh|powershell)\s+-c\s+(.*)$", RegexOptions.IgnoreCase);
+            if (pwshMatch.Success)
+            {
+                var shell = pwshMatch.Groups[1].Value;
+                var command = pwshMatch.Groups[2].Value;
+
+                // For PowerShell -c commands, pass the command directly as it already has -c
+                Run(parameters.RootDirectory, shell, $"-c {command}");
 
                 continue;
             }
