@@ -142,7 +142,7 @@ The NodeInDocker build type combines parameters from both Docker and Node.js bui
 
 ---
 
-## 🔄 NodeInDocker
+## 🔄 Node
 
 **Inherits all settings from Forge.**
 

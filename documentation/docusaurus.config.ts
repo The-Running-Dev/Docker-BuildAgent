@@ -33,6 +33,7 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
+          routeBasePath: 'docs',
         },
         blog: false,
         theme: {

@@ -30,17 +30,17 @@ sidebar_position: 0
 
 ## ⚡ Fast Track
 
-Ready to get started? Check out our [Fast Track Guide](usage) for quick examples, or explore the comprehensive [Build Types Reference](build-types) to understand all available build commands and choose the right approach for your project.
+Ready to get started? Check out our [Fast Track Guide](fast-track.md) for quick examples, or explore the comprehensive [Build Types Reference](build-types.md) to understand all available build commands and choose the right approach for your project.
 
-For advanced configuration, see [Customization Options](customization).
+For advanced configuration, see [Customization Options](customization.md).
 
 ## 🏗️ Architecture & Development
 
 For developers and advanced users, explore our architecture guides:
 
-- **[Multi-Build Architecture](architecture/multi-build-architecture)** - Understanding the modular build system
-- **[Dependency Injection](architecture/dependency-injection)** - Service architecture and testing
-- **[Development Guide](architecture/development-guide)** - Complete setup and contribution guide
-- **[Configuration & Compatibility](architecture/configuration-compatibility)** - Environment setup and platform compatibility
+- **[Multi-Build Architecture](architecture/multi-build-architecture.md)** - Understanding the modular build system
+- **[Dependency Injection](architecture/dependency-injection.md)** - Service architecture and testing
+- **[Development Guide](architecture/development-guide.md)** - Complete setup and contribution guide
+- **[Configuration & Compatibility](architecture/configuration-compatibility.md)** - Environment setup and platform compatibility
 
 <!-- 📦 ⚡ 🛠️ -->

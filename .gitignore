@@ -41,3 +41,7 @@ documentation/static/img/undraw_docusaurus_mountain.svg
 *.DotSettings
 
 forge/TestResults/
+
+documentation/build/
+
+documentation/src/navbarLinks.ts
