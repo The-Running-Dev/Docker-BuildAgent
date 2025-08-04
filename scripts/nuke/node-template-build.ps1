@@ -150,9 +150,13 @@ Invoke-SafeCommand {
     if ($NodeTemplateRepositoryUrl -match '^(.+?)#(.+)$') {
         # URL contains a branch specification
         $repoUrl = $Matches[1]
-        $branch = $Matches[2]
-        
-        Write-Host "   Using branch: $branch" -ForegroundColor Gray
+        $branch = $Matches[2].Trim()
+
+        if ([string]::IsNullOrWhiteSpace($branch)) {
+            throw "Branch Cannot be Empty"
+        }
+
+        Write-Host "   Using Branch: $branch" -ForegroundColor Gray
         
         # Clone with specific branch - don't suppress errors
         git clone --depth 1 -b $branch $repoUrl $NodeTemplateDirPath
