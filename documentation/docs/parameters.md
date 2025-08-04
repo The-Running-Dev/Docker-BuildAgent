@@ -57,6 +57,7 @@ These are the base parameters available to all builds. **NodeParams** and **Dock
 | `RegistryUser`        | Registry user name.                                     |                |
 | `RegistryToken`       | Registry authentication token.                          |                |
 | `CreateGitHubRelease` | Whether to create a GitHub release after build (bool).  | false          |
+| `PreRelease`          | Whether to mark the GitHub release as pre-release (bool)| false          |
 </TabItem>
 <TabItem value="nuke" label="NUKE Parameters">
 | Parameter                 | Description                                             | Default        |
@@ -68,6 +69,7 @@ These are the base parameters available to all builds. **NodeParams** and **Dock
 | `--registry-user`         | Registry user name.                                     |                |
 | `--registry-token`        | Registry authentication token.                          |                |
 | `--create-github-release` | Whether to create a GitHub release after build (bool).  | false          |
+| `--pre-release`           | Whether to mark the GitHub release as pre-release (bool)| false          |
 </TabItem>
 </Tabs>
 
@@ -91,6 +93,7 @@ The NodeInDocker build type combines parameters from both Docker and Node.js bui
 | `RegistryUser`        | Registry user name.                                     |                | Docker |
 | `RegistryToken`       | Registry authentication token.                          |                | Docker |
 | `CreateGitHubRelease` | Whether to create a GitHub release after build (bool).  | false          | Docker |
+| `PreRelease`          | Whether to mark the GitHub release as pre-release (bool)| false          | Docker |
 </TabItem>
 <TabItem value="nuke" label="NUKE Parameters">
 | Parameter                 | Description                                             | Default        | Source |
@@ -103,6 +106,7 @@ The NodeInDocker build type combines parameters from both Docker and Node.js bui
 | `--registry-user`         | Registry user name.                                     |                | Docker |
 | `--registry-token`        | Registry authentication token.                          |                | Docker |
 | `--create-github-release` | Whether to create a GitHub release after build (bool).  | false          | Docker |
+| `--pre-release`           | Whether to mark the GitHub release as pre-release (bool)| false          | Docker |
 </TabItem>
 </Tabs>
 

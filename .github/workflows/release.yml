@@ -1,67 +1,46 @@
+# Manual Release Creation Workflow
+#
+# This workflow creates official releases for the Docker Build Agent project.
+# It is triggered manually when you want to create a new release version.
+#
+# Features:
+#   - Manual trigger with optional version override
+#   - Comprehensive testing before release
+#   - Docker image building and publishing
+#   - GitHub release creation with changelog
+#   - Semantic versioning with GitVersion
+#
+# Usage:
+#   1. Go to Actions tab in GitHub
+#   2. Select "Create Release" workflow
+#   3. Click "Run workflow"
+#   4. Optionally specify a custom version (e.g., v1.2.3)
+#   5. Click "Run workflow" button
+#
+# The workflow will:
+#   - Run all tests to ensure quality
+#   - Build and publish Docker images
+#   - Create a GitHub release with auto-generated changelog
+#   - Tag the repository with the version number
 
-# Release Workflow
-#
-# This workflow handles production deployments for the Docker Build Agent project.
-# It builds and publishes Docker images to the container registry, creates GitHub releases,
-# and triggers documentation updates when changes are detected.
-#
-# Workflow Configuration:
-#   - Name: Release
-#   - Triggers:
-#     * Manual dispatch (workflow_dispatch) for on-demand releases
-#     * Automatic execution on pushes to the main branch
-#   - Ignores: Changes only to documentation/ and .github/ directories
-#   - Permissions: packages:write, contents:write for registry push and release creation
-#
-# Release Process:
-#   1. Checkout repository with full git history for proper versioning
-#   2. Execute shared setup actions (.github/actions/common)
-#   3. Run comprehensive test suite with coverage reporting
-#   4. Build and publish Docker images to container registry
-#   5. Create GitHub release with auto-generated changelog
-#   6. Detect documentation changes and trigger docs rebuild if needed
-#
-# Quality Assurance:
-#   - Executes all test projects before deployment
-#   - Generates coverage reports for release validation
-#   - Ensures only tested code reaches production
-#   - Validates build integrity before publishing artifacts
-#
-# Environment Variables:
-#   - GITHUB_TOKEN: GitHub authentication for releases and API access
-#   - RegistryToken: Container registry authentication token
-#   - NotificationsWebHookUrl: Discord webhook for deployment notifications
-#
-# Release Artifacts:
-#   - Docker images pushed to GitHub Container Registry (ghcr.io)
-#   - GitHub release with semantic versioning and changelog
-#   - Git tags created automatically via GitVersion
-#   - Discord notifications for successful deployments
-#   - Test and coverage reports for release validation
-#
-# Documentation Integration:
-#   - Automatically detects documentation changes in commits
-#   - Triggers documentation site rebuild when docs are updated
-#   - Maintains documentation synchronization with releases
-#
-# Notes:
-#   - Only runs on main branch pushes or manual triggers
-#   - Creates production releases with --create-github-release flag
-#   - Automatically triggers documentation deployment if docs changed
-#   - Uses GitVersion for semantic versioning and changelog generation
-#   - Includes comprehensive testing before any deployment
-#   - Fails fast if tests don't pass, preventing broken releases
-#
-name: Release
+name: Create Release
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'documentation/**'
-      - '.github/**'
+    inputs:
+      version:
+        description: 'Release Version (optional, leave empty for auto-version)'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as Pre-Release'
+        required: false
+        type: boolean
+        default: false
+      release_notes:
+        description: 'Custom Release Notes (optional)'
+        required: false
+        type: string
 
 permissions:
   packages: write
@@ -70,48 +49,42 @@ permissions:
   pull-requests: write
 
 jobs:
-  Build:
-    name: Build & Release
+  create-release:
+    name: Create Release
     runs-on: ubuntu-latest
-
+    
     steps:
-      # Checkout the repository with full git history for GitVersion and changelog generation
+      # Checkout with full history for GitVersion
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # Execute shared setup steps (Docker, .NET, GitVersion, etc.)
+      # Setup build environment
       - name: Setup Build Environment
         uses: ./.github/actions/common
 
-      # Execute tests steps
+      # Run tests to ensure quality
       - name: Run Tests & Generate Coverage
         uses: ./.github/actions/tests
 
-      # Build Docker image and create GitHub release with artifacts
-      - name: Build and Publish Release
-        run: nuke --type docker --create-github-release true
+      # Build and create release
+      - name: Build and Create Release
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            echo "Using custom version: ${{ github.event.inputs.version }}"
+            nuke --type docker --create-github-release true --version "${{ github.event.inputs.version }}" --pre-release "${{ github.event.inputs.prerelease }}"
+          else
+            echo "Using GitVersion for automatic versioning"
+            nuke --type docker --create-github-release true --pre-release "${{ github.event.inputs.prerelease }}"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
 
-      # Check if documentation files were modified in this commit
-      - name: Check for Documentation Changes
-        id: docs-changed
-        run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q '^documentation/'; then
-            echo "Documentation changes detected"
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "No documentation changes found"
-            echo "changed=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Trigger documentation site rebuild if docs were updated
+      # Trigger documentation build if needed
       - name: Trigger Documentation Build
-        if: steps.docs-changed.outputs.changed == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

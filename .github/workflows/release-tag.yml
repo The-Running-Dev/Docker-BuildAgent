@@ -1,0 +1,70 @@
+# Tag-Based Release Workflow
+#
+# This workflow creates releases when you push a version tag to the repository.
+# This is useful if you prefer to create releases by pushing tags rather than
+# using the manual workflow dispatch method.
+#
+# Usage:
+#   1. Create and push a tag: git tag v1.2.3 && git push origin v1.2.3
+#   2. The workflow will automatically run and create a release
+#
+# Tag Format:
+#   - Use semantic versioning: v1.2.3, v1.0.0-beta.1, etc.
+#   - Must start with 'v' (configured in GitVersion.yml)
+
+name: Tag Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  packages: write
+  contents: write
+  checks: write
+
+jobs:
+  tag-release:
+    name: Create Release from Tag
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout with full history
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Setup build environment
+      - name: Setup Environment
+        uses: ./.github/actions/common
+
+      # Run tests
+      - name: Tests & Coverage
+        uses: ./.github/actions/tests
+
+      # Determine if this is a prerelease
+      - name: Check if Pre-Release
+        id: prerelease
+        run: |
+          if [[ "${{ github.ref_name }}" =~ -[a-zA-Z] ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Build and create release
+      - name: Build and Create Release
+        run: nuke --type docker --create-github-release true --pre-release "${{ steps.prerelease.outputs.prerelease }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+
+      # Trigger documentation build
+      - name: Trigger Documentation Build
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: Update-Documentation

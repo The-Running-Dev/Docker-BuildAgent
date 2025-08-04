@@ -59,6 +59,9 @@ public class Docker : Base<DockerParams, DiscordNotifications>, IDockerComponent
     [Parameter("Should a GitHub release be created")]
     public readonly bool CreateGitHubRelease;
 
+    [Parameter("Should the GitHub release be marked as pre-release")]
+    public readonly bool PreRelease;
+
     // Component interface implementations
     DockerParams IDockerComponent.Parameters => Parameters;
     
@@ -107,6 +110,8 @@ public class Docker : Base<DockerParams, DiscordNotifications>, IDockerComponent
         ];
 
         Parameters.ReleaseTag = $"v{Parameters.Version}"; // Add "v" prefix to match GitService tag format
+        Parameters.CreateGitHubRelease = CreateGitHubRelease;
+        Parameters.PreRelease = PreRelease;
     }
 
     /// <summary>

@@ -51,6 +51,11 @@ public class DockerParams : ForgeParams
     public bool CreateGitHubRelease { get; set; } = false;
 
     /// <summary>
+    /// Gets or sets a value indicating whether the GitHub release should be marked as a pre-release.
+    /// </summary>
+    public bool PreRelease { get; set; } = false;
+
+    /// <summary>
     /// Gets or sets the release tag for the current version.
     /// </summary>
     public string ReleaseTag { get; set; } = "v0.0.0";

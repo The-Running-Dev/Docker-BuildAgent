@@ -4,6 +4,146 @@ title: "🔄 GitHub Actions"
 sidebar_position: 8
 ---
 
+## 🚀 Release Strategy
+
+The Build Agent project uses a **controlled release strategy** to distinguish between development builds and official releases:
+
+### Development Workflow
+
+- **Push to main** → Triggers "Deploy" workflow → Builds and publishes Docker images (no GitHub releases)
+- **Pull requests** → Triggers "CI" workflow → Validation and testing only
+
+### Release Workflow
+
+- **Manual releases**: Use "Create Release" workflow in GitHub Actions
+- **Tag-based releases**: Push a version tag (e.g., `git tag v1.2.3 && git push origin v1.2.3`)
+
+### Pre-releases
+
+Tags with suffixes like `v1.0.0-beta.1` or `v1.0.0-rc.1` are automatically marked as pre-releases.
+
+---
+
+## 📦 Creating Official Releases
+
+### Option 1: Manual Release (Recommended)
+
+1. Go to **Actions** tab in your GitHub repository
+2. Select **"Create Release"** workflow
+3. Click **"Run workflow"**
+4. Optionally specify:
+   - Custom version (e.g., `v1.2.3`)
+   - Mark as pre-release
+   - Custom release notes
+5. Click **"Run workflow"** button
+
+### Option 2: Tag-Based Release
+
+```bash
+# Create and push a version tag
+git tag v1.2.3
+git push origin v1.2.3
+
+# For pre-releases
+git tag v1.0.0-beta.1
+git push origin v1.0.0-beta.1
+```
+
+---
+
+## 📦 Example Workflows
+
+### Create Release Workflow
+
+```yaml
+name: Create Release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (optional, leave empty for auto-version)'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Build Environment
+        uses: ./.github/actions/common
+
+      - name: Run Tests & Generate Coverage
+        uses: ./.github/actions/tests
+
+      - name: Build and Create Release
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            nuke --type docker --create-github-release true --version "${{ github.event.inputs.version }}" --pre-release "${{ github.event.inputs.prerelease }}"
+          else
+            nuke --type docker --create-github-release true --pre-release "${{ github.event.inputs.prerelease }}"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+```
+
+### Deploy Workflow (Continuous Deployment)
+
+```yaml
+name: Deploy
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - 'documentation/**'
+
+permissions:
+  packages: write
+  contents: write
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Build Environment
+        uses: ./.github/actions/common
+
+      - name: Run Tests & Generate Coverage
+        uses: ./.github/actions/tests
+
+      - name: Build and Publish to Registry
+        run: nuke --type docker --create-github-release false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+```
+
+---
+
 ## 🐳 Docker Image
 
 This workflow builds and pushes a Docker image using the Build Agent. It checks out your repository, runs the `docker-build` target, and passes required secrets for authentication.

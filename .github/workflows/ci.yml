@@ -97,11 +97,11 @@ jobs:
           fetch-depth: 0
 
       # Execute shared setup steps (Docker, .NET, GitVersion, etc.)
-      - name: Setup Build Environment
+      - name: Setup Environment
         uses: ./.github/actions/common
 
       # Execute tests steps
-      - name: Run Tests & Generate Coverage
+      - name: Tests & Coverage
         uses: ./.github/actions/tests
 
       # Run the Docker build in dry-run mode for validation

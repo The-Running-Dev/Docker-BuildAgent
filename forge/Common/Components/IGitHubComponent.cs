@@ -77,8 +77,13 @@ public interface IGitHubComponent : INukeBuild
         {
             try
             {
-                // Create GitHub release first
-                await GitHubService.CreateRelease(Parameters);
+                // Create GitHub release with prerelease option
+                var releaseOptions = new Entities.GitHubReleaseOptions
+                {
+                    PreRelease = Parameters.PreRelease
+                };
+                
+                await GitHubService.CreateRelease(Parameters, releaseOptions);
                 
                 Logger.Ok("GitHub Release Created Successfully");
             }

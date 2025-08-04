@@ -16,7 +16,7 @@ sidebar_position: 0
 - 📂 Dynamic build and app environment generation from pipeline secrets
 - 🪄 Automatic detection of Node.js package managers
 - 💬 Discord integration for notifications
-- 🚀 GitHub integration for creating releases
+- 🚀 GitHub integration for creating releases with **controlled release strategy**
 - 📜 Orchestration by convention or via `.build.scripts` and `.build.copy`
 - 🧪 Dry-run mode for safe testing
 - 🟢 Node.js runtime

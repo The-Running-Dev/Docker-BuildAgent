@@ -1,8 +1,9 @@
 FROM mcr.microsoft.com/devcontainers/javascript-node:latest
 
 LABEL maintainer="ben@subzerodev.com" \
-      version="0.3" \
+      version="0.0" \
       description="Build Agent with Node.js, Angular CLI, TypeScript, Docker, PowerShell, and GitVersion"
+LABEL org.opencontainers.image.source="https://github.com/The-Running-Dev/Docker-BuildAgent"
 
 # Disable telemetry
 ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
