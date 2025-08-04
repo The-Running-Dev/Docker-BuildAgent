@@ -39,7 +39,7 @@ public static class ChangeLogFormatter
 
         // Group commits by date (descending: latest date first)
         var commitsByDate = commits
-            .GroupBy(c => c.Date)
+            .GroupBy(c => DateTime.Parse(c.Date).ToString(options.DateFormat))
             .OrderByDescending(g => g.Key);
 
         var today = DateTime.UtcNow.ToString(options.DateFormat);
@@ -47,8 +47,8 @@ public static class ChangeLogFormatter
         
         // Add header
         var header = config.Tag == null 
-            ? $"## Complete History (Generated {today})"
-            : $"## Changes Since {config.Tag} (Generated {today})";
+            ? $"## History ({today})"
+            : $"## Since {config.Tag} ({today})";
         changelogBuilder.AppendLine($"{header}\n");
 
         // Add commits grouped by date

@@ -1,6 +1,7 @@
 ﻿using Nuke.Common;
+using Microsoft.Extensions.DependencyInjection;
 
-using Entities;
+using Services;
 using Extensions;
 using Parameters;
 using Notifications;
@@ -33,9 +34,11 @@ public class Forge : Base<ForgeParams, DiscordNotifications>
     /// verbosity is set to verbose.</remarks>
     protected override void Configure()
     {
+        var changeLogConfigService = ServiceProvider.GetRequiredService<IChangeLogConfigService>();
+
         // Copy Nuke CLI parameters
         Parameters.Hydrate(this, verbose: Verbosity == Verbosity.Verbose);
-        Parameters.ChangeLogConfig = ChangeLogConfig.FromString(ChangeLogSource);
+        Parameters.ChangeLogConfig = changeLogConfigService.Create(ChangeLogSource);
     }
     
     /// <summary>
