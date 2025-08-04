@@ -1,14 +1,21 @@
 import {themes as prismThemes} from 'prism-react-renderer';
-import getVersion from './scripts/get-version';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import { PreBuild } from './scripts/pre-build';
+import { navbarLinks } from './src/navbarLinks';
 
-// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
-const version = getVersion();
+const version = PreBuild.getVersion();
 const config: Config = {
   title: 'Build Agent',
   tagline: 'Smart automation for DevOps teams and CI/CD pipelines',
+  url: 'https://build-agent.subzerodev.com',
+  baseUrl: '/',
+  trailingSlash: false,
   favicon: 'img/favicon.ico',
+  projectName: 'build-agent',
+  organizationName: 'the-running-dev',
+  onBrokenLinks: 'throw',
+  onBrokenMarkdownLinks: 'warn',
   markdown: {
     mermaid: true,
   },
@@ -16,13 +23,6 @@ const config: Config = {
   future: {
     v4: true,
   },
-  url: 'https://build-agent.subzerodev.com',
-  baseUrl: '/',
-  trailingSlash: false,
-  organizationName: 'The-Running-Dev',
-  projectName: 'Build Agent',
-  onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
@@ -33,11 +33,8 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          routeBasePath: '/', // Serve the docs at the site's root
-          path: 'docs',
-          id: 'default',
         },
-        blog: false, // Disable blog since docs is now the root
+        blog: false,
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -79,7 +76,8 @@ const config: Config = {
           href: 'https://ghcr.io/the-running-dev/build-agent',
           label: 'Container Registry',
           position: 'right',
-        }
+        },
+        ...navbarLinks,
       ],
     },
     prism: {

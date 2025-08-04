@@ -1,0 +1,36 @@
+/**
+ * Material Teal Theme - Custom CSS for Docusaurus
+ * A refreshing teal color palette inspired by Material Design
+ * Features deep teals for light mode and bright aqua-teals for dark mode
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #00796b;
+  --ifm-color-primary-dark: #00695c;
+  --ifm-color-primary-darker: #004d40;
+  --ifm-color-primary-darkest: #00251a;
+  --ifm-color-primary-light: #26a69a;
+  --ifm-color-primary-lighter: #4db6ac;
+  --ifm-color-primary-lightest: #80cbc4;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 121, 107, 0.1);
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #4db6ac;
+  --ifm-color-primary-dark: #26a69a;
+  --ifm-color-primary-darker: #00897b;
+  --ifm-color-primary-darkest: #00796b;
+  --ifm-color-primary-light: #80cbc4;
+  --ifm-color-primary-lighter: #b2dfdb;
+  --ifm-color-primary-lightest: #e0f2f1;
+  --docusaurus-highlighted-code-line-bg: rgba(77, 182, 172, 0.3);
+}
+
+.hero__title {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+}

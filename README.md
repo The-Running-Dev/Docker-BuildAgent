@@ -1,59 +1,57 @@
-# Docker-BuildAgent
+---
+
+- [📚 Documentation Portal](#-documentation-portal)
+  - [Key Documentation Pages](#key-documentation-pages)
+- [📊 Project Status](#-project-status)
+- [Overview](#overview)
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Usage](#usage)
+  - [Building and Running Locally](#building-and-running-locally)
+  - [Build and Push to Container Registry](#build-and-push-to-container-registry)
+  - [GitHub Actions CI/CD](#github-actions-cicd)
+    - [Workflow Steps](#workflow-steps)
+    - [Tagging Support](#tagging-support)
+- [Environment Variables](#environment-variables)
+- [Customization](#customization)
+- [Image Details](#image-details)
+- [Example: Run Nuke Build in Your Container Project](#example-run-nuke-build-in-your-container-project)
+- [Example GitHub Action: Run Nuke Build in Your Container Project](#example-github-action-run-nuke-build-in-your-container-project)
+- [Related Resources](#related-resources)
+- [Contributing](#contributing)
 
 ---
 
 ## 📚 Documentation Portal
 
-This repository now includes a full documentation site at [build-agent.subzerodev.com](https://build-agent.subzerodev.com), covering all usage, customization, parameters, targets, advanced topics, and troubleshooting for the Build Agent and Forge system.
+This repository includes a full documentation site at [build-agent.subzerodev.com](https://build-agent.subzerodev.com), covering all usage, customization, parameters, targets, advanced topics, and troubleshooting for the Build Agent and Forge system.
 
 **Start here:** [Docs Site Home](https://build-agent.subzerodev.com)
 
 ### Key Documentation Pages
 
-- [🚀 Fast Track / Usage Guide](https://build-agent.subzerodev.com/usage)
-- [📝 Customization Options](https://build-agent.subzerodev.com/customization)
-- [⚙️ Parameters & Settings](https://build-agent.subzerodev.com/parameters)
-- [🎯 Build Targets](https://build-agent.subzerodev.com/targets)
-- [🐳 Docker Templates](https://build-agent.subzerodev.com/docker-templates)
-- [🔄 CI/CD Examples](https://build-agent.subzerodev.com/ci-cd)
-- [⚡ Advanced Usage](https://build-agent.subzerodev.com/advanced)
-- [🛠️ Development Setup](https://build-agent.subzerodev.com/development)
-- [❓ Troubleshooting & FAQ](https://build-agent.subzerodev.com/troubleshooting)
+- [🚀 Fast Track / Usage Guide](https://build-agent.subzerodev.com/docs/usage)
+- [📝 Customization Options](https://build-agent.subzerodev.com/docs/customization)
+- [⚙️ Parameters & Settings](https://build-agent.subzerodev.com/docs/parameters)
+- [🎯 Build Targets](https://build-agent.subzerodev.com/docs/targets)
+- [🐳 Docker Templates](https://build-agent.subzerodev.com/docs/docker-templates)
+- [🔄 CI/CD Examples](https://build-agent.subzerodev.com/docs/ci-cd)
+- [⚡ Advanced Usage](https://build-agent.subzerodev.com/docs/advanced)
+- [🛠️ Development Setup](https://build-agent.subzerodev.com/docs/development)
+- [❓ Troubleshooting & FAQ](https://build-agent.subzerodev.com/docs/troubleshooting)
 
 For the most up-to-date and detailed information, always refer to the documentation site. The rest of this README provides a high-level summary.
 
-![Build Status](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml/badge.svg?branch=main)
-![Release Status](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml/badge.svg?branch=main)
-![Documentation](https://img.shields.io/badge/docs-build--agent.subzerodev.com-blue?logo=gitbook&logoColor=white)
-![Test Results](https://img.shields.io/badge/tests-passing-brightgreen?logo=github-actions&logoColor=white)
+## 📊 Project Status
 
----
+[![CI](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml)
+[![Release](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml)
+[![Version](https://img.shields.io/github/v/release/the-running-dev/Docker-BuildAgent?logo=semver&logoColor=white&label=Version)](https://github.com/the-running-dev/Docker-BuildAgent/releases/latest)
+[![License](https://img.shields.io/badge/License-MIT-blue?logo=opensourceinitiative&logoColor=white)](https://github.com/the-running-dev/Docker-BuildAgent/blob/main/LICENSE)
+[![Docs](https://img.shields.io/badge/Docs-Live-blue?logo=gitbook&logoColor=white)](https://build-agent.subzerodev.com)
 
-## Table of Contents
-
-- [Docker-BuildAgent](#docker-buildagent)
-  - [📚 Documentation Portal](#-documentation-portal)
-    - [Key Documentation Pages](#key-documentation-pages)
-  - [Table of Contents](#table-of-contents)
-  - [Overview](#overview)
-  - [Features](#features)
-  - [Project Structure](#project-structure)
-  - [Prerequisites](#prerequisites)
-  - [Usage](#usage)
-    - [Building and Running Locally](#building-and-running-locally)
-    - [Build and Push to Container Registry](#build-and-push-to-container-registry)
-    - [GitHub Actions CI/CD](#github-actions-cicd)
-      - [Workflow Steps](#workflow-steps)
-      - [Tagging Support](#tagging-support)
-  - [Environment Variables](#environment-variables)
-  - [Customization](#customization)
-  - [Image Details](#image-details)
-  - [Example: Run Nuke Build in Your Container Project](#example-run-nuke-build-in-your-container-project)
-  - [Example GitHub Action: Run Nuke Build in Your Container Project](#example-github-action-run-nuke-build-in-your-container-project)
-  - [Related Resources](#related-resources)
-  - [Contributing](#contributing)
-
----
+> 📋 For comprehensive project metrics including build health, security scans, community stats, and development activity, visit the [**📊 Project Status Dashboard**](https://build-agent.subzerodev.com/docs/project-status) in our documentation.
 
 ## Overview
 
@@ -69,6 +67,11 @@ Docker-BuildAgent is a pre-configured Docker image and build environment designe
 - **Git** for source control
 - **GitVersion** for semantic versioning in CI/CD
 - **Nuke Build** support for advanced .NET build automation
+- **Forge Build System** with multiple specialized build types:
+  - **Docker builds** with automated image creation and registry push
+  - **Node.js builds** with package manager detection and custom scripts
+  - **Combined Node+Docker builds** for full-stack applications
+  - **Changelog generation** with Git integration and customizable formatting
 - **Cross-platform build scripts** (`build.sh`, `build.ps1`, `build.cmd`)
 - **Ready-to-use in CI/CD pipelines** (e.g., GitHub Actions)
 
@@ -80,7 +83,12 @@ README.md                 # Project documentation
 build.sh                  # Bash build/push script (Linux/macOS/CI)
 build.ps1                 # PowerShell build script (Windows)
 GitVersion.yml            # GitVersion configuration for semantic versioning
-docker/                   # .NET build project (Nuke, custom build logic)
+forge/                    # Forge build system with multiple specialized builds:
+  ├── Common/             # Shared services, utilities, and base classes
+  ├── Docker/             # Docker image build automation
+  ├── Node/               # Node.js application builds
+  ├── NodeInDocker/       # Combined Node.js + Docker builds
+  └── Forge/              # Changelog generation and build orchestration
 .github/workflows/        # GitHub Actions workflow(s)
 ```
 
@@ -177,19 +185,39 @@ The `.github/workflows/ci.yml` workflow automates building, linting, scanning, a
 - **Default Shell:** PowerShell (`pwsh`)
 - **Default Working Directory:** `/workspace`
 - **How to update tool versions:** Edit the `Dockerfile` to specify desired versions.
-- **Build Automation:** The `Forge/` directory contains a .NET (Nuke) build project for advanced automation. The `nuke/docker-ci` script enables containerized builds.
+- **Build Automation:** The `forge/` directory contains a comprehensive .NET (Nuke) build system with multiple specialized builds for different project types. Each build provides specific commands like `docker-build`, `node-build`, `node-in-docker-build`, and `forge` for changelog generation.
+- **Changelog Generation:** Built-in changelog generation with customizable date formatting (yyyy.MM.dd), tag-based filtering, and automatic prepending to existing changelogs.
 
-## Example: Run Nuke Build in Your Container Project
+## Example: Build Commands
+
+The build agent provides specialized commands for different project types:
 
 ```pwsh
-# Run from the project root, mounting the workspace
-# (adjust the path as needed for your environment)
+# Build a Docker image from your project
 docker run --rm -it \
     -v "${PWD}:/workspace" \
-    -w "/workspace" \
-    ghcr.io/the-running-dev/build-agent:latest pwsh -Command "nuke --target Build"
-    # or through a predefined command
-    # -Command "docker-build"
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    ghcr.io/the-running-dev/build-agent:latest \
+    docker-build
+
+# Build a Node.js application  
+docker run --rm -it \
+    -v "${PWD}:/workspace" \
+    ghcr.io/the-running-dev/build-agent:latest \
+    node-build
+
+# Build Node.js app and create Docker image
+docker run --rm -it \
+    -v "${PWD}:/workspace" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    ghcr.io/the-running-dev/build-agent:latest \
+    node-in-docker-build
+
+# Generate changelog from Git history
+docker run --rm -it \
+    -v "${PWD}:/workspace" \
+    ghcr.io/the-running-dev/build-agent:latest \
+    forge --target GenerateChangeLog
 ```
 
 ## Example GitHub Action: Run Nuke Build in Your Container Project

@@ -74,6 +74,12 @@ docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
   node-template-build
+
+# Changelog generation and build orchestration
+docker run \
+  -v ./:/workspace \
+  -it ghcr.io/the-running-dev/build-agent:latest \
+  forge --target GenerateChangeLog
 ```
 
 ### Option 2: Local PowerShell Scripts
@@ -85,10 +91,12 @@ Use the local build script for development:
 .\build.ps1 -type docker
 .\build.ps1 -type node
 .\build.ps1 -type node-in-docker
+.\build.ps1 -type forge
 
 # With additional parameters
 .\build.ps1 -type docker -isProd --image-tag myapp:v1.0.0
 .\build.ps1 -type node --artifacts-dir ./dist
+.\build.ps1 -type forge --change-log-source all
 ```
 
 ### Option 3: Direct NUKE Commands
@@ -98,6 +106,8 @@ Run builds directly with NUKE CLI (for development):
 ```powershell
 # Compile and run specific projects
 dotnet run --project forge/Docker/Docker.csproj -- Build
+dotnet run --project forge/Node/Node.csproj -- Build
+dotnet run --project forge/Forge/Forge.csproj -- GenerateChangeLog
 dotnet run --project forge/Node/Node.csproj -- Build
 dotnet run --project forge/NodeInDocker/NodeInDocker.csproj -- Build
 dotnet run --project forge/NodeTemplate/NodeTemplate.csproj -- Build

@@ -92,7 +92,56 @@ jobs:
           RegistryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
 ```
 
-## 🛠️ Custom Build
+## � Changelog Generation
+
+This workflow generates a changelog from Git commit history using the Forge build system. It can be configured to generate complete history or changes since a specific tag.
+
+```yaml
+name: Changelog-Generation
+on:
+  workflow_dispatch:
+    inputs:
+      changelog_source:
+        description: 'Changelog source (all, tag name, or leave empty for since last tag)'
+        required: false
+        default: ''
+        type: string
+  push:
+    branches:
+      - main
+
+jobs:
+  Generate-Changelog:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/the-running-dev/build-agent:latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Changelog
+        run: |
+          if [ -n "${{ github.event.inputs.changelog_source }}" ]; then
+            forge --target GenerateChangeLog --change-log-source "${{ github.event.inputs.changelog_source }}"
+          else
+            forge --target GenerateChangeLog
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Commit Changelog
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git diff --staged --quiet || git commit -m "Update changelog"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+## �🛠️ Custom Build
 
 Because the build agent has all the tooling, you can run any Bash/PowerShell/NPM/Angular CLI scripts.
 

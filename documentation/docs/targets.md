@@ -8,14 +8,22 @@ This page describes the main build targets available in the Forge system for Doc
 
 ---
 
-## 🛠️ Forge (Generic) Targets
+## 🛠️ Forge (Changelog Generation) Targets
 
-- 🏗️ **Build**: Runs the main build process for the selected project type (Docker, Node, etc.), depending on your command-line arguments.
-- 📝 **GenerateChangeLog**: Generates or updates the project changelog based on recent commits.
+- 🏗️ **Build**: Completes the build process after changelog generation (depends on GenerateChangeLog).
+- 📝 **GenerateChangeLog**: Generates formatted changelog from Git commit history and saves to CHANGELOG.md.
+- ⚙️ **Setup**: Initializes parameters and environment configuration.
 
-### 🗺️ Target Execution Order
+**Changelog Features**:
 
-This diagram shows the order in which the Forge (Generic) targets are executed:
+- Supports multiple sources: since last tag, complete history, or specific tag
+- Uses customizable date formatting (default: `yyyy.MM.dd`)
+- Automatically prepends new content to existing changelog files
+- Groups commits by date in descending order (latest first)
+
+### 🗺️ Forge Target Execution Order
+
+This diagram shows the order in which the Forge (Changelog Generation) targets are executed:
 
 ```mermaid
 flowchart TD
@@ -31,7 +39,7 @@ flowchart TD
 - 📤 **PushToRegistry**: Pushes the built Docker image(s) to the configured container registry.
 - 🖼️ **BuildDockerImage**: Runs the actual Docker build command to produce the image.
 
-### 🗺️ Target Execution Order
+### 🗺️ Docker Target Execution Order
 
 This diagram shows the order in which the Docker build targets are executed:
 
@@ -74,7 +82,7 @@ The NodeInDocker build combines Node.js application building with Docker image c
 - 🌱 **GenerateEnvironment**: Generates the environment file from your mapping configuration.
 - 🧹 **Clean**: Cleans the artifacts directory and prepares the workspace for a fresh build.
 
-### 🗺️ Target Execution Order
+### 🗺️ NodeInDocker Target Execution Order
 
 This diagram shows the order in which the NodeInDocker build targets are executed:
 

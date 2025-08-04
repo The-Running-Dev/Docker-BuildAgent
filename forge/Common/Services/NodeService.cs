@@ -127,6 +127,7 @@ public class NodeService : INodeService
         if (string.IsNullOrWhiteSpace(rootDirectory))
         {
             _logger.LogWarning("Root directory is empty or whitespace — Unable to Detect Node App Type.");
+            
             return "unknown";
         }
 
@@ -229,8 +230,10 @@ public class NodeService : INodeService
                 parameters.Config.ScriptsConfigPath.StripDirectory(parameters.RootDirectory));
 
             var pm = DetectPackageManager(parameters);
+            var nodeModulesPath = Path.Combine(parameters.RootDirectory, "node_modules");
 
             scripts = [
+                $"bash -c \"rm -rf {nodeModulesPath}\"",
                 $"{pm} install",
                 $"{pm} run build:prod"
             ];
@@ -238,14 +241,37 @@ public class NodeService : INodeService
 
         foreach (var script in scripts)
         {
-            var match = Regex.Match(script, @"^(npm|pnpm|yarn)\s+(.*)", RegexOptions.IgnoreCase);
-
-            if (match.Success)
+            var npmMatch = Regex.Match(script, @"^(npm|pnpm|yarn)\s+(.*)", RegexOptions.IgnoreCase);
+            if (npmMatch.Success)
             {
-                var packageManager = match.Groups[1].Value;
-                var command = match.Groups[2].Value;
+                var packageManager = npmMatch.Groups[1].Value;
+                var command = npmMatch.Groups[2].Value;
 
                 Run(parameters.RootDirectory, packageManager, command);
+
+                continue;
+            }
+
+            var bashMatch = Regex.Match(script, @"^(bash|sh)\s+(.*)$", RegexOptions.IgnoreCase);
+            if (bashMatch.Success)
+            {
+                var shell = bashMatch.Groups[1].Value;
+                var command = bashMatch.Groups[2].Value;
+
+                // For bash/sh commands, pass the command directly
+                Run(parameters.RootDirectory, shell, command);
+
+                continue;
+            }
+
+            var pwshMatch = Regex.Match(script, @"^(pwsh|powershell)\s+-c\s+(.*)$", RegexOptions.IgnoreCase);
+            if (pwshMatch.Success)
+            {
+                var shell = pwshMatch.Groups[1].Value;
+                var command = pwshMatch.Groups[2].Value;
+
+                // For PowerShell -c commands, pass the command directly as it already has -c
+                Run(parameters.RootDirectory, shell, $"-c {command}");
 
                 continue;
             }
@@ -346,31 +372,31 @@ public class NodeService : INodeService
             .StartProcess(command, args, workingDirectory: workingDirectory, logOutput: false, logInvocation: false)
             .AssertZeroExitCode()
             .Output.ForEach(x =>
+        {
+            var text = x.Text?.Trim();
+
+            // Skip all empty or whitespace lines regardless of OutputType
+            if (string.IsNullOrWhiteSpace(text))
             {
-                var text = x.Text?.Trim();
+                return;
+            }
 
-                // Skip all empty or whitespace lines regardless of OutputType
-                if (string.IsNullOrWhiteSpace(text))
-                {
-                    return;
-                }
+            var lower = text.ToLowerInvariant();
 
-                var lower = text.ToLowerInvariant();
-
-                // Known warning patterns
-                if (lower.Contains("warn"))
-                {
-                    _logger.LogWarning("{OutputText}", text);
-                }
-                // Only log as error if it's stderr and it's meaningful
-                else if (x.Type == OutputType.Err)
-                {
-                    _logger.LogDebug("{OutputText}", text);
-                }
-                else
-                {
-                    _logger.LogInformation("{OutputText}", text);
-                }
-            });
+            // Known warning patterns
+            if (lower.Contains("warn"))
+            {
+                _logger.LogWarning("{OutputText}", text);
+            }
+            // Only log as error if it's stderr and it's meaningful
+            else if (x.Type == OutputType.Err)
+            {
+                _logger.LogDebug("{OutputText}", text);
+            }
+            else
+            {
+                _logger.LogInformation("{OutputText}", text);
+            }
+        });
     }
 }

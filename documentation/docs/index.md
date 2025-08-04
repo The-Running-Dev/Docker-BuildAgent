@@ -25,7 +25,8 @@ sidebar_position: 0
 - 🟣 .NET 8 SDK for .NET builds and tools
 - 🗃️ Git for source control
 - 🔢 GitVersion for semantic versioning in CI/CD
-- 📝 CHANGELOG generation
+- 📝 **CHANGELOG generation** with Git integration and customizable formatting
+- ⚡ **Forge build system** with specialized commands for different project types
 
 ## ⚡ Fast Track
 

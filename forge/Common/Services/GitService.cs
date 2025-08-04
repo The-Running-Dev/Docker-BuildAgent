@@ -166,8 +166,9 @@ public class GitService : IGitService
         var content = string.Empty;
         if (File.Exists(filePath))
         {
-            content = File.ReadAllText(filePath);
-            content += "\n" + changeLog;
+            var existingContent = File.ReadAllText(filePath);
+
+            content = changeLog + existingContent;
 
             _logger.LogDebug("Appending to Existing Changelog File");
         }
