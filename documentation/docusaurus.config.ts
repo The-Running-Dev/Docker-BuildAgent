@@ -1,10 +1,10 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
+import { themes as prismThemes } from 'prism-react-renderer';
+
+import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
-import { PreBuild } from './scripts/pre-build';
+
 import { navbarLinks } from './src/navbarLinks';
 
-const version = PreBuild.getVersion();
 const config: Config = {
   title: 'Build Agent',
   tagline: 'Smart automation for DevOps teams and CI/CD pipelines',
@@ -37,7 +37,7 @@ const config: Config = {
         },
         blog: false,
         theme: {
-          customCss: './src/css/custom.css',
+          customCss: './static/themes/agent.css',
         },
       } satisfies Preset.Options,
     ],
@@ -59,25 +59,18 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          label: `v${version}`,
-          position: 'right',
-          href: '#',
-        },
-        {
-          href: 'https://github.com/The-Running-Dev/Docker-BuildAgent',
-          label: 'GitHub',
+          type: 'custom-gitHubLinks',
           position: 'right',
         },
         {
-          href: 'https://github.com/The-Running-Dev/Docker-BuildAgent/releases',
-          label: 'Releases',
+          type: 'custom-versionDisplay',
           position: 'right',
         },
         {
-          href: 'https://ghcr.io/the-running-dev/build-agent',
-          label: 'Container Registry',
+          type: 'custom-themeSwitcher',
           position: 'right',
         },
+        // ...auto generated links,
         ...navbarLinks,
       ],
     },
