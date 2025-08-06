@@ -59,7 +59,7 @@ Write-Host "🔨 Phase 1: Preparing Documentation Environment..." -ForegroundCol
     node-template-build `
         -AppDir $appDir `
         -PackageManager 'pnpm' `
-        -NodeTemplateRepositoryUrl 'https://github.com/The-Running-Dev/Docusaurus-Template.git#feature/comments_badges' `
+        -NodeTemplateRepositoryUrl 'https://github.com/The-Running-Dev/Docusaurus-Template.git' `
         -SkipInstall `
         -IsProduction:$false
 
