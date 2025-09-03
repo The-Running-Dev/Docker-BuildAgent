@@ -160,7 +160,108 @@ public class DockerServiceTests : IDisposable
 
         var exception = Assert.Throws<InvalidOperationException>(() => _dockerService.Build(_testParams));
         
-        Assert.Contains("No Dockerfile Template Exists", exception.Message);
+        Assert.Contains("No Dockerfile Template exists for application type", exception.Message);
+    }
+
+    [Fact]
+    public void Build_WithTemplateInGitHubDirectory_UsesGitHubTemplate()
+    {
+        var gitHubTemplatesDir = Path.Combine(_testParams.RootDirectory, ".github", "templates");
+        Directory.CreateDirectory(gitHubTemplatesDir);
+        CreateTemplateDockerfile(gitHubTemplatesDir, "node", "FROM node:18 # GitHub Template");
+        
+        _mockNodeService.Setup(x => x.DetectApplicationType(_testParams.RootDirectory))
+                       .Returns("node");
+
+        var exception = Record.Exception(() => _dockerService.Build(_testParams));
+        
+        VerifyLoggerWarning("Dockerfile not Found, Using a Template...");
+        VerifyLoggerInfo($"Found template in: {gitHubTemplatesDir}");
+        
+        // Verify template was copied
+        var dockerfilePath = Path.Combine(_testParams.RootDirectory, _testParams.DockerFile);
+        Assert.True(File.Exists(dockerfilePath));
+        var content = File.ReadAllText(dockerfilePath);
+        Assert.Contains("FROM node:18 # GitHub Template", content);
+    }
+
+    [Fact]
+    public void Build_WithTemplateInProjectRoot_UsesProjectRootTemplate()
+    {
+        var projectTemplatesDir = Path.Combine(_testParams.RootDirectory, "templates");
+        Directory.CreateDirectory(projectTemplatesDir);
+        CreateTemplateDockerfile(projectTemplatesDir, "node", "FROM node:18 # Project Template");
+        
+        _mockNodeService.Setup(x => x.DetectApplicationType(_testParams.RootDirectory))
+                       .Returns("node");
+
+        var exception = Record.Exception(() => _dockerService.Build(_testParams));
+        
+        VerifyLoggerWarning("Dockerfile not Found, Using a Template...");
+        VerifyLoggerInfo($"Found template in: {projectTemplatesDir}");
+        
+        // Verify template was copied
+        var dockerfilePath = Path.Combine(_testParams.RootDirectory, _testParams.DockerFile);
+        Assert.True(File.Exists(dockerfilePath));
+        var content = File.ReadAllText(dockerfilePath);
+        Assert.Contains("FROM node:18 # Project Template", content);
+    }
+
+    [Fact]
+    public void Build_WithMultipleTemplateLocations_UsesCorrectPriority()
+    {
+        // Create templates in multiple locations
+        var userTemplatesDir = Path.Combine(_testRootDirectory, "user-templates");
+        Directory.CreateDirectory(userTemplatesDir);
+        _testParams.TemplatesDir = userTemplatesDir; // Set user-specified (highest priority)
+        
+        var gitHubTemplatesDir = Path.Combine(_testParams.RootDirectory, ".github", "templates");
+        Directory.CreateDirectory(gitHubTemplatesDir);
+        var projectTemplatesDir = Path.Combine(_testParams.RootDirectory, "templates");
+        Directory.CreateDirectory(projectTemplatesDir);
+        
+        CreateTemplateDockerfile(userTemplatesDir, "node", "FROM node:18 # User Template");
+        CreateTemplateDockerfile(gitHubTemplatesDir, "node", "FROM node:18 # GitHub Template");
+        CreateTemplateDockerfile(projectTemplatesDir, "node", "FROM node:18 # Project Template");
+        
+        _mockNodeService.Setup(x => x.DetectApplicationType(_testParams.RootDirectory))
+                       .Returns("node");
+
+        var exception = Record.Exception(() => _dockerService.Build(_testParams));
+        
+        VerifyLoggerWarning("Dockerfile not Found, Using a Template...");
+        VerifyLoggerInfo($"Found template in: {userTemplatesDir}");
+        
+        // Verify the highest priority template was used
+        var dockerfilePath = Path.Combine(_testParams.RootDirectory, _testParams.DockerFile);
+        Assert.True(File.Exists(dockerfilePath));
+        var content = File.ReadAllText(dockerfilePath);
+        Assert.Contains("FROM node:18 # User Template", content);
+    }
+
+    [Fact]
+    public void Build_WithNoUserSpecifiedTemplatesDir_UsesGitHubTemplates()
+    {
+        // Clear user-specified templates dir to test fallback
+        _testParams.TemplatesDir = string.Empty;
+        
+        var gitHubTemplatesDir = Path.Combine(_testParams.RootDirectory, ".github", "templates");
+        Directory.CreateDirectory(gitHubTemplatesDir);
+        CreateTemplateDockerfile(gitHubTemplatesDir, "node", "FROM node:18 # GitHub Template");
+        
+        _mockNodeService.Setup(x => x.DetectApplicationType(_testParams.RootDirectory))
+                       .Returns("node");
+
+        var exception = Record.Exception(() => _dockerService.Build(_testParams));
+        
+        VerifyLoggerWarning("Dockerfile not Found, Using a Template...");
+        VerifyLoggerInfo($"Found template in: {gitHubTemplatesDir}");
+        
+        // Verify template was copied
+        var dockerfilePath = Path.Combine(_testParams.RootDirectory, _testParams.DockerFile);
+        Assert.True(File.Exists(dockerfilePath));
+        var content = File.ReadAllText(dockerfilePath);
+        Assert.Contains("FROM node:18 # GitHub Template", content);
     }
 
     [Fact]
@@ -227,6 +328,13 @@ public class DockerServiceTests : IDisposable
     private void CreateTemplateDockerfile(string appType, string content)
     {
         var templatePath = Path.Combine(_testParams.TemplatesDir, $"Dockerfile.{appType}");
+        
+        File.WriteAllText(templatePath, content);
+    }
+
+    private void CreateTemplateDockerfile(string templateDir, string appType, string content)
+    {
+        var templatePath = Path.Combine(templateDir, $"Dockerfile.{appType}");
         
         File.WriteAllText(templatePath, content);
     }

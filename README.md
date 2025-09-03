@@ -193,6 +193,7 @@ The project uses a **controlled release strategy** to distinguish between develo
 - To install additional global npm packages, add them to the `npm install -g` command in the `Dockerfile`.
 - Add or update PowerShell/.NET tools as needed using `dotnet tool install --global <tool>`.
 - Use the `Forge/` directory for advanced .NET build automation with Nuke.
+- **Docker Templates:** Store custom Dockerfile templates in your repository at `.github/templates/` or `templates/` directory. The build agent will automatically discover and use them when no Dockerfile exists in your project. See [Docker Templates documentation](https://build-agent.subzerodev.com/docs/docker-templates) for details.
 
 ## Image Details
 
