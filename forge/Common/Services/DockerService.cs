@@ -123,12 +123,69 @@ public class DockerService : IDockerService
     }
 
     /// <summary>
+    /// Finds a template Dockerfile by searching through multiple directories in order of priority.
+    /// </summary>
+    /// <param name="parameters">The parameters containing root directory and template directory information.</param>
+    /// <returns>The full path to the template Dockerfile if found, otherwise null.</returns>
+    /// <remarks>
+    /// Searches for templates in the following order:
+    /// 1. User-specified TemplatesDir parameter (if exists)
+    /// 2. .github/templates/ in project root
+    /// 3. templates/ in project root  
+    /// 4. /nuke/templates/ (container fallback)
+    /// </remarks>
+    private string FindTemplateDockerFile(DockerParams parameters)
+    {
+        var appType = _nodeService.DetectApplicationType(parameters.RootDirectory);
+        var templateFileName = $"Dockerfile.{appType}";
+        
+        // Define template directories in order of priority
+        var templateDirectories = new[]
+        {
+            parameters.TemplatesDir, // User-specified or configured template directory
+            Path.Combine(parameters.RootDirectory, ".github", "templates"), // GitHub convention
+            Path.Combine(parameters.RootDirectory, "templates"), // Project root templates
+            "/nuke/templates" // Container fallback (for backward compatibility)
+        };
+
+        foreach (var templateDir in templateDirectories)
+        {
+            if (!string.IsNullOrEmpty(templateDir) && Directory.Exists(templateDir))
+            {
+                var templatePath = Path.Combine(templateDir, templateFileName);
+                if (File.Exists(templatePath))
+                {
+                    _logger.LogInformation("Found template in: {TemplateDirectory}", templateDir);
+                    return templatePath;
+                }
+            }
+        }
+
+        // If no template found, log the attempted locations and throw exception
+        var searchedLocations = templateDirectories
+            .Where(dir => !string.IsNullOrEmpty(dir))
+            .Select(dir => $"  - {dir}")
+            .ToArray();
+            
+        _logger.LogError("No Dockerfile template found for application type '{AppType}'. Searched locations:\n{SearchedLocations}", 
+            appType, string.Join("\n", searchedLocations));
+            
+        throw new InvalidOperationException($"No Dockerfile Template exists for application type '{appType}'. " +
+            $"Please create a template named '{templateFileName}' in one of the following locations: " +
+            $"{string.Join(", ", templateDirectories.Where(d => !string.IsNullOrEmpty(d)))}");
+    }
+
+    /// <summary>
     /// Builds a Docker image using the specified parameters.
     /// </summary>
     /// <remarks>
     /// This method constructs a Docker image by locating the Dockerfile in the specified root
     /// directory and applying the provided tags. It logs the build process information based on the verbosity level
-    /// set in the parameters.
+    /// set in the parameters. If no Dockerfile exists, it searches for templates in multiple locations:
+    /// 1. User-specified TemplatesDir parameter
+    /// 2. .github/templates/ in project root
+    /// 3. templates/ in project root
+    /// 4. /nuke/templates/ (container fallback)
     /// </remarks>
     /// <param name="parameters">The parameters used to configure the Docker build, including the root directory, Dockerfile path, tags, and verbosity level.</param>
     public void Build(DockerParams parameters)
@@ -141,20 +198,12 @@ public class DockerService : IDockerService
         var dockerFile = Path.Combine(parameters.RootDirectory, parameters.DockerFile);
         var latestTag = parameters.Tags.FirstOrDefault(x => x.Contains("latest"));
 
-        if (!File.Exists(dockerFile) && Directory.Exists(parameters.TemplatesDir))
+        if (!File.Exists(dockerFile))
         {
-            _logger.LogWarning("Dockerfile not Found, Using a Template...");
+            var templateDockerFile = FindTemplateDockerFile(parameters);
             
-            var appType = _nodeService.DetectApplicationType(parameters.RootDirectory);
-            var templateDockerFile = Path.Combine(parameters.TemplatesDir, $"Dockerfile.{appType}");
-
-            if (!File.Exists(templateDockerFile))
-            {
-                throw new InvalidOperationException($"No Dockerfile Template Exists {dockerFile}, Aborting...");
-            }
-
+            _logger.LogWarning("Dockerfile not Found, Using a Template...");
             _logger.LogWarning("Using Dockerfile Template: {TemplateDockerFile}...", templateDockerFile);
-
             File.Copy(templateDockerFile, dockerFile);
         }
 
