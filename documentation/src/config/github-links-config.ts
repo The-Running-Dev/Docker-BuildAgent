@@ -44,7 +44,7 @@ export class GitHubLinksConfig {
       icon: faTag,
     },
     {
-      href: 'https://ghcr.io/The-Running-Dev/build-agent',
+      href: 'https://ghcr.io/the-running-dev/build-agent',
       label: 'Container Registry',
       position: 'right',
       title: 'View container packages',
