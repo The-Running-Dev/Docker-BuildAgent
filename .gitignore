@@ -4,6 +4,8 @@
 .resolved-version
 artifacts/
 bin/
+!scripts/nuke/bin/
+!scripts/nuke/bin/**
 obj/
 .env
 node_modules/
