@@ -17,7 +17,6 @@ The core PowerShell module that powers Build Agent automation scripts and provid
 | `Copy-Directory` | Recursively copy directories with advanced pattern filtering and gitignore management |
 | `Invoke-Script` | Execute PowerShell scripts conditionally with standardized messaging |
 | `Invoke-DotNetBuild` | Execute .NET builds with environment-specific configurations |
-| `Invoke-Forge` | Execute Forge applications for different build types |
 | `Initialize-Build` | Set up build paths and validate project structure |
 | `Get-PackageManager` | Auto-detect Node.js package manager based on lock files |
 | `Invoke-SafeCommand` | Execute commands with comprehensive error handling |
@@ -49,20 +48,14 @@ When copying files, the function now automatically:
 
 This ensures that template files and generated code don't accidentally get committed to version control.
 
-### Invoke-Forge
+### Invoke-Build (Preferred)
 
-Execute specific build types from the Forge system:
+For user automation, prefer the PowerShell module command `Invoke-Build`:
 
 ```powershell
-Invoke-Forge -BuildTypes @("docker", "node") -Arguments @("--verbose")
+Invoke-Build -type "docker" -args @{ createRegistry = $true; dryRun = $true }
 ```
 
-**Parameters:**
-
-- `BuildTypes`: Array of build types to execute (e.g., "docker", "node", "forge")
-- `Arguments`: Optional arguments to pass to each build
-- `WorkingDir`: Working directory for the build operations
-- `ArtifactsDir`: Directory containing the built Forge DLL files
 
 ## Docker-BuildAgent PowerShell Module (New)
 
@@ -90,12 +83,11 @@ Set-BuildAgentConfig `
     -Environment "development"
 ```
 
-### Dynamic Build Functions
+### Build Invocation
 
-The module automatically generates strongly-typed functions for each build type based on parameter definitions in the Forge system. These functions provide:
+The module exposes a single `Invoke-Build` command that accepts a build type and a hashtable of parameters. It provides:
 
-- Parameter validation
-- Intellisense in supported editors
+- Optional parameter validation
 - Consistent Docker container execution
 - Automatic workspace mounting
 
@@ -107,6 +99,6 @@ The module includes a parameter extraction script (`Update-ModuleParameters.ps1`
 2. Extracts parameter metadata including name, type, and documentation
 3. Handles inheritance to combine parameters from base classes
 4. Generates a JSON file with complete parameter definitions
-5. Creates strongly-typed PowerShell functions at runtime
+5. Enables optional validation in `Invoke-Build`
 
-This ensures that the PowerShell module always reflects the current state of the Forge build system.
+This ensures that the PowerShell module validates parameters against the current state of the Forge build system when requested.

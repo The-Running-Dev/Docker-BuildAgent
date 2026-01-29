@@ -349,10 +349,9 @@ The changelog formatter supports these options:
 
 **What it does**:
 
-- Automatically generates strongly-typed functions for all build types
+- Provides a single `Invoke-Build` command for all build types
 - Provides consistent Docker container execution pattern
 - Handles parameter validation and conversion
-- Supports IDE intellisense and tab completion
 - Maintains consistent environment configuration
 
 **Installation**:
@@ -372,14 +371,14 @@ Set-BuildAgentConfig `
 **Usage Example**:
 
 ```powershell
-# Call dynamically generated functions for each build type
-Invoke-ForgeDocker -CreateRegistry $true -DryRun $true
-Invoke-ForgeNode -PackageManager "pnpm" -IsProduction $true
+# Use Invoke-Build for each build type
+Invoke-Build -type "docker" -args @{ createRegistry = $true; dryRun = $true }
+Invoke-Build -type "node" -args @{ packageManager = "pnpm"; isProduction = $true }
 ```
 
 **Parameter Extraction**:
 
-The module includes a parameter extraction script that generates function definitions from C# parameter files:
+The module includes a parameter extraction script that generates a `parameters.json` definition file from C# parameter files:
 
 ```powershell
 ./Update-ModuleParameters.ps1

@@ -47,7 +47,7 @@ This section covers common issues, troubleshooting steps, and frequently asked q
 - **Q: How do I run a build for a specific project type?**
   - A: Use the `-type` argument with the build script, e.g., `./build.ps1 -type docker`, `./build.ps1 -type node`, or `./build.ps1 -type forge`.
 - **Q: How do I use the PowerShell module instead of shell commands?**
-  - A: Import the module with `Import-Module ./scripts/powershell-module/Docker-BuildAgent.psm1`, configure it with `Set-BuildAgentConfig`, and use the dynamically generated `Invoke-Forge*` functions.
+  - A: Import the module with `Import-Module ./scripts/powershell-module/Docker-BuildAgent.psm1`, configure it with `Set-BuildAgentConfig`, and use `Invoke-Build` with a `-type` and `-args` hashtable.
 - **Q: Why is my changelog empty or not generating correctly?**
   - A: Ensure your Git repository has commits and tags. Use `--change-log-source all` to generate complete history, or verify the last tag exists with `git tag -l`.
 - **Q: Can I customize the changelog date format?**
