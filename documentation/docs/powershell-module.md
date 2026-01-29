@@ -37,28 +37,34 @@ Set-BuildAgentConfig `
 | `Environment` | Build environment type | development |
 | `AdditionalParameters` | Optional hashtable of extra parameters | {} |
 
-## Dynamically Generated Functions
+## Build Invocation
 
-The module automatically generates strongly-typed PowerShell functions for each build type defined in the Forge build system. For example:
+The module uses a single command, `Invoke-Build`, which forwards a build type and an argument hashtable to the containerized build command. Parameter names are passed in camelCase and are converted to CLI kebab-case automatically.
 
 ```powershell
 # Docker build with parameters
-Invoke-ForgeDocker `
-    -ImageName "my-app" `
-    -Tag "v1.0" `
-    -CreateRegistry $true `
-    -DryRun $true
+Invoke-Build `
+    -type "docker" `
+    -args @{
+        imageName = "my-app"
+        tag = "v1.0"
+        createRegistry = $true
+        dryRun = $true
+    }
 
 # Node.js build with parameters
-Invoke-ForgeNode `
-    -PackageManager "pnpm" `
-    -IsProduction $true `
-    -ArtifactsDir "./dist"
+Invoke-Build `
+    -type "node" `
+    -args @{
+        packageManager = "pnpm"
+        isProduction = $true
+        artifactsDir = "./dist"
+    }
 ```
 
 ## Updating Parameter Definitions
 
-The module includes a parameter extraction script that scans C# parameter classes in the Forge build system and generates corresponding PowerShell function definitions:
+The module includes a parameter extraction script that scans C# parameter classes in the Forge build system and generates a `parameters.json` file used for optional validation:
 
 ```powershell
 # Run from the module directory
@@ -71,7 +77,7 @@ This script:
 2. Extracts parameter metadata including XML documentation
 3. Handles inheritance to combine parameters from base classes
 4. Generates a JSON file with complete parameter definitions
-5. Creates strongly-typed PowerShell functions at runtime
+5. Enables optional validation in `Invoke-Build` via `-validateArgs`
 
 ## Migration from Shell Commands
 
@@ -97,18 +103,19 @@ Set-BuildAgentConfig `
     -WorkspacePath $PWD
 
 # Run the build (can be called multiple times with different parameters)
-Invoke-ForgeDocker -CreateRegistry $true
+Invoke-Build -type "docker" -args @{ createRegistry = $true }
 ```
 
 ## Benefits
 
-- **IDE Integration**: Get parameter intellisense and tab completion in VS Code and other editors
-- **Type Safety**: Parameter validation prevents common errors
-- **Discoverability**: See available parameters and their descriptions
+- **Simplicity**: One command for all build types
+- **Consistency**: Uniform argument handling across build targets
+- **Validation**: Optional validation against `parameters.json`
 - **Reusability**: Configure once, use consistently across scripts
 - **Automation**: Easier integration with custom CI/CD scripts
 
 ## Limitations
 
-- Currently requires manual execution of `Update-ModuleParameters.ps1` when new parameters are added
+- Requires manual execution of `Update-ModuleParameters.ps1` when new parameters are added
+- Validation only runs when `-validateArgs` is specified
 - PowerShell 5.1 or later required (included with Windows 10/11 or PowerShell Core)
