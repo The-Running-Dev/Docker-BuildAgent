@@ -1,3 +1,0 @@
-#!/bin/bash
-
-pwsh /nuke/scripts/node-in-docker-build.ps1 "$@"
