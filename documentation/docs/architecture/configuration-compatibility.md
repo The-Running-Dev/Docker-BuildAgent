@@ -226,14 +226,14 @@ docker run \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  docker-build
+  build docker
 
 # Windows (Docker Desktop)
 docker run \
   -v //var/run/docker.sock:/var/run/docker.sock \
   -v ${PWD}:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  docker-build
+  build docker
 ```
 
 #### Docker Daemon Configuration
@@ -531,7 +531,7 @@ docker run \
   -e VERBOSITY=Verbose \
   -e DRY_RUN=true \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-build
+  build node
 ```
 
 This configuration guide ensures compatibility across different environments and platforms while providing comprehensive setup instructions for all supported scenarios.

@@ -14,13 +14,13 @@
 #
 # Build Process:
 #   1. Checkout repository with full git history
-#   2. Build documentation using node-template-build command in build-agent container
+#   2. Build documentation using unified build command in build-agent container
 #   3. Upload generated documentation as GitHub Pages artifact
 #   4. Deploy artifact to GitHub Pages environment
 #
 # Build Configuration:
 #   - Uses ghcr.io/the-running-dev/build-agent:latest container for consistent builds
-#   - Executes node-template-build with documentation directory target
+#   - Executes `build node-template` with documentation directory target
 #   - Builds Docusaurus site from ./documentation directory
 #   - Outputs static files to ./documentation/build
 #
@@ -66,16 +66,16 @@ jobs:
 
       # Get the latest changelog for the documentation
       - name: Get Latest Changelog
-        run: forge-build --change-log-source 'all'
+        run: build forge --change-log-source 'all'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
 
-      # Build documentation using node-template-build in the build-agent container
+      # Build documentation using unified build command in the build-agent container
       - name: Build Documentation Site
         run: |
-          node-template-build \
+          build node-template \
             -AppDir 'documentation' \
             -NodeTemplateRepositoryUrl 'https://github.com/The-Running-Dev/Docusaurus-Template.git#feature/comments_badges'
 

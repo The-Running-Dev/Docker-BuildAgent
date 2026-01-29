@@ -11,10 +11,12 @@ Docker-BuildAgent is a comprehensive CI/CD build system with a multi-build archi
 The project uses a component-based build system with 5 specialized build types:
 
 1. **Docker Build** (`forge/Docker/`) - Container image automation
-2. **Node Build** (`forge/Node/`) - JavaScript/TypeScript application builds  
+2. **Node Build** (`forge/Node/`) - JavaScript/TypeScript application builds
 3. **NodeInDocker Build** (`forge/NodeInDocker/`) - Combined Node + Container builds
 4. **Forge Build** (`forge/Forge/`) - Changelog generation and release orchestration
-5. **NodeTemplate Build** (`scripts/nuke/node-template-build.ps1`) - Template-based project generation
+5. **NodeTemplate Build** (integrated in `scripts/nuke/build.ps1`) - Template-based project generation
+
+All build types are invoked via the unified `build` command: `build <type> [args]`
 
 ### Base Class Pattern
 
@@ -28,9 +30,11 @@ All builds inherit from `Base<TParams, TNotifications>` providing:
 ### Component Interfaces
 
 Key interfaces for specialized functionality:
-- `IDockerComponent` - Docker operations and image management
-- `INodeComponent` - Node.js package manager detection and execution
-- `INotifications` - Multi-channel notification support
+- `ICleanComponent` - Provides cleanup target for removing artifacts
+- `IDockerComponent` - Docker operations and image management (build, push)
+- `INodeComponent` - Node.js package manager detection and execution (build, copy artifacts)
+- `IGitHubComponent` - GitHub release and Git tag management
+- `INotifications` - Multi-channel notification support (Discord, etc.)
 
 ## Build Configuration System
 
@@ -94,43 +98,106 @@ ForgeParams (base parameters)
 
 ### Container-Based Execution (Recommended)
 
+All builds use the unified `build` command with type as first argument:
+
 ```bash
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest docker-build
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest node-build
+# Docker build with automatic image tagging and registry push
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build docker --registry-url ghcr.io --registry-user username
+
+# Node.js build with artifact output
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node --artifacts-dir ./dist
+
+# Node + Docker combined build
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node-in-docker
+
+# Node template build for documentation sites
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node-template -AppDir documentation
+
+# Forge: Changelog and release management
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build forge --change-log-source all
 ```
 
-### Local PowerShell Scripts
+### Using PowerShell Module
 
 ```powershell
-.\build.ps1 -type docker -isProd
-.\build.ps1 -type node --artifacts-dir ./dist
-.\build.ps1 -type forge --change-log-source all
+# Import and configure the module
+Import-Module .\scripts\powershell-module\Docker-BuildAgent.psm1
+Set-BuildAgentConfig `
+    -DockerImage "ghcr.io/the-running-dev/build-agent:latest" `
+    -WorkspacePath $PWD `
+    -ArtifactsDir "./artifacts"
+
+# Execute builds via dynamically-generated module functions
+Invoke-ForgeDocker -ImageName myapp -Tag v1.0 -RegistryUrl ghcr.io
+Invoke-ForgeNode -PackageManager pnpm -ArtifactsDir ./dist
+Invoke-ForgeNodeInDocker
+Invoke-Forge -ChangeLogSource all
+```
+
+### Local PowerShell Scripts (via unified build.ps1)
+
+```powershell
+# Using the unified build script directly
+.\scripts\nuke\build.ps1 docker -ImageName myapp -Tag v1.0
+.\scripts\nuke\build.ps1 node -ArtifactsDir ./dist
+.\scripts\nuke\build.ps1 node-in-docker -SkipDockerBuild $false
+.\scripts\nuke\build.ps1 forge -ChangeLogSource all
+.\scripts\nuke\build.ps1 node-template -AppDir documentation
 ```
 
 ### Direct NUKE Execution
 
 ```bash
-dotnet run --project forge/Docker/Docker.csproj -- --root /workspace
+# Build Docker images
+dotnet run --project forge/Docker/Docker.csproj -- --registry-url ghcr.io --registry-user username
+
+# Build Node.js applications
 dotnet run --project forge/Node/Node.csproj -- --artifacts-dir artifacts
+
+# Combined Node + Docker
+dotnet run --project forge/NodeInDocker/NodeInDocker.csproj -- --skip-docker-build false
+
+# Changelog and release
+dotnet run --project forge/Forge/Forge.csproj -- --change-log-source all
 ```
 
-## PowerShell Automation (`scripts/nuke/`)
+## PowerShell Automation (`scripts/`)
 
-### Core Helper Module (`nuke-helpers.psm1`)
+### PowerShell Module (`scripts/powershell-module/`)
+
+New programmatic interface providing:
+- **Docker-BuildAgent.psm1** - Main module with configuration and dynamic function generation
+- **Docker-BuildAgent.psd1** - Module manifest for proper PowerShell import
+- **Update-ModuleParameters.ps1** - Script to sync module functions with C# parameters
+
+Module functions (dynamically generated from C# parameters):
+- `Set-BuildAgentConfig` - Configure module for your environment (DockerImage, WorkspacePath, etc.)
+- `Invoke-ForgeDocker` - Execute Docker builds with all available parameters
+- `Invoke-ForgeNode` - Execute Node.js builds with all available parameters
+- `Invoke-ForgeNodeInDocker` - Execute combined Node + Docker builds
+- `Invoke-Forge` - Execute changelog/release builds
+
+### Core Helper Module (`scripts/nuke/nuke-helpers.psm1`)
 
 Key functions for build automation:
 - `Invoke-Forge` - Execute multi-build workflows
-- `Copy-Directory` - Recursive copying with ignore patterns
+- `Copy-Directory` - Recursive copying with .gitignore management and exclude patterns
 - `Initialize-Build` - Environment setup and validation
 - `Invoke-DotNetBuild` - .NET compilation management
 - `Get-PackageManager` - Auto-detect npm/pnpm/yarn from lock files
+- `Invoke-SafeCommand` - Execute commands with comprehensive error handling
 
 ### Build Script Architecture
 
-- `docker-build.ps1` - Container build automation
-- `node-build.ps1` - Node.js application builds
-- `forge-build.ps1` - Release and changelog generation
-- `node-template-build.ps1` - Template-based project creation
+Consolidated into a single unified entry point:
+
+- `scripts/nuke/build.ps1` - Unified build script handling all build types:
+  - `build docker` - Container build automation
+  - `build node` - Node.js application builds
+  - `build node-in-docker` - Combined Node + Docker builds
+  - `build forge` - Release and changelog generation
+  - `build node-template` - Template-based project creation
+- `scripts/nuke/nuke-helpers.psm1` - Shared helper functions
 
 ## Development Workflow
 
@@ -256,18 +323,24 @@ npm run build:dev      # Development build with hot reload
 ### Essential Commands
 
 ```bash
-# Container builds
-docker-build --image-tag myapp:v1.0.0 --dry-run
-node-build --artifacts-dir ./dist
-node-in-docker-build --skip-docker-build
+# Container builds using unified build command (recommended)
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build docker --registry-url ghcr.io
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node --artifacts-dir ./dist
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node-in-docker
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node-template -AppDir docs
+docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build forge --change-log-source all
 
-# Local builds  
-.\build.ps1 -type docker -isProd
-.\build.ps1 -type node --verbosity Verbose
+# PowerShell module
+Import-Module .\scripts\powershell-module\Docker-BuildAgent.psm1
+Set-BuildAgentConfig -DockerImage ghcr.io/the-running-dev/build-agent:latest -WorkspacePath $PWD
+Invoke-ForgeDocker -ImageName myapp
+Invoke-ForgeNode -PackageManager pnpm
 
 # Direct NUKE execution
-dotnet forge/artifacts/Docker.dll --root /workspace --dry-run
-dotnet forge/artifacts/Node.dll --artifacts-dir artifacts --verbosity Quiet
+dotnet run --project forge/Docker/Docker.csproj -- --registry-url ghcr.io
+dotnet run --project forge/Node/Node.csproj -- --artifacts-dir artifacts
+dotnet run --project forge/NodeInDocker/NodeInDocker.csproj
+dotnet run --project forge/Forge/Forge.csproj -- --change-log-source all
 ```
 
 ### Environment Variables
