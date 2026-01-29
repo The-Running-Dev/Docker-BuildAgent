@@ -71,7 +71,7 @@ function Get-BuildConfigName {
 function Convert-HashtableToArgs {
     param([hashtable]$parameters)
 
-    $result = @{}
+    $result = @()
     foreach ($key in $parameters.Keys) {
         $value = $parameters[$key]
         if ($null -eq $value) { continue }
