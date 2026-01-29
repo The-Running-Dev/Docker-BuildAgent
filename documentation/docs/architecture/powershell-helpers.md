@@ -6,8 +6,6 @@ sidebar_position: 5
 
 The Build Agent provides several PowerShell helper modules that simplify build automation tasks and provide consistent behavior across different environments.
 
-The Build Agent provides several PowerShell helper modules that simplify build automation tasks and provide consistent behavior across different environments.
-
 ## nuke-helpers.psm1
 
 The core PowerShell module that powers Build Agent automation scripts and provides standardized functions for common operations.
