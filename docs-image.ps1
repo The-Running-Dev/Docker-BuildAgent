@@ -82,7 +82,7 @@ foreach ($file in $imageFiles) {
         
         # Use --mount for robust cross-platform bind mounts.
         $volumeMounts += "--mount"
-        $volumeMounts += "type=bind,source=$absoluteLocalPath,target=$containerPath"
+        $volumeMounts += "type=bind,source=`"$absoluteLocalPath`",target=`"$containerPath`""
 
         Write-Host "  [+] Mounting local file: $file"
     }
@@ -96,12 +96,12 @@ $dockerArgs = @(
     "-it"
 )
 $dockerArgs += $volumeMounts
-$dockerArgs += "--mount", "type=bind,source=./docs,target=/template/docs" # Mount the local docs directory
-$dockerArgs += "--mount", "type=bind,source=./src/pages,target=/template/src/pages" # Mount the local pages directory
-$dockerArgs += "--mount", "type=bind,source=./src/navbarLinks.ts,target=/template/src/navbarLinks.ts"
+$dockerArgs += "--mount", ("type=bind,source=`"{0}`",target=`"/template/docs`"" -f (Resolve-Path (Join-Path $localPath "docs")).Path) # Mount the local docs directory
+$dockerArgs += "--mount", ("type=bind,source=`"{0}`",target=`"/template/src/pages`"" -f (Resolve-Path (Join-Path $localPath "src/pages")).Path) # Mount the local pages directory
+$dockerArgs += "--mount", ("type=bind,source=`"{0}`",target=`"/template/src/navbarLinks.ts`"" -f (Resolve-Path (Join-Path $localPath "src/navbarLinks.ts")).Path)
 $dockerArgs += "--mount", "type=volume,target=/template/node_modules" # Anonymous volume to protect node_modules
 $dockerArgs += $imageName
 
 # 4. Execute the command.
 Write-Host "[INFO] Starting container with dynamically generated mounts..." -ForegroundColor Cyan
-& docker $dockerArgs
+& docker @dockerArgs
