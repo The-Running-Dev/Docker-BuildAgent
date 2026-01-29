@@ -40,8 +40,17 @@ public static class Node
         }
 
         var json = File.ReadAllText(packageJsonPath);
-        var dependencies = System.Text.Json.JsonDocument.Parse(json).RootElement
-            .TryGetProperty("dependencies", out var deps) ? deps.ToString() : "";
+        string dependencies;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            dependencies = doc.RootElement.TryGetProperty("dependencies", out var deps) ? deps.ToString() : "";
+        }
+        catch
+        {
+            Log.Warning("package.json is Invalid JSON — Unable to Detect Node App Type.");
+            return "unknown";
+        }
 
         var type = "unknown";
 
@@ -96,7 +105,7 @@ public static class Node
         {
             pm = "pnpm";
         }
-        if (File.Exists(Path.Join(p.RootDirectory, "yarn.lock")))
+        else if (File.Exists(Path.Join(p.RootDirectory, "yarn.lock")))
         {
             pm = "yarn";
         }
@@ -145,6 +154,8 @@ public static class Node
                 if (!File.Exists(scriptPath))
                 {
                     Log.Error($"File not Found: {scriptPath.StripDirectory(p.RootDirectory)}");
+                    
+                    continue;
                 }
 
                 Run(p.RootDirectory, "pwsh", $"-NoProfile -NonInteractive -f \"{scriptPath}\"");
