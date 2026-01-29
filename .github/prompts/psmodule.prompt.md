@@ -1,6 +1,6 @@
 ```powershell
-# Generate PowerShell functions for automated build agent operations using Forge parameters
-# This script inspects Forge parameter definitions and creates corresponding Docker-based build functions
+# Provide a PowerShell module interface for automated build agent operations using Forge parameters
+# The module exposes Invoke-Build and optional parameter validation from parameters.json
 #
 # Required folder structure:
 # - forge/Common/Parameters/*.cs      # Parameter definition files
@@ -63,12 +63,13 @@ function Set-BuildAgentConfig {
     # Implementation will validate and set configuration
 }
 
-# Auto-generate build functions:
-# 1. Parse parameter definitions from .cs files
-# 2. Create typed functions with parameter validation
-# 3. Implement Docker container execution
-# 4. Handle build artifacts and logging
-# 5. Support development/production environments
+# Module behavior:
+# 1. Accept build type and args hashtable via Invoke-Build
+# 2. Convert camelCase keys to CLI kebab-case
+# 3. Optionally validate args against parameters.json
+# 4. Implement Docker container execution
+# 5. Handle build artifacts and logging
+# 6. Support development/production environments
 
 Export-ModuleMember -Function * -Variable BuildAgentConfig
 ```
