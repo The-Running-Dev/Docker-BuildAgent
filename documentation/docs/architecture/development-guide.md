@@ -390,7 +390,7 @@ docker run \
   -v ./test-project:/workspace \
   -e GITHUB_TOKEN=$GITHUB_TOKEN \
   -it build-agent:dev \
-  node-in-build docker --dry-run true
+  build node-in-docker --dry-run true
 ```
 
 ### Manual Testing
