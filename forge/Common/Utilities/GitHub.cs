@@ -43,8 +43,7 @@ public static class GitHub
 
         var body = assetsText + releaseNotes;
 
-        var repo = p.RepositoryUrl.GetGitHubRepoSlug();
-        var apiUrl = $"https://api.github.com/repos/{repo}/releases";
+        var apiUrl = BuildReleaseApiUrl(p.RepositoryUrl);
         var tagName = p.Version.Version;
 
         using var client = new HttpClient();
@@ -72,5 +71,12 @@ public static class GitHub
 
             Log.Error($"❌ Failed to Create GitHub Release: {response.StatusCode}. {error.SanitizeForLog()}");
         }
+    }
+
+    internal static string BuildReleaseApiUrl(string repositoryUrl)
+    {
+        var repo = repositoryUrl.GetGitHubRepoSlug();
+        
+        return $"https://api.github.com/repos/{repo}/releases";
     }
 }

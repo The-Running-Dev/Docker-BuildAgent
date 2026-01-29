@@ -28,13 +28,18 @@ public static class Docker
     /// <param name="p">The parameters required for logging into the Docker registry, including the repository, user, and token.</param>
     public static void Login(DockerParams p)
     {
-        var server = p.RegistryUrl.GetRegistryServer();
+        var server = GetRegistryServerForLogin(p.RegistryUrl);
 
         DockerTasks.DockerLogin(s => s
             .DisableProcessInvocationLogging()
             .SetServer(server)
             .SetUsername(p.RegistryUser)
             .SetPassword(p.RegistryToken));
+    }
+
+    internal static string GetRegistryServerForLogin(string registryUrl)
+    {
+        return registryUrl.GetRegistryServer();
     }
 
     /// <summary>
