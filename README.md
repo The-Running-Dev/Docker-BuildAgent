@@ -202,12 +202,12 @@ The project uses a **controlled release strategy** to distinguish between develo
 - **Default Shell:** PowerShell (`pwsh`)
 - **Default Working Directory:** `/workspace`
 - **How to update tool versions:** Edit the `Dockerfile` to specify desired versions.
-- **Build Automation:** The `forge/` directory contains a comprehensive .NET (Nuke) build system with multiple specialized builds for different project types. Each build provides specific commands like `docker-build`, `node-build`, `node-in-docker-build`, and `forge` for changelog generation.
+- **Build Automation:** The `forge/` directory contains a comprehensive .NET (Nuke) build system with multiple specialized builds for different project types. Use the unified `build` command with type argument: `build docker`, `build node`, `build node-in-docker`, `build node-template`, and `build forge` for changelog generation.
 - **Changelog Generation:** Built-in changelog generation with customizable date formatting (yyyy.MM.dd), tag-based filtering, and automatic prepending to existing changelogs.
 
 ## Example: Build Commands
 
-The build agent provides specialized commands for different project types:
+The build agent provides a unified `build` command with different types:
 
 ```pwsh
 # Build a Docker image from your project
@@ -215,26 +215,26 @@ docker run --rm -it \
     -v "${PWD}:/workspace" \
     -v /var/run/docker.sock:/var/run/docker.sock \
     ghcr.io/the-running-dev/build-agent:latest \
-    docker-build
+    build docker
 
-# Build a Node.js application  
+# Build a Node.js application
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     ghcr.io/the-running-dev/build-agent:latest \
-    node-build
+    build node
 
 # Build Node.js app and create Docker image
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     -v /var/run/docker.sock:/var/run/docker.sock \
     ghcr.io/the-running-dev/build-agent:latest \
-    node-in-docker-build
+    build node-in-docker
 
 # Generate changelog from Git history
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     ghcr.io/the-running-dev/build-agent:latest \
-    forge --target GenerateChangeLog
+    build forge --change-log-source all
 ```
 
 ## Example GitHub Action: Run Nuke Build in Your Container Project
@@ -265,7 +265,7 @@ jobs:
           fetch-depth: 0
 
       - name: Container CI
-        run: docker-build
+        run: build docker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}

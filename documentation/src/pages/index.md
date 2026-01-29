@@ -12,6 +12,7 @@ hide_table_of_contents: false
   - [Building and Running Locally](#building-and-running-locally)
   - [Build and Push to Container Registry](#build-and-push-to-container-registry)
   - [GitHub Actions CI/CD](#github-actions-cicd)
+    - [Release Strategy](#release-strategy)
     - [Workflow Steps](#workflow-steps)
     - [Tagging Support](#tagging-support)
 - [Environment Variables](#environment-variables)
@@ -45,7 +46,7 @@ For the most up-to-date and detailed information, always refer to the documentat
 ## 📊 Project Status
 
 [![CI](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml)
-[![Release](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml)
+[![Deploy](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml)
 [![Version](https://img.shields.io/github/v/release/the-running-dev/Docker-BuildAgent?logo=semver&logoColor=white&label=Version)](https://github.com/the-running-dev/Docker-BuildAgent/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-blue?logo=opensourceinitiative&logoColor=white)](https://github.com/the-running-dev/Docker-BuildAgent/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/Docs-Live-blue?logo=gitbook&logoColor=white)](https://build-agent.subzerodev.com)
@@ -148,7 +149,26 @@ You can use the provided `build.sh`, `build.ps1` script to build and push the im
 
 ### GitHub Actions CI/CD
 
-The `.github/workflows/ci.yml` workflow automates building, linting, scanning, and pushing the Docker image on every push to the `main` branch, or when a new tag is pushed, or via manual dispatch. It requires the `REGISTRY_TOKEN` secret to be set in your repository.
+The repository includes multiple GitHub Actions workflows for different purposes:
+
+- **CI Workflow** (`.github/workflows/ci.yml`): Runs on pull requests and feature branches for validation
+- **Deploy Workflow** (`.github/workflows/release.yml`): Builds and publishes Docker images on every main branch push
+- **Create Release Workflow** (`.github/workflows/create-release.yml`): Manual workflow to create official releases
+- **Tag Release Workflow** (`.github/workflows/tag-release.yml`): Creates releases when version tags are pushed
+
+#### Release Strategy
+
+The project uses a **controlled release strategy** to distinguish between development builds and official releases:
+
+**For Development:**
+
+- Every push to `main` → Triggers "Deploy" workflow → Builds and publishes Docker images (no GitHub releases)
+- Pull requests → Triggers "CI" workflow → Validation only
+
+**For Official Releases:**
+
+- **Manual releases**: Use "Create Release" workflow in GitHub Actions
+- **Tag-based releases**: Push a version tag (e.g., `git tag v1.2.3 && git push origin v1.2.3`)
 
 #### Workflow Steps
 
@@ -161,8 +181,9 @@ The `.github/workflows/ci.yml` workflow automates building, linting, scanning, a
 
 #### Tagging Support
 
-- On branch pushes, the image is tagged as `latest`.
-- On tag pushes (e.g., `v1.2.3`), the image is tagged accordingly (e.g., `ghcr.io/the-running-dev/build-agent:v1.2.3`).
+- **Development builds**: On main branch pushes, Docker images are tagged with version numbers from GitVersion
+- **Release builds**: On manual release creation or tag pushes, GitHub releases are created with proper changelog and artifacts
+- **Pre-releases**: Tags with suffixes like `v1.0.0-beta.1` or `v1.0.0-rc.1` are marked as pre-releases
 
 ## Environment Variables
 
@@ -184,12 +205,12 @@ The `.github/workflows/ci.yml` workflow automates building, linting, scanning, a
 - **Default Shell:** PowerShell (`pwsh`)
 - **Default Working Directory:** `/workspace`
 - **How to update tool versions:** Edit the `Dockerfile` to specify desired versions.
-- **Build Automation:** The `forge/` directory contains a comprehensive .NET (Nuke) build system with multiple specialized builds for different project types. Each build provides specific commands like `docker-build`, `node-build`, `node-in-docker-build`, and `forge` for changelog generation.
+- **Build Automation:** The `forge/` directory contains a comprehensive .NET (Nuke) build system with multiple specialized builds for different project types. Use the unified `build` command with type argument: `build docker`, `build node`, `build node-in-docker`, `build node-template`, and `build forge` for changelog generation.
 - **Changelog Generation:** Built-in changelog generation with customizable date formatting (yyyy.MM.dd), tag-based filtering, and automatic prepending to existing changelogs.
 
 ## Example: Build Commands
 
-The build agent provides specialized commands for different project types:
+The build agent provides a unified `build` command with different types:
 
 ```pwsh
 # Build a Docker image from your project
@@ -197,26 +218,26 @@ docker run --rm -it \
     -v "${PWD}:/workspace" \
     -v /var/run/docker.sock:/var/run/docker.sock \
     ghcr.io/the-running-dev/build-agent:latest \
-    docker-build
+    build docker
 
-# Build a Node.js application  
+# Build a Node.js application
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     ghcr.io/the-running-dev/build-agent:latest \
-    node-build
+    build node
 
 # Build Node.js app and create Docker image
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     -v /var/run/docker.sock:/var/run/docker.sock \
     ghcr.io/the-running-dev/build-agent:latest \
-    node-in-docker-build
+    build node-in-docker
 
 # Generate changelog from Git history
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     ghcr.io/the-running-dev/build-agent:latest \
-    forge --target GenerateChangeLog
+    build forge --change-log-source all
 ```
 
 ## Example GitHub Action: Run Nuke Build in Your Container Project
@@ -247,7 +268,7 @@ jobs:
           fetch-depth: 0
 
       - name: Container CI
-        run: docker-build
+        run: build docker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}

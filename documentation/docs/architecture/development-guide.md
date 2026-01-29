@@ -144,13 +144,13 @@ docker run \
   -v ./:/workspace \
   -e GITHUB_TOKEN=$GITHUB_TOKEN \
   -it build-agent:dev \
-  docker-build --dry-run true
+  build docker --dry-run true
 
 # Test Node build
 docker run \
   -v ./:/workspace \
   -it build-agent:dev \
-  node-build --artifacts-dir ./test-output
+  build node --artifacts-dir ./test-output
 ```
 
 ## 📁 Project Structure
@@ -390,7 +390,7 @@ docker run \
   -v ./test-project:/workspace \
   -e GITHUB_TOKEN=$GITHUB_TOKEN \
   -it build-agent:dev \
-  node-in-docker-build --dry-run true
+  build node-in-docker --dry-run true
 ```
 
 ### Manual Testing
@@ -430,8 +430,8 @@ which node
 which dotnet
 
 # Test build commands manually
-docker-build --help
-node-build --help
+build docker --help
+build node --help
 ```
 
 ### Common Issues

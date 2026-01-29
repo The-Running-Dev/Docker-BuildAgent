@@ -3,13 +3,16 @@
     PowerShell helper module for build operations, directory management, and environment setup.
 .DESCRIPTION
     This module provides a comprehensive set of functions for common build operations including:
-    - Directory copying with ignore pattern support (.copy.ignore files)
+    - Directory copying with advanced ignore pattern support (.copy.ignore files)
+      * File-level exclusions (exact filenames and wildcard patterns)
+      * Directory-level exclusions (ignore entire directories and subdirectories)
+      * Cross-platform path handling for Windows and Unix-style paths
     - Build script initialization and environment setup
     - PowerShell script execution with custom messaging
     - .NET SDK environment management and installation
     - .NET command execution with automatic error handling
-    - Safe command execution with comprehensive error handling
-    - Package manager detection for Node.js projects
+    - Safe command execution with comprehensive error handling and exit code validation
+    - Package manager detection for Node.js projects (npm, yarn, pnpm)
     - Argument management for build tools
 
     All functions include robust parameter validation, error handling, and detailed logging
@@ -29,7 +32,12 @@
     Get-PackageManager         - Detect Node.js package manager (npm, yarn, pnpm) from lock files
 
 .EXAMPLE
-    # Copy a template directory with ignore patterns
+    # Copy a template directory with advanced ignore pattern support
+    # Create a .copy.ignore file in the source directory with patterns like:
+    # docs/template      <- ignores entire directories
+    # *.log             <- ignores files by extension
+    # node_modules      <- ignores common directories
+    # temp*             <- ignores directories starting with 'temp'
     Copy-Directory -SourceDir './template' -DestinationDir './docs-ui' -Overwrite
         
     # Initialize and validate build paths with .NET environment setup
@@ -476,8 +484,11 @@ function Copy-Directory {
 .SYNOPSIS
     Recursively copy all files and subdirectories from a source directory to a destination directory.
 .DESCRIPTION
-    Copies all files and subdirectories from $sourceDir to $destinationDir, preserving the directory structure. If -Overwrite is specified, existing files will be overwritten; otherwise, existing files are skipped.
-    Supports a .copy.ignore file in the source directory to exclude specific files from being copied.
+    Copies all files and subdirectories from $sourceDir to $destinationDir, preserving the directory structure. 
+    If -Overwrite is specified, existing files will be overwritten; otherwise, existing files are skipped.
+    
+    Supports a .copy.ignore file in the source directory to exclude specific files, directories, or patterns 
+    from being copied. The ignore patterns support both file-level and directory-level exclusions.
 .PARAMETER sourceDir
     The source directory to copy from.
 .PARAMETER destinationDir
@@ -486,11 +497,39 @@ function Copy-Directory {
     If specified, existing files in the destination will be overwritten. Otherwise, they are skipped.
 .EXAMPLE
     Copy-Directory -sourceDir './template' -destinationDir './docs-ui' -Overwrite
+    # Copies all files from template to docs-ui, overwriting existing files
 .EXAMPLE
     Copy-Directory -sourceDir './template' -destinationDir './docs-ui'
+    # Copies files from template to docs-ui, skipping existing files
+.EXAMPLE
+    # Create a .copy.ignore file in the source directory with patterns like:
+    # docs/template
+    # *.log
+    # temp*
+    # node_modules
+    Copy-Directory -sourceDir './source' -destinationDir './destination'
+    # Files matching the ignore patterns will be skipped during copy
 .NOTES
-    If a .copy.ignore file exists in the source directory, files matching the patterns in that file will be excluded from copying.
-    Each line in .copy.ignore should contain a filename or pattern to ignore.
+    .copy.ignore File Support:
+    - Place a .copy.ignore file in the source directory to specify exclusion patterns
+    - Each line should contain a filename, directory name, or pattern to ignore
+    - Lines starting with # are treated as comments and ignored
+    - Empty lines are ignored
+    
+    Supported Ignore Patterns:
+    - Exact filenames: "config.txt" - ignores files named exactly "config.txt"
+    - Exact directory paths: "docs/template" - ignores all files within the docs/template directory
+    - Wildcard patterns: "*.log" - ignores all files ending with .log
+    - Directory wildcards: "temp*" - ignores all files in directories starting with "temp"
+    
+    Pattern Matching Logic:
+    1. Exact filename match against the ignore pattern
+    2. Exact relative path match against the ignore pattern  
+    3. Directory containment check (e.g., "docs/template" matches "docs/template/file.txt")
+    4. Wildcard pattern matching using PowerShell -like operator
+    
+    The function automatically creates and maintains a .gitignore file in the destination directory
+    with entries for all copied files, ensuring proper version control exclusion.
 #>
     param(
         [Parameter(Mandatory = $true)]
@@ -528,6 +567,24 @@ function Copy-Directory {
             }
         }
 
+        # Prepare gitignore management
+        $gitignoreFile = Join-Path $DestinationDir ".gitignore"
+        $copiedFiles = @()
+        
+        # Create .gitignore if it doesn't exist
+        if (-not (Test-Path $gitignoreFile)) {
+            Write-Host "  [CREATE] Creating .gitignore File" -ForegroundColor Green
+            "# Auto-Generated by Copy-Directory Function" | Out-File -FilePath $gitignoreFile -Encoding UTF8
+            "# Files Copied From: $SourceDir" | Out-File -FilePath $gitignoreFile -Append -Encoding UTF8
+            "" | Out-File -FilePath $gitignoreFile -Append -Encoding UTF8
+        }
+        
+        # Read existing gitignore entries
+        $existingEntries = @()
+        if (Test-Path $gitignoreFile) {
+            $existingEntries = Get-Content $gitignoreFile | Where-Object { $_.Trim() -and -not $_.StartsWith('#') }
+        }
+
         try {
             Get-ChildItem -Path $SourceDir -Recurse | ForEach-Object {
                 if (-not $_.PSIsContainer) {
@@ -537,7 +594,27 @@ function Copy-Directory {
                     # Check if file should be ignored
                     $shouldIgnore = $false
                     foreach ($pattern in $ignorePatterns) {
-                        if ($fileName -like $pattern -or $relativePath -like $pattern) {
+                        # Check exact filename match
+                        if ($fileName -like $pattern) {
+                            $shouldIgnore = $true
+                            break
+                        }
+                        
+                        # Check exact relative path match
+                        if ($relativePath -like $pattern) {
+                            $shouldIgnore = $true
+                            break
+                        }
+                        
+                        # Check if file is within an ignored directory
+                        # Handle patterns like "docs/template" to match files like "docs/template/file.txt"
+                        if ($relativePath -like "$pattern/*" -or $relativePath -like "$pattern\*") {
+                            $shouldIgnore = $true
+                            break
+                        }
+                        
+                        # Handle wildcard patterns like "docs/template*" 
+                        if ($relativePath -like $pattern) {
                             $shouldIgnore = $true
                             break
                         }
@@ -545,6 +622,7 @@ function Copy-Directory {
                     
                     if ($shouldIgnore) {
                         Write-Host "  [SKIP] Ignored: $relativePath" -ForegroundColor DarkYellow
+                        
                         return
                     }
                     
@@ -557,10 +635,28 @@ function Copy-Directory {
 
                     if ($Overwrite -or -not (Test-Path $destPath)) {
                         Copy-Item -Path $_.FullName -Destination $destPath -Force:$Overwrite
+                        
+                        # Track copied files for gitignore
+                        $copiedFiles += $relativePath
 
                         Write-Host "  [OK] Copied: $relativePath" -ForegroundColor Green
                     } else {
                         Write-Host "  [SKIP] Skipped (Exists): $relativePath" -ForegroundColor Gray
+                    }
+                }
+            }
+            
+            # Update .gitignore with newly copied files
+            if ($copiedFiles.Count -gt 0) {
+                Write-Host "  [UPDATE] Adding $($copiedFiles.Count) Entries to .gitignore" -ForegroundColor Cyan
+                
+                foreach ($file in $copiedFiles) {
+                    # Convert to forward slashes for cross-platform compatibility
+                    $gitignoreEntry = $file -replace '\\', '/'
+                    
+                    # Only add if not already present
+                    if ($existingEntries -notcontains $gitignoreEntry) {
+                        $gitignoreEntry | Out-File -FilePath $gitignoreFile -Append -Encoding UTF8
                     }
                 }
             }

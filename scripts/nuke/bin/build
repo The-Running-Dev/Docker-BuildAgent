@@ -1,0 +1,12 @@
+#!/usr/bin/env pwsh
+
+# Unified build entry point for Docker-BuildAgent container
+# Usage: build <type> [args...]
+# Types: docker, node, node-in-docker, node-template, forge
+
+$ErrorActionPreference = 'Stop'
+
+& /nuke/scripts/build.ps1 @args
+
+if ($null -eq $LASTEXITCODE) { exit 1 }
+exit $LASTEXITCODE

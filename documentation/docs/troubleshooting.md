@@ -19,6 +19,13 @@ This section covers common issues, troubleshooting steps, and frequently asked q
   - Ensure the CI environment has access to the required tools and permissions. The workflow sets up tools in the `/root/.dotnet/tools` directory and updates the PATH.
 - **Forge build type errors:**
   - Make sure you specify the correct `-type` argument (e.g., `docker`, `node`, `forge`).
+- **Copy-Directory .gitignore issues:**
+  - If the .gitignore feature isn't working properly, check that the destination directory is writable.
+  - Verify that copied files have relative paths that can be properly converted to forward slashes.
+  - If you don't want .gitignore management, you can modify the function in your local copy.
+- **PowerShell module parameter detection issues:**
+  - Run `Update-ModuleParameters.ps1` if you've updated parameter definitions in C# code.
+  - Ensure XML documentation comments exist on parameter properties for proper help text.
 - **Changelog generation issues:**
   - Ensure your Git repository has commit history and proper tag structure.
   - Check that the repository has at least one tag if using the default (since last tag) option.
@@ -39,6 +46,8 @@ This section covers common issues, troubleshooting steps, and frequently asked q
   - A: The workflow installs .NET tools globally, creates a symlink for GitVersion, and adds `/root/.dotnet/tools` to the PATH for reliable access.
 - **Q: How do I run a build for a specific project type?**
   - A: Use the `-type` argument with the build script, e.g., `./build.ps1 -type docker`, `./build.ps1 -type node`, or `./build.ps1 -type forge`.
+- **Q: How do I use the PowerShell module instead of shell commands?**
+  - A: Import the module with `Import-Module ./scripts/powershell-module/Docker-BuildAgent.psm1`, configure it with `Set-BuildAgentConfig`, and use `Invoke-Build` with a `-type` and `-args` hashtable.
 - **Q: Why is my changelog empty or not generating correctly?**
   - A: Ensure your Git repository has commits and tags. Use `--change-log-source all` to generate complete history, or verify the last tag exists with `git tag -l`.
 - **Q: Can I customize the changelog date format?**

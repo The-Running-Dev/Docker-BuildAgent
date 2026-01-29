@@ -84,22 +84,22 @@ Write-Host "Production Mode: $($isProd.IsPresent)" -ForegroundColor Green
 Write-Host "Artifacts Directory: $artifactsDir" -ForegroundColor Yellow
 
 # Import the helper module for common build operations
-Write-Host "Loading build helpers..." -ForegroundColor Blue
+Write-Host "Loading Build Helpers..." -ForegroundColor Blue
 Import-Module (Join-Path $PSScriptRoot 'scripts/nuke/nuke-helpers.psm1') -Force
 
 # Initialize build environment (sets up paths, validates prerequisites)
-Write-Host "Initializing build environment..." -ForegroundColor Blue
+Write-Host "Initializing Build Environment..." -ForegroundColor Blue
 Initialize-Build
 
 # Execute dotnet build to create the artifacts
-Write-Host "Compiling Forge solution..." -ForegroundColor Blue
+Write-Host "Compiling Forge Solution..." -ForegroundColor Blue
 Invoke-DotNetBuild `
     -ProjectOrSolution $solutionFile `
     -OutputDirectory $artifactsDir `
     -IsProduction:$isProd
 
 # Execute the build workflow for the specified type
-Write-Host "Executing $type build workflow..." -ForegroundColor Blue
+Write-Host "Executing $type Build Workflow..." -ForegroundColor Blue
 Invoke-Forge `
     -BuildTypes $type `
     -Arguments $buildArguments `

@@ -4,9 +4,21 @@ title: 🔧 Build Types & Commands
 sidebar_position: 2
 ---
 
-The Build Agent provides several specialized build commands (executables) available in the container. Each command is optimized for specific project types and use cases.
+The Build Agent provides a **unified `build` command** with different types. Each type is optimized for specific project types and use cases.
 
-## 🐳 docker-build
+## Unified Build Command
+
+All builds use the same command pattern:
+
+```bash
+build <type> [parameters]
+```
+
+Available types: `docker`, `node`, `node-in-docker`, `node-template`, `forge`
+
+---
+
+## 🐳 build docker
 
 **Purpose**: Creates Docker images for your project artifacts with automatic tagging and registry push capabilities.
 
@@ -26,7 +38,7 @@ docker run \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  docker-build
+  build docker
 ```
 
 **Common Parameters**:
@@ -37,7 +49,7 @@ docker run \
 
 ---
 
-## 📦 node-build
+## 📦 build node
 
 **Purpose**: Builds Node.js applications with automatic package manager detection and script execution.
 
@@ -55,7 +67,7 @@ docker run \
 docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-build
+  build node
 ```
 
 **Build Scripts Convention**:
@@ -69,7 +81,7 @@ If no `.build.scripts` file exists, defaults to:
 
 ---
 
-## 🔄 node-in-docker-build
+## 🔄 build node-in-docker
 
 **Purpose**: Combines Node.js build with Docker image creation in a comprehensive two-phase build pipeline.
 
@@ -107,14 +119,14 @@ docker run \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-in-docker-build
+  build node-in-docker
 
 # With custom parameters
 docker run \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-in-docker-build \
+  build node-in-docker \
   --artifacts-dir ./dist \
   --image-tag my-app:latest \
   --registry-url ghcr.io/myorg \
@@ -153,7 +165,7 @@ docker run \
 
 ```bash
 # Production build with registry push
-node-in-docker-build \
+build node-in-docker \
   --artifacts-dir ./build \
   --image-tag myapp:v1.2.3 \
   --registry-url ghcr.io/myorg \
@@ -163,13 +175,13 @@ node-in-docker-build \
   --release-tag v1.2.3
 
 # Development build (dry run)
-node-in-docker-build \
+build node-in-docker \
   --image-tag myapp:dev \
   --dry-run true \
   --verbosity Verbose
 
 # Custom Dockerfile and artifacts location
-node-in-docker-build \
+build node-in-docker \
   --docker-file Dockerfile.prod \
   --artifacts-dir ./dist/app \
   --templates-dir ./docker-templates \
@@ -207,7 +219,7 @@ The build process respects these environment variables:
 
 ---
 
-## 📚 node-template-build
+## 📚 build node-template
 
 **Purpose**: Builds documentation sites using templates (primarily Docusaurus) with smart file merging.
 
@@ -225,36 +237,36 @@ The build process respects these environment variables:
 docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-template-build -appDir documentation
+  build node-template -AppDir documentation
 ```
 
 **Key Parameters**:
 
-- `-appDir` - Target directory for documentation (default: 'documentation')
-- `-packageManager` - Force specific package manager (npm/pnpm/yarn)
-- `-skipInstall` - Skip npm install step
-- `-isProduction` - Build for production using build:prod script
-- `-nodeTemplateRepositoryUrl` - Custom template repository URL
+- `-AppDir` - Target directory for documentation (default: 'documentation')
+- `-PackageManager` - Force specific package manager (npm/pnpm/yarn)
+- `-SkipInstall` - Skip npm install step
+- `-IsProduction` - Build for production using build:prod script
+- `-NodeTemplateRepositoryUrl` - Custom template repository URL
 
 **Examples**:
 
 ```bash
 # Basic usage with auto-detection
-node-template-build
+build node-template
 
 # Custom directory with specific package manager
-node-template-build -appDir docs-ui -packageManager pnpm
+build node-template -AppDir docs-ui -PackageManager pnpm
 
 # Skip install and build for development
-node-template-build -skipInstall -isProduction:$false
+build node-template -SkipInstall -IsProduction:$false
 
 # Use custom template repository
-node-template-build -nodeTemplateRepositoryUrl https://github.com/my-org/custom-template.git
+build node-template -NodeTemplateRepositoryUrl https://github.com/my-org/custom-template.git
 ```
 
 ---
 
-## � forge
+## 📝 build forge
 
 **Purpose**: Provides build orchestration and changelog generation from Git history with advanced formatting options.
 
@@ -273,19 +285,19 @@ node-template-build -nodeTemplateRepositoryUrl https://github.com/my-org/custom-
 docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  forge --target GenerateChangeLog
+  build forge --target GenerateChangeLog
 
 # Generate complete history
 docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  forge --target GenerateChangeLog --change-log-source all
+  build forge --change-log-source all
 
 # Generate changelog since specific tag
 docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  forge --target GenerateChangeLog --change-log-source v1.0.0
+  build forge --change-log-source v1.0.0
 ```
 
 **Key Parameters**:
@@ -331,7 +343,50 @@ The changelog formatter supports these options:
 
 ---
 
-## �🔧 Common Features
+## 🧰 PowerShell Module
+
+**Purpose**: Provides a programmable PowerShell interface for integrating Build Agent functionality into custom scripts and workflows.
+
+**What it does**:
+
+- Provides a single `Invoke-Build` command for all build types
+- Provides consistent Docker container execution pattern
+- Handles parameter validation and conversion
+- Maintains consistent environment configuration
+
+**Installation**:
+
+```powershell
+# Import module from repository
+Import-Module ./scripts/powershell-module/Docker-BuildAgent.psm1
+
+# Configure for your environment
+Set-BuildAgentConfig `
+    -DockerImage "ghcr.io/the-running-dev/build-agent:latest" `
+    -DockerHost "tcp://host.docker.internal:2375" `
+    -WorkspacePath "D:\Projects\YourProject" `
+    -Environment "development"
+```
+
+**Usage Example**:
+
+```powershell
+# Use Invoke-Build for each build type
+Invoke-Build -type "docker" -args @{ createRegistry = $true; dryRun = $true }
+Invoke-Build -type "node" -args @{ packageManager = "pnpm"; isProduction = $true }
+```
+
+**Parameter Extraction**:
+
+The module includes a parameter extraction script that generates a `parameters.json` definition file from C# parameter files:
+
+```powershell
+./Update-ModuleParameters.ps1
+```
+
+---
+
+## 🔧 Common Features
 
 All build commands share these common capabilities:
 
@@ -349,7 +404,7 @@ All build commands share these common capabilities:
 
 ### Logging & Output
 
-- Colored console output with emojis
+- Colored console output with status prefixes
 - Detailed progress information
 - Error handling with meaningful messages
 
@@ -364,14 +419,14 @@ All build commands share these common capabilities:
 
 ## 🎯 Choosing the Right Build Type
 
-| Project Type | Recommended Command | Use Case |
-|-------------|-------------------|----------|
-| Pure Docker projects | `docker-build` | Existing Dockerfile, containerizing artifacts |
-| Node.js apps (no container) | `node-build` | Build and test Node.js applications |
-| Node.js apps (with container) | `node-in-docker-build` | Complete CI/CD pipeline with registry push |
-| Documentation sites | `node-template-build` | Docusaurus, GitBook, static sites |
-| Changelog generation | `forge` | Git history-based changelog creation |
-| Build orchestration | `forge` | Complex multi-stage build processes |
+| Project Type | Command | Use Case |
+|-------------|---------|----------|
+| Pure Docker projects | `build docker` | Existing Dockerfile, containerizing artifacts |
+| Node.js apps (no container) | `build node` | Build and test Node.js applications |
+| Node.js apps (with container) | `build node-in-docker` | Complete CI/CD pipeline with registry push |
+| Documentation sites | `build node-template` | Docusaurus, GitBook, static sites |
+| Changelog generation | `build forge` | Git history-based changelog creation |
+| Build orchestration | `build forge` | Complex multi-stage build processes |
 
 ---
 

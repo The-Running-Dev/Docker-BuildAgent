@@ -54,26 +54,26 @@ docker run \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  docker-build
+  build docker
 
 # Node.js build
 docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-build
+  build node
 
 # Combined Node.js + Docker build
 docker run \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-in-docker-build
+  build node-in-docker
 
 # Template-based documentation build
 docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-template-build
+  build node-template
 
 # Changelog generation and build orchestration
 docker run \
