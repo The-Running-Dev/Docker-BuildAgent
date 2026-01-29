@@ -25,7 +25,7 @@
       "type": "string",
       "enum": [
         "Build",
-        "ChangeLog",
+        "GenerateChangeLog",
         "Setup"
       ]
     },
@@ -101,7 +101,8 @@
     {
       "properties": {
         "ChangeLogSource": {
-          "type": "string"
+          "type": "string",
+          "description": "The source of the change log"
         },
         "DryRun": {
           "type": "boolean",
