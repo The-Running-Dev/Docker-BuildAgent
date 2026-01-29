@@ -42,87 +42,119 @@ function Set-BuildAgentConfig {
     $script:BuildAgentConfig.Environment = $Environment
     $script:BuildAgentConfig.Parameters = $AdditionalParameters
 
-    Write-Host "[OK] Build agent configuration updated." -ForegroundColor Green
+    Write-Host "[OK] Build Agent Configuration Updated." -ForegroundColor Green
 }
 
 # --- Private Helper Functions ---
 
 function Convert-ToKebabCase {
-    param([string]$InputString)
-    return ($InputString -replace '([a-z])([A-Z])', '$1-$2').ToLower()
+    param([string]$inputString)
+
+    return ($inputString -replace '([a-z])([A-Z])', '$1-$2').ToLower()
 }
 
-# --- Dynamic Function Generation ---
+# --- Build Invocation ---
 
-function New-BuildFunction {
-    param(
-        [string]$FunctionName,
-        $Parameters
-    )
+function Get-BuildConfigName {
+    param([string]$type)
 
-    $paramBlock = $Parameters | ForEach-Object {
-        @"
-    # $($_.Description)
-    [Parameter()]
-    [string]`$($_.Name),
-"@
+    switch ($type) {
+        'docker' { return 'Docker' }
+        'node' { return 'Node' }
+        'node-in-docker' { return 'NodeInDocker' }
+        'node-template' { return 'NodeTemplate' }
+        'forge' { return 'Forge' }
+        default { return $type }
     }
-    $paramBlock = ($paramBlock -join "`n").TrimEnd(",`n")
-
-    $argumentBlock = $Parameters | ForEach-Object {
-        $kebabCase = Convert-ToKebabCase -InputString $_.Name
-        "if (`$PSBoundParameters.ContainsKey('$($_.Name)')) { `$arguments += '--$kebabCase', `$($_.Name) }"
-    }
-    $argumentBlock = $argumentBlock -join "`n    "
-
-    $nukeTargetName = $FunctionName -replace "Forge", ""
-
-    $functionBody = @"
-function Invoke-$FunctionName {
-    [CmdletBinding()]
-    param(
-        $paramBlock
-    )
-
-    Write-Host "Executing '$nukeTargetName' build..."
-
-    `$baseArgs = @(
-        "run", "--rm",
-        "-v", "`"$(`$script:BuildAgentConfig.WorkspacePath):/workspace`"",
-        "-w", "/workspace",
-        "-e", "DOCKER_HOST=`$(`$script:BuildAgentConfig.DockerHost)",
-        "`$(`$script:BuildAgentConfig.DockerImage)"
-    )
-
-    `$nukeTarget = @("build", "$nukeTargetName")
-    `$arguments = @()
-    
-    $argumentBlock
-
-    `$command = "docker `" + (`$baseArgs + `$nukeTarget + `$arguments) -join " `"
-    Write-Host "Executing command: `$command"
-    Invoke-Expression -Command `$command
-}
-"@
-
-    return [scriptblock]::Create($functionBody)
 }
 
-# Load parameters from JSON and generate functions
-$parametersJsonPath = Join-Path $PSScriptRoot "parameters.json"
-if (-not (Test-Path $parametersJsonPath)) {
-    Write-Warning "parameters.json not found. Please run Update-ModuleParameters.ps1 from the module directory."
-} else {
-    $buildConfigs = Get-Content $parametersJsonPath | ConvertFrom-Json
+function Convert-HashtableToArgs {
+    param([hashtable]$parameters)
 
-    foreach ($config in $buildConfigs) {
-        if ($config.Name -and $config.Parameters.Count -gt 0) {
-            $functionName = "Forge" + $config.Name
-            $scriptBlock = New-BuildFunction -FunctionName $functionName -Parameters $config.Parameters
-            Invoke-Command -ScriptBlock $scriptBlock
-            Export-ModuleMember -Function "Invoke-$functionName"
+    $result = @{}
+    foreach ($key in $parameters.Keys) {
+        $value = $parameters[$key]
+        if ($null -eq $value) { continue }
+
+        $kebab = Convert-ToKebabCase -InputString $key
+        if ($value -is [System.Collections.IEnumerable] -and -not ($value -is [string])) {
+            foreach ($item in $value) {
+                $result += "--$kebab"
+                $result += "$item"
+            }
+        }
+        else {
+            $result += "--$kebab"
+            $result += "$value"
         }
     }
+    return $result
 }
 
-Export-ModuleMember -Function 'Set-BuildAgentConfig' -Variable 'BuildAgentConfig'
+function Get-AllowedParametersForType {
+    param([string]$type)
+
+    $parametersJsonPath = Join-Path $PSScriptRoot "parameters.json"
+    if (-not (Test-Path $parametersJsonPath)) {
+        return @()
+    }
+
+    $buildConfigs = Get-Content $parametersJsonPath | ConvertFrom-Json
+    $configName = Get-BuildConfigName -Type $type
+    $config = $buildConfigs | Where-Object { $_.Name -eq $configName } | Select-Object -First 1
+
+    if (-not $config) { return @() }
+
+    return $config.Parameters | ForEach-Object { $_.Name }
+}
+
+function Invoke-Build {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('docker', 'node', 'node-in-docker', 'node-template', 'forge')]
+        [string]$type,
+
+        [hashtable]$args = @{},
+
+        [switch]$validateArgs
+    )
+
+    Write-Host "Executing '$type' build..."
+
+    $mergedArgs = @{}
+    foreach ($key in $script:BuildAgentConfig.Parameters.Keys) {
+        $mergedArgs[$key] = $script:BuildAgentConfig.Parameters[$key]
+    }
+    foreach ($key in $args.Keys) {
+        $mergedArgs[$key] = $args[$key]
+    }
+
+    if ($validateArgs) {
+        $allowed = Get-AllowedParametersForType -Type $type
+        if ($allowed.Count -gt 0) {
+            $unknown = $mergedArgs.Keys | Where-Object { $_ -notin $allowed }
+            if ($unknown.Count -gt 0) {
+                throw "Unknown parameter(s) for '$Type': $($unknown -join ', ')"
+            }
+        }
+    }
+
+    $argsList = @(
+        "run", "--rm",
+        "-v", "`"$($script:BuildAgentConfig.WorkspacePath):/workspace`"",
+        "-w", "/workspace",
+        "-e", "DOCKER_HOST=$($script:BuildAgentConfig.DockerHost)",
+        "$($script:BuildAgentConfig.DockerImage)",
+        "build", "$type"
+    )
+
+    $argsList += Convert-HashtableToArgs -Parameters $mergedArgs
+
+    Write-Host "Executing: docker $($argsList -join ' ')"
+    & docker @argsList
+
+    if ($LASTEXITCODE -ne 0) { throw "Docker invocation failed with exit code $LASTEXITCODE" }
+}
+
+Export-ModuleMember -Function 'Set-BuildAgentConfig', 'Invoke-Build' -Variable 'BuildAgentConfig'
