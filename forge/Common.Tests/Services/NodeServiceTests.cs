@@ -3,8 +3,8 @@ using Xunit;
 using Microsoft.Extensions.Logging;
 
 using Entities;
-using Extensions;
 using Services;
+using Extensions;
 using Parameters;
 
 namespace Common.Tests.Services;

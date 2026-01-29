@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using Microsoft.Extensions.Logging;
 using Moq;
-using Nuke.Common;
 using Xunit;
+using Nuke.Common;
 using Assert = Xunit.Assert;
+using Microsoft.Extensions.Logging;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 using Services;
