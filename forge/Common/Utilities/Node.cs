@@ -1,5 +1,4 @@
 ﻿using System.IO;
-using System.Text.RegularExpressions;
 
 using Serilog;
 using Nuke.Common.IO;
@@ -132,13 +131,8 @@ public static class Node
 
         foreach (var script in scripts)
         {
-            var match = Regex.Match(script, @"^(npm|pnpm|yarn)\s+(.*)", RegexOptions.IgnoreCase);
-
-            if (match.Success)
+            if (script.TryParsePackageManagerCommand(out var packageManager, out var command))
             {
-                var packageManager = match.Groups[1].Value;
-                var command = match.Groups[2].Value;
-
                 Run(p.RootDirectory, packageManager, command);
 
                 continue;

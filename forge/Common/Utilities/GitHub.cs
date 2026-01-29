@@ -43,7 +43,7 @@ public static class GitHub
 
         var body = assetsText + releaseNotes;
 
-        var repo = Regex.Replace(p.RepositoryUrl, @"(https?:\/\/)?(www\.)?(ghcr\.io|github\.com)\/", "");
+        var repo = p.RepositoryUrl.GetGitHubRepoSlug();
         var apiUrl = $"https://api.github.com/repos/{repo}/releases";
         var tagName = p.Version.Version;
 

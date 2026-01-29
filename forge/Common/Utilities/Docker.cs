@@ -1,12 +1,12 @@
 ﻿using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 using Serilog;
 using Nuke.Common;
 using Nuke.Common.Tooling;
 using Nuke.Common.Tools.Docker;
 
+using Extensions;
 using Parameters;
 
 namespace Utilities;
@@ -28,9 +28,11 @@ public static class Docker
     /// <param name="p">The parameters required for logging into the Docker registry, including the repository, user, and token.</param>
     public static void Login(DockerParams p)
     {
+        var server = p.RegistryUrl.GetRegistryServer();
+
         DockerTasks.DockerLogin(s => s
             .DisableProcessInvocationLogging()
-            .SetServer(Regex.Replace(p.RegistryUrl, @"/.*$", ""))
+            .SetServer(server)
             .SetUsername(p.RegistryUser)
             .SetPassword(p.RegistryToken));
     }
