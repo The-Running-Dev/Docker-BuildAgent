@@ -4,9 +4,7 @@ title: "🔌 PowerShell Module"
 sidebar_position: 10
 ---
 
-The new PowerShell module provides a programmatic interface to the Build Agent functionality, making it easier to integrate into custom scripts and automation workflows.
-
-The new PowerShell module provides a programmatic interface to the Build Agent functionality, making it easier to integrate into custom scripts and automation workflows.
+The PowerShell module provides a programmatic interface to the Build Agent functionality, making it easier to integrate into custom scripts and automation workflows.
 
 ## Installation
 

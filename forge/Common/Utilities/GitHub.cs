@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 
 using Serilog;
 
+using Extensions;
 using Parameters;
 
 namespace Utilities;
@@ -69,7 +70,7 @@ public static class GitHub
         {
             var error = await response.Content.ReadAsStringAsync();
 
-            Log.Error($"❌ Failed to Create GitHub Release: {response.StatusCode}\n{error}");
+            Log.Error($"❌ Failed to Create GitHub Release: {response.StatusCode}. {error.SanitizeForLog()}");
         }
     }
 }

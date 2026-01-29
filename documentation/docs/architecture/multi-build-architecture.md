@@ -67,7 +67,7 @@ docker run \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  node-in-build docker
+  build node-in-docker
 
 # Template-based documentation build
 docker run \

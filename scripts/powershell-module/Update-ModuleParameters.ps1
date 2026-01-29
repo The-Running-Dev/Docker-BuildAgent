@@ -3,11 +3,6 @@ param(
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "../../")).Path,
     [string]$ModulePath = $PSScriptRoot,
     [string]$OutputFile = (Join-Path $PSScriptRoot "parameters.json")
-)tBinding()]
-param(
-    [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path,
-    [string]$ModulePath = $PSScriptRoot,
-    [string]$OutputFile = (Join-Path $PSScriptRoot "parameters.json")
 )
 
 function Get-ParameterFiles {

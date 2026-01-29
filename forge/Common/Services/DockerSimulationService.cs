@@ -435,9 +435,9 @@ public class DockerSimulationService : IDockerService
             var stepNumber = 1;
             var totalSteps = CountDockerfileInstructions(lines);
 
-            foreach (var line in lines)
+            for (var i = 0; i < lines.Length; i++)
             {
-                var trimmedLine = line.Trim();
+                var trimmedLine = lines[i].Trim();
                 
                 // Skip comments and empty lines
                 if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith("#"))
@@ -447,12 +447,11 @@ public class DockerSimulationService : IDockerService
 
                 // Handle multi-line commands (lines ending with \)
                 var fullCommand = trimmedLine;
-                var lineIndex = Array.IndexOf(lines, line);
                 
-                while (fullCommand.EndsWith("\\") && lineIndex + 1 < lines.Length)
+                while (fullCommand.EndsWith("\\") && i + 1 < lines.Length)
                 {
-                    lineIndex++;
-                    var nextLine = lines[lineIndex].Trim();
+                    i++;
+                    var nextLine = lines[i].Trim();
                     fullCommand = fullCommand.TrimEnd('\\') + " " + nextLine;
                 }
 
@@ -483,15 +482,24 @@ public class DockerSimulationService : IDockerService
     {
         var count = 0;
         
-        foreach (var line in lines)
+        for (var i = 0; i < lines.Length; i++)
         {
-            var trimmedLine = line.Trim();
-            if (!string.IsNullOrWhiteSpace(trimmedLine) && !trimmedLine.StartsWith("#"))
+            var trimmedLine = lines[i].Trim();
+            if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith("#"))
             {
-                var instruction = GetDockerInstruction(trimmedLine);
-                if (!string.IsNullOrEmpty(instruction))
+                continue;
+            }
+
+            var instruction = GetDockerInstruction(trimmedLine);
+            if (!string.IsNullOrEmpty(instruction))
+            {
+                count++;
+
+                // Handle multi-line commands by skipping subsequent lines
+                while (trimmedLine.EndsWith("\\") && i + 1 < lines.Length)
                 {
-                    count++;
+                    i++;
+                    trimmedLine = lines[i].Trim();
                 }
             }
         }

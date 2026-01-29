@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Collections.Generic;
 
 using Serilog;
@@ -206,12 +207,22 @@ public static class Git
     /// <param name="tag">The name of the tag to create and push. Cannot be null or empty.</param>
     public static void CreateTag(string tag)
     {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            throw new ArgumentException("Tag cannot be null or empty.", nameof(tag));
+        }
+
+        if (!IsValidTag(tag))
+        {
+            throw new ArgumentException($"Invalid tag format: {tag}", nameof(tag));
+        }
+
         var existingTags = GitTasks.Git("tag");
 
         if (existingTags.All(l => l.Text != tag))
         {
-            GitTasks.Git($"tag -f {tag}");
-            GitTasks.Git($"push origin -f {tag}");
+            GitTasks.Git($"tag -f \"{tag}\"");
+            GitTasks.Git($"push origin -f \"{tag}\"");
 
             Log.Information($"🏷️ Created and Pushed Tag: {tag}");
         }
@@ -219,6 +230,11 @@ public static class Git
         {
             Log.Information($"✅ Tag {tag} Already Exists");
         }
+    }
+
+    private static bool IsValidTag(string tag)
+    {
+        return Regex.IsMatch(tag, "^[A-Za-z0-9][A-Za-z0-9._-]*$");
     }
 
     /// <summary>
