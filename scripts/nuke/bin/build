@@ -5,3 +5,5 @@
 # Types: docker, node, node-in-docker, node-template, forge
 
 & /nuke/scripts/build.ps1 @args
+
+exit $LASTEXITCODE
