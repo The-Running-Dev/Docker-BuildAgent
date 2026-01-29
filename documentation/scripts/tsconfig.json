@@ -1,0 +1,63 @@
+{
+  "compilerOptions": {
+    // Override settings specific to pre-build script
+    "target": "ES2020",
+    "module": "CommonJS",
+    "jsx": "react-jsx",
+    "outDir": "./build",
+    "rootDir": "..",
+    "sourceMap": true,
+    "declaration": false,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+
+    // Node.js specific settings
+    "moduleResolution": "node",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    // Path mapping for imports
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@config/*": ["./config/*"],
+      "@data/*": ["./data/*"],
+      "@scripts/*": ["./scripts/*"]
+    }
+  },
+  "include": [
+    "*.ts",
+    "../config/**/*",
+    "../src/entities/**/*",
+    "../src/schemas/**/*",
+    "../src/config/**/*",
+    "../src/components/ThemeSwitcher/models.ts",
+    "../src/components/ThemeSwitcher/schema.ts",
+    "../src/components/NavBarLinks/models.ts",
+    "../src/components/NavBarLinks/schema.ts",
+    "../src/components/Projects/constants.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "../build",
+    "../artifacts",
+    "../.docusaurus",
+    "build",
+    "../src/components/**/*.tsx",
+    "../src/pages/**/*",
+    "../src/theme/**/*",
+    "../data/index.ts"
+  ],
+  "ts-node": {
+    "compilerOptions": {
+      "module": "CommonJS"
+    }
+  }
+}
