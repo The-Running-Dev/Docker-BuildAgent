@@ -141,7 +141,12 @@ public static class Git
         var commits = output
             .Select(line =>
             {
-                var parts = line.Split('\t');
+                var parts = line.Split('\t', 4);
+                if (parts.Length < 4)
+                {
+                    return null;
+                }
+
                 return new CommitInfo
                 {
                     Hash = parts[0],
@@ -150,6 +155,7 @@ public static class Git
                     Message = parts[3]
                 };
             })
+            .Where(x => x != null)
             .ToList();
 
         return commits;
