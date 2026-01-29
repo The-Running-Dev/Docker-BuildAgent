@@ -12,14 +12,14 @@
    - Technical details of helper module implementations
    - Function reference and usage examples
    - Details on .gitignore management in Copy-Directory
-   - Parameter extraction and dynamic function generation
+   - Parameter extraction and Invoke-Build validation workflow
 
 ## Updated Documentation
 
 1. **Build Types & Commands** (`docs/build-types.md`)
    - Added PowerShell module section
    - Updated usage examples for all build types
-   - Added information on parameter extraction
+   - Added information on parameter extraction and Invoke-Build usage
 
 2. **CI/CD Documentation** (`docs/ci-cd.md`)
    - Added detailed workflow descriptions
@@ -40,7 +40,7 @@
 ## Key Features Documented
 
 1. **PowerShell Module**
-   - Dynamic function generation based on C# parameter definitions
+   - Invoke-Build command with parameter hashtables
    - Configuration management with Set-BuildAgentConfig
    - Parameter extraction with XML documentation support
 
