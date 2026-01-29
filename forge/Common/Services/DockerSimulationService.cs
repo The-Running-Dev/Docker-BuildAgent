@@ -52,7 +52,7 @@ public class DockerSimulationService : IDockerService
         
         ValidateLoginParameters(parameters);
         
-        var server = Regex.Replace(parameters.RegistryUrl, @"/.*$", "");
+        var server = parameters.RegistryUrl.GetRegistryServer();
         _logger.LogInformation("   🌐 Registry Server: {Server}", server);
         _logger.LogInformation("   👤 Username: {Username}", parameters.RegistryUser);
         _logger.LogInformation("   🔑 Token: {Token}", MaskToken(parameters.RegistryToken));

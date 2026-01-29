@@ -54,6 +54,11 @@ public static class Docker
     {
         var dockerFile = Path.Combine(p.RootDirectory, p.DockerFile);
         var latestTag = p.Tags.FirstOrDefault(x => x.Contains("latest"));
+        var versionTag = p.Tags.FirstOrDefault(x => !x.Contains("latest"));
+        if (string.IsNullOrWhiteSpace(latestTag) || string.IsNullOrWhiteSpace(versionTag))
+        {
+            Assert.Fail("Docker tags must include both a 'latest' tag and a version tag.");
+        }
 
         if (!File.Exists(dockerFile) && Directory.Exists(p.TemplatesDir))
         {
