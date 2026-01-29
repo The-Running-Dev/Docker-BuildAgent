@@ -80,9 +80,9 @@ foreach ($file in $imageFiles) {
         $absoluteLocalPath = (Resolve-Path $localFilePath).Path
         $containerPath = "$imageTemplatePath/$file"
         
-        # Add the -v flag and its value as separate arguments for robustness.
-        $volumeMounts += "-v"
-        $volumeMounts += "$absoluteLocalPath`:$containerPath"
+        # Use --mount for robust cross-platform bind mounts.
+        $volumeMounts += "--mount"
+        $volumeMounts += "type=bind,source=$absoluteLocalPath,target=$containerPath"
 
         Write-Host "  [+] Mounting local file: $file"
     }
@@ -96,10 +96,10 @@ $dockerArgs = @(
     "-it"
 )
 $dockerArgs += $volumeMounts
-$dockerArgs += "-v", "./docs:/template/docs" # Mount the local docs directory
-$dockerArgs += "-v", "./src/pages:/template/src/pages" # Mount the local pages directory
-$dockerArgs += "-v", "./src/navbarLinks.ts:/template/src/navbarLinks.ts"
-$dockerArgs += "-v", "/template/node_modules" # Anonymous volume to protect node_modules
+$dockerArgs += "--mount", "type=bind,source=./docs,target=/template/docs" # Mount the local docs directory
+$dockerArgs += "--mount", "type=bind,source=./src/pages,target=/template/src/pages" # Mount the local pages directory
+$dockerArgs += "--mount", "type=bind,source=./src/navbarLinks.ts,target=/template/src/navbarLinks.ts"
+$dockerArgs += "--mount", "type=volume,target=/template/node_modules" # Anonymous volume to protect node_modules
 $dockerArgs += $imageName
 
 # 4. Execute the command.
