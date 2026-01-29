@@ -37,7 +37,7 @@ const config: Config = {
         },
         blog: false,
         theme: {
-          customCss: './static/themes/agent.css',
+          customCss: require.resolve('./src/css/agent.css'),
         },
       } satisfies Preset.Options,
     ],
