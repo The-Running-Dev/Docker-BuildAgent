@@ -127,11 +127,11 @@ Set-BuildAgentConfig `
     -WorkspacePath $PWD `
     -ArtifactsDir "./artifacts"
 
-# Execute builds via dynamically-generated module functions
-Invoke-ForgeDocker -ImageName myapp -Tag v1.0 -RegistryUrl ghcr.io
-Invoke-ForgeNode -PackageManager pnpm -ArtifactsDir ./dist
-Invoke-ForgeNodeInDocker
-Invoke-Forge -ChangeLogSource all
+# Execute builds via Invoke-Build
+Invoke-Build -type "docker" -args @{ imageName = "myapp"; tag = "v1.0"; registryUrl = "ghcr.io" }
+Invoke-Build -type "node" -args @{ packageManager = "pnpm"; artifactsDir = "./dist" }
+Invoke-Build -type "node-in-docker" -args @{}
+Invoke-Build -type "forge" -args @{ changeLogSource = "all" }
 ```
 
 ### Local PowerShell Scripts (via unified build.ps1)
@@ -166,16 +166,13 @@ dotnet run --project forge/Forge/Forge.csproj -- --change-log-source all
 ### PowerShell Module (`scripts/powershell-module/`)
 
 New programmatic interface providing:
-- **Docker-BuildAgent.psm1** - Main module with configuration and dynamic function generation
+- **Docker-BuildAgent.psm1** - Main module with configuration and `Invoke-Build`
 - **Docker-BuildAgent.psd1** - Module manifest for proper PowerShell import
 - **Update-ModuleParameters.ps1** - Script to sync module functions with C# parameters
 
-Module functions (dynamically generated from C# parameters):
+Module commands:
 - `Set-BuildAgentConfig` - Configure module for your environment (DockerImage, WorkspacePath, etc.)
-- `Invoke-ForgeDocker` - Execute Docker builds with all available parameters
-- `Invoke-ForgeNode` - Execute Node.js builds with all available parameters
-- `Invoke-ForgeNodeInDocker` - Execute combined Node + Docker builds
-- `Invoke-Forge` - Execute changelog/release builds
+- `Invoke-Build` - Execute build types with a parameter hashtable
 
 ### Core Helper Module (`scripts/nuke/nuke-helpers.psm1`)
 
@@ -333,8 +330,8 @@ docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build
 # PowerShell module
 Import-Module .\scripts\powershell-module\Docker-BuildAgent.psm1
 Set-BuildAgentConfig -DockerImage ghcr.io/the-running-dev/build-agent:latest -WorkspacePath $PWD
-Invoke-ForgeDocker -ImageName myapp
-Invoke-ForgeNode -PackageManager pnpm
+Invoke-Build -type "docker" -args @{ imageName = "myapp" }
+Invoke-Build -type "node" -args @{ packageManager = "pnpm" }
 
 # Direct NUKE execution
 dotnet run --project forge/Docker/Docker.csproj -- --registry-url ghcr.io
