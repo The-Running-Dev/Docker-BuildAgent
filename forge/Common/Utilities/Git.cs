@@ -225,7 +225,7 @@ public static class Git
 
         var existingTags = GitTasks.Git("tag");
 
-        if (existingTags.All(l => l.Text != tag))
+        if (existingTags.All(l => !string.Equals(l.Text?.Trim(), tag, StringComparison.OrdinalIgnoreCase)))
         {
             GitTasks.Git($"tag -f \"{tag}\"");
             GitTasks.Git($"push origin -f \"{tag}\"");
