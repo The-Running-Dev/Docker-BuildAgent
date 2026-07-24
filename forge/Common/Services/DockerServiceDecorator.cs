@@ -150,20 +150,17 @@ public class DockerServiceDecorator : IDockerService
                     {
                         // Try to find any static instance or current context
                         var staticFields = buildType.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                        foreach (var field in staticFields)
+                        foreach (var field in staticFields.Where(field => field.FieldType == buildType))
                         {
-                            if (field.FieldType == buildType)
+                            var instance = field.GetValue(null);
+                            if (instance != null)
                             {
-                                var instance = field.GetValue(null);
-                                if (instance != null)
+                                var dryRunProp = instance.GetType().GetProperty("DryRun");
+                                if (dryRunProp != null)
                                 {
-                                    var dryRunProp = instance.GetType().GetProperty("DryRun");
-                                    if (dryRunProp != null)
-                                    {
-                                        var isDryRun = (bool)(dryRunProp.GetValue(instance) ?? false);
-                                        _logger.LogDebug("Dry-run detection via build type reflection: {IsDryRun}", isDryRun);
-                                        return isDryRun;
-                                    }
+                                    var isDryRun = (bool)(dryRunProp.GetValue(instance) ?? false);
+                                    _logger.LogDebug("Dry-run detection via build type reflection: {IsDryRun}", isDryRun);
+                                    return isDryRun;
                                 }
                             }
                         }

@@ -104,7 +104,7 @@ public class DockerSimulationService : IDockerService
         _logger.LogInformation("   📤 Would push: {LatestTag}", latestTag);
         _logger.LogInformation("   📤 Would push: {VersionTag}", versionTag);
         _logger.LogInformation("   ⏱️  Estimated push time: 30 seconds - 2 minutes (depending on image size and network)");
-        _logger.Push("Docker Images: {Version}, latest", parameters.Version);
+        _logger.LogInformation("Docker Images: {Version}, latest", parameters.Version);
         _logger.LogInformation("   ✅ Push simulation completed successfully");
     }
 
@@ -446,14 +446,16 @@ public class DockerSimulationService : IDockerService
                 }
 
                 // Handle multi-line commands (lines ending with \)
-                var fullCommand = trimmedLine;
-                
-                while (fullCommand.EndsWith("\\") && i + 1 < lines.Length)
+                var commandParts = new List<string> { trimmedLine.TrimEnd('\\').TrimEnd() };
+
+                while (trimmedLine.EndsWith("\\") && i + 1 < lines.Length)
                 {
                     i++;
-                    var nextLine = lines[i].Trim();
-                    fullCommand = fullCommand.TrimEnd('\\') + " " + nextLine;
+                    trimmedLine = lines[i].Trim();
+                    commandParts.Add(trimmedLine.TrimEnd('\\').TrimEnd());
                 }
+
+                var fullCommand = string.Join(" ", commandParts.Where(part => !string.IsNullOrWhiteSpace(part)));
 
                 // Extract the Docker instruction
                 var instruction = GetDockerInstruction(fullCommand);
@@ -513,17 +515,12 @@ public class DockerSimulationService : IDockerService
     private static string GetDockerInstruction(string line)
     {
         var instructions = new[] { "FROM", "WORKDIR", "COPY", "ADD", "RUN", "CMD", "ENTRYPOINT", "EXPOSE", "ENV", "ARG", "USER", "LABEL", "VOLUME", "HEALTHCHECK" };
-        
-        foreach (var instruction in instructions)
-        {
-            if (line.StartsWith(instruction + " ", StringComparison.OrdinalIgnoreCase) ||
-                line.Equals(instruction, StringComparison.OrdinalIgnoreCase))
-            {
-                return instruction;
-            }
-        }
-        
-        return string.Empty;
+
+        var matchedInstruction = instructions.FirstOrDefault(instruction =>
+            line.StartsWith(instruction + " ", StringComparison.OrdinalIgnoreCase) ||
+            line.Equals(instruction, StringComparison.OrdinalIgnoreCase));
+
+        return matchedInstruction ?? string.Empty;
     }
 
     /// <summary>

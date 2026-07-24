@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.RegularExpressions;
 
 using Serilog;
@@ -33,15 +34,18 @@ public static class GitHub
         var releaseNotes = File.Exists(changelogPath) ? await File.ReadAllTextAsync(changelogPath) : "No Changelog Available.";
 
         // Compose Docker image asset links
-        var assetsText = "## Images\n";
+        var assetsTextBuilder = new StringBuilder();
+        assetsTextBuilder.AppendLine("## Images");
+
         foreach (var tag in p.Tags)
         {
-            assetsText += $"- {tag}{Environment.NewLine}";
+            assetsTextBuilder.AppendLine($"- {tag}");
         }
-        assetsText += $"{Environment.NewLine}";
-        assetsText += $"## CHANGELOG{Environment.NewLine}";
 
-        var body = assetsText + releaseNotes;
+        assetsTextBuilder.AppendLine();
+        assetsTextBuilder.AppendLine("## CHANGELOG");
+
+        var body = assetsTextBuilder.ToString() + releaseNotes;
 
         var apiUrl = BuildReleaseApiUrl(p.RepositoryUrl);
         var tagName = p.Version.Version;

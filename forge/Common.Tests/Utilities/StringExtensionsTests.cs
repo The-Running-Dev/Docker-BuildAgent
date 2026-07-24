@@ -33,7 +33,7 @@ public class StringExtensionsTests
     public void SanitizeForLog_UsesCustomPlaceholder_WhenProvided()
     {
         string? input = null;
-        var result = input.SanitizeForLog(emptyPlaceholder: "(empty)");
+        var result = StringExtensions.SanitizeForLog(input, emptyPlaceholder: "(empty)");
 
         Assert.Equal("(empty)", result);
     }
