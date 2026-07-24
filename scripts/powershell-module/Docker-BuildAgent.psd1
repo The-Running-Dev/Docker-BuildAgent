@@ -7,9 +7,7 @@
     Copyright            = '(c) 2025 The-Running-Dev. All rights reserved.'
     Description          = 'A PowerShell module for orchestrating Docker-based builds with the Docker-BuildAgent.'
     PowerShellVersion    = '5.1'
-    DotNetFrameworkVersion = '4.7.2'
-    CLRVersion           = '4.0'
-    ProcessorArchitecture  = 'Amd64'
+    CompatiblePSEditions = @('Desktop', 'Core')
     RequiredModules      = @()
     RequiredAssemblies   = @()
     ScriptsToProcess     = @()
