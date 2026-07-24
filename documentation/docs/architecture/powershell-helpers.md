@@ -13,7 +13,7 @@ The core PowerShell module that powers Build Agent automation scripts and provid
 ### Key Functions
 
 | Function | Description |
-|----------|-------------|
+| -------- | ----------- |
 | `Copy-Directory` | Recursively copy directories with advanced pattern filtering and gitignore management |
 | `Invoke-Script` | Execute PowerShell scripts conditionally with standardized messaging |
 | `Invoke-DotNetBuild` | Execute .NET builds with environment-specific configurations |

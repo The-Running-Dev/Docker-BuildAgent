@@ -55,9 +55,6 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
-    paths-ignore:
-      - 'documentation/**'
-      - '.github/**'
 
 permissions:
   packages: write
@@ -101,3 +98,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+
+      # Validate docs-template build on pull requests (no deploy)
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+
+      - name: Validate Docs Build
+        run: |
+          pnpm --dir docs-template install --frozen-lockfile
+          pnpm --dir docs-template build

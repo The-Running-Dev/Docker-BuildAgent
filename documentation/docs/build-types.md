@@ -375,7 +375,7 @@ All build commands share these common capabilities:
 ## 🎯 Choosing the Right Build Type
 
 | Project Type | Command | Use Case |
-|-------------|---------|----------|
+| ------------ | ------- | -------- |
 | Pure Docker projects | `build docker` | Existing Dockerfile, containerizing artifacts |
 | Node.js apps (no container) | `build node` | Build and test Node.js applications |
 | Node.js apps (with container) | `build node-in-docker` | Complete CI/CD pipeline with registry push |

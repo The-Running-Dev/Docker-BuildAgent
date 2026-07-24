@@ -93,8 +93,8 @@ RUN set -eux; \
 # Build documentation for inclusion in the image and GitHub Pages
 WORKDIR /app/docs-template
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
-RUN pnpm install --frozen-lockfile && \
-    pnpm build
+RUN test -f package.json && test -f pnpm-lock.yaml || (echo "docs-template missing package.json or pnpm-lock.yaml" >&2; exit 1); \
+    pnpm install --frozen-lockfile && pnpm build
 
 # Expose port 3000 for documentation server
 EXPOSE 3000

@@ -2,7 +2,7 @@
 # Documentation Deployment Workflow
 #
 # This workflow builds documentation and deploys it to GitHub Pages.
-# The documentation is generated using the Build Agent container in the checked-out workspace,
+# The documentation is generated directly from the docs-template workspace,
 # then uploaded and deployed to GitHub Pages.
 #
 # Workflow Configuration:
@@ -13,20 +13,23 @@
 #   - Permissions: pages:write, id-token:write
 #
 # Build Process:
-#   1. Checkout repository with submodules
-#   2. Build docs using `build node-template` in the build-agent container
-#   3. Upload generated static files from `documentation/build`
+#   1. Checkout repository (with submodules)
+#   2. Install docs dependencies and build docs-template directly
+#   3. Upload generated static files from `docs-template/artifacts`
 #   4. Deploy artifact to GitHub Pages
 #
 # Benefits:
-#   - Uses the same build tooling as CI/CD and local builds
-#   - Avoids image-internal path coupling for docs output
+#   - Avoids dependency on a prebuilt build-agent image
+#   - Uses the latest checked-out docs-template submodule content
 #   - Public access via GitHub Pages
 #
 name: Docs
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types:
+      - Update-Documentation
   push:
     branches:
       - main
@@ -34,7 +37,6 @@ on:
       - 'docs-template'
       - 'docs-template/**'
       - 'documentation/**'
-      - 'Dockerfile'
       - 'scripts/setup-docs-submodule.ps1'
 
 permissions:
@@ -48,27 +50,34 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # Checkout the repository with submodules
+      # Checkout the repository
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
+          submodules: recursive
 
-      # Build documentation in a containerized build-agent environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.0.0 --activate
+
+      # Build documentation directly from the docs-template workspace
       - name: Build Documentation Site
         run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/workspace" \
-            -w /workspace \
-            ghcr.io/the-running-dev/build-agent:latest \
-            build node-template -AppDir documentation
+          pnpm --dir docs-template install --frozen-lockfile
+          pnpm --dir docs-template build
 
       # Upload the documentation artifact for GitHub Pages
       - name: Upload Documentation Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: documentation/build
+          path: docs-template/artifacts
 
   # Deploy the uploaded artifact to GitHub Pages
   Deploy:
