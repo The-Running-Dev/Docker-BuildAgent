@@ -16,10 +16,10 @@
     TypesToProcess       = @()
     FormatsToProcess     = @()
     NestedModules        = @()
-    FunctionsToExport    = '*'
-    CmdletsToExport      = '*'
-    VariablesToExport    = '*'
-    AliasesToExport      = '*'
+    FunctionsToExport    = @('Set-BuildAgentConfig', 'Invoke-Build')
+    CmdletsToExport      = @()
+    VariablesToExport    = @('BuildAgentConfig')
+    AliasesToExport      = @()
     PrivateData          = @{
         PSData = @{
             ReleaseNotes = @(

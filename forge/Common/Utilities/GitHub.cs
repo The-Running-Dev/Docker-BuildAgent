@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Threading.Tasks;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 using Serilog;
@@ -37,7 +38,8 @@ public static class GitHub
         var assetsTextBuilder = new StringBuilder();
         assetsTextBuilder.AppendLine("## Images");
 
-        foreach (var tag in p.Tags)
+        var tags = p.Tags ?? new List<string>();
+        foreach (var tag in tags)
         {
             assetsTextBuilder.AppendLine($"- {tag}");
         }
@@ -48,7 +50,9 @@ public static class GitHub
         var body = assetsTextBuilder.ToString() + releaseNotes;
 
         var apiUrl = BuildReleaseApiUrl(p.RepositoryUrl);
-        var tagName = p.Version.Version;
+        var tagName = !string.IsNullOrWhiteSpace(p.ReleaseTag)
+            ? p.ReleaseTag
+            : p.Version?.Version ?? "v0.0.0";
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("NukeBuild", "1.0"));
@@ -60,7 +64,7 @@ public static class GitHub
             name = tagName,
             body = body,
             draft = false,
-            prerelease = false
+            prerelease = p.PreRelease
         };
         
         var response = await client.PostAsJsonAsync(apiUrl, payload);

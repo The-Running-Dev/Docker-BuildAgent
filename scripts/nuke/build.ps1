@@ -79,7 +79,7 @@ function Invoke-NodeTemplateBuild {
 
     # Set default value for production build if not specified
     if (-not $PSBoundParameters.ContainsKey('isProduction')) {
-        $script:isProduction = $true
+        $isProduction = $true
     }
 
     # Define file paths and setup variables
@@ -227,7 +227,7 @@ function Invoke-NodeTemplateBuild {
     }
     Write-Host ""
 
-    if ($templateBuildFilePath) {
+    if (Test-Path $templateBuildFilePath) {
         Write-Host "[INFO] Run: $templateBuildFilePath for Local Build" -ForegroundColor White
     }
     #endregion

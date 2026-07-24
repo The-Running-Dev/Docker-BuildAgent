@@ -151,7 +151,7 @@ function Invoke-Build {
 
     $argsList += Convert-HashtableToArgs -Parameters $mergedArgs
 
-    Write-Host "Executing: docker $($argsList -join ' ')"
+    Write-Host "Executing: docker run ... build $type [arguments hidden for security]"
     & docker @argsList
 
     if ($LASTEXITCODE -ne 0) { throw "Docker invocation failed with exit code $LASTEXITCODE" }

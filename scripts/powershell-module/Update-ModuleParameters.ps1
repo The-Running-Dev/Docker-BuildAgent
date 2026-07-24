@@ -22,7 +22,8 @@ function Parse-ParameterFileWithXmlDoc {
     if (-not $classNameMatch) { return $null }
     $className = $classNameMatch.Matches.Groups[1].Value
 
-    $propertyRegex = [regex]'(?s)/// <summary>(.*?)</summary>.*?public (\w+) (\w+) \{ get; set; \}'
+    # Supports nullable/reference/value types, arrays, and simple generic forms such as List<string>.
+    $propertyRegex = [regex]'(?s)/// <summary>(.*?)</summary>.*?public\s+([\w\.\?\[\]<> ,]+?)\s+(\w+)\s*\{\s*get;\s*set;\s*\}'
     $matches = $propertyRegex.Matches($content)
 
     $params = @()
