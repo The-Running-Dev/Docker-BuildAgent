@@ -55,10 +55,6 @@ name: Build
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths-ignore:
-      - 'documentation/**'
-      - '.github/**'
   push:
     branches:
       - main
@@ -97,15 +93,6 @@ jobs:
       - name: Build and Publish
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: nuke --type docker --create-github-release false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
-          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
-
-      # Validate Docker build on pull requests (no publish)
-      - name: Validate Build
-        if: github.event_name == 'pull_request'
-        run: nuke --type docker --dry-run true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
