@@ -13,10 +13,11 @@
 #   - Permissions: pages:write, id-token:write
 #
 # Build Process:
-#   1. Checkout repository with submodules
-#   2. Install docs dependencies and build docs-template directly
-#   3. Upload generated static files from `docs-template/artifacts`
-#   4. Deploy artifact to GitHub Pages
+#   1. Checkout repository
+#   2. Initialize/update docs-template via existing setup script
+#   3. Install docs dependencies and build docs-template directly
+#   4. Upload generated static files from `docs-template/artifacts`
+#   5. Deploy artifact to GitHub Pages
 #
 # Benefits:
 #   - Avoids dependency on a prebuilt build-agent image
@@ -27,6 +28,13 @@ name: Docs
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - 'docs-template'
+      - 'docs-template/**'
+      - 'documentation/**'
+      - 'scripts/setup-docs-submodule.ps1'
+      - '.github/workflows/docs.yml'
   push:
     branches:
       - main
@@ -47,12 +55,15 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # Checkout the repository with submodules
+      # Checkout the repository
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          submodules: recursive
           fetch-depth: 0
+
+      - name: Setup docs-template submodule
+        shell: pwsh
+        run: ./scripts/setup-docs-submodule.ps1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -82,6 +93,7 @@ jobs:
   Deploy:
     name: Deploy to GitHub Pages
     needs: Build-and-Deploy
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     
     environment:

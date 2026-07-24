@@ -9,7 +9,7 @@ ARG TYPESCRIPT_VERSION=latest
 ARG TSX_VERSION=latest
 ARG ANGULAR_CLI_VERSION=21.1.2
 ARG ANGULAR_GHPAGES_VERSION=3.0.2
-ARG PNPM_VERSION=10.16.0
+ARG PNPM_VERSION=9.0.0
 ARG QDK_VERSION=2.5.3
 ARG IMAGE_VERSION=2.0.0
 
@@ -93,8 +93,11 @@ RUN set -eux; \
 # Build documentation for inclusion in the image and GitHub Pages
 WORKDIR /app/docs-template
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
-RUN pnpm install --frozen-lockfile && \
-    pnpm build
+RUN if [ -f package.json ] && [ -f pnpm-lock.yaml ]; then \
+            pnpm install --frozen-lockfile && pnpm build; \
+        else \
+            echo "Skipping docs-template build because package.json or pnpm-lock.yaml is missing."; \
+        fi
 
 # Expose port 3000 for documentation server
 EXPOSE 3000

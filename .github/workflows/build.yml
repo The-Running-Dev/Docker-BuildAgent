@@ -55,6 +55,10 @@ name: Build
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths-ignore:
+      - 'documentation/**'
+      - '.github/**'
   push:
     branches:
       - main
@@ -79,6 +83,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       # Execute shared setup steps (Docker, .NET, GitVersion, etc.)
       - name: Setup Environment
@@ -88,9 +93,19 @@ jobs:
       - name: Tests & Coverage
         uses: ./.github/actions/tests
 
-      # Build and Publish (No Release Creation)
+      # Build and Publish (main branch push only)
       - name: Build and Publish
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: nuke --type docker --create-github-release false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+
+      # Validate Docker build on pull requests (no publish)
+      - name: Validate Build
+        if: github.event_name == 'pull_request'
+        run: nuke --type docker --dry-run true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
@@ -98,6 +113,7 @@ jobs:
 
       # Check if documentation files were modified in this commit
       - name: Check for Documentation Changes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: docs-changed
         run: |
           if git diff --name-only HEAD~1 HEAD | grep -q '^documentation/'; then
@@ -110,7 +126,7 @@ jobs:
 
       # Trigger documentation site rebuild if docs were updated
       - name: Trigger Documentation Build
-        if: steps.docs-changed.outputs.changed == 'true'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.docs-changed.outputs.changed == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
