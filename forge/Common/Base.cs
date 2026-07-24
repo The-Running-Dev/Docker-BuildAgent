@@ -295,11 +295,12 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
 
             return null;
         }
-        catch (ArgumentException ex) when (ex.Message.Contains("same key has already been added"))
+        catch (ArgumentException ex) when (ex.Message.Contains("same key has already been added", StringComparison.OrdinalIgnoreCase))
         {
             // Git config contains a duplicate key (e.g. github-pr-owner-number written by the
             // GitHub CLI or a PR checkout). Nuke's config parser treats duplicate keys as fatal,
-            // but this does not affect the build — suppress silently.
+            // but this does not affect the build — disable GitRepository-derived features for this run.
+            Console.WriteLine($"{DateTime.Now:HH:mm:ss} [WRN] Duplicate Git config key detected while loading repository info; GitRepository features will be disabled.");
             return null;
         }
         catch (Exception ex)
