@@ -34,12 +34,17 @@ $docsSourceDir = "documentation"
 
 Write-Host "[START] Setting Up Docusaurus Template as Git Submodule..." -ForegroundColor Cyan
 
-# 1. Add submodule
+# 1. Add submodule (idempotent)
 Write-Host "[SETUP] Adding Git Submodule..." -ForegroundColor Yellow
-if (Test-Path $submodulePath) {
-    Write-Host "[WARN] Submodule Path Already Exists. Initializing..." -ForegroundColor Yellow
-    git submodule add --force $templateRepoUrl $submodulePath
-} else {
+$hasSubmodule = Test-Path ".gitmodules" -and (Select-String -Path ".gitmodules" -Pattern "\[submodule \"docs-template\"\]" -Quiet)
+
+if ($hasSubmodule) {
+    Write-Host "[INFO] Submodule already configured. Updating..." -ForegroundColor Yellow
+}
+elseif (Test-Path $submodulePath) {
+    throw "Path '$submodulePath' already exists but is not configured as a git submodule. Remove it or run 'git submodule update --init --recursive'."
+}
+else {
     git submodule add $templateRepoUrl $submodulePath
 }
 
