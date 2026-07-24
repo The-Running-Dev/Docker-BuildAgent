@@ -58,13 +58,6 @@ on:
     paths-ignore:
       - 'documentation/**'
       - '.github/**'
-  push:
-    branches:
-      - '**'
-      - '!main'
-    paths-ignore:
-      - 'documentation/**'
-      - '.github/**'
 
 permissions:
   packages: write
@@ -76,10 +69,6 @@ jobs:
   Build:
     name: Build & Validate
     runs-on: ubuntu-latest
-
-    # Conditional execution: run on PR events and workflow_dispatch always, 
-    # run on push events for non-main branches only
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref != 'refs/heads/main')
 
     steps:
       # Prevent duplicate workflow runs for the same content
