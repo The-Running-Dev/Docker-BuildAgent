@@ -20,7 +20,7 @@ function Set-BuildAgentConfig {
         [string]$DockerImage,
 
         [Parameter(Mandatory = $true)]
-        [ValidatePattern('^tcp://.*:\d+$')]
+        [ValidatePattern('^(tcp://[^\s:]+:\d+|unix:///[^\s]+|npipe:////\./pipe/[^\s]+)$')]
         [string]$DockerHost,
 
         [Parameter(Mandatory = $true)]
@@ -99,7 +99,7 @@ function Get-AllowedParametersForType {
         return @()
     }
 
-    $buildConfigs = Get-Content $parametersJsonPath | ConvertFrom-Json
+    $buildConfigs = Get-Content $parametersJsonPath -Raw | ConvertFrom-Json
     $configName = Get-BuildConfigName -Type $type
     $config = $buildConfigs | Where-Object { $_.Name -eq $configName } | Select-Object -First 1
 

@@ -2,8 +2,8 @@
 # Documentation Deployment Workflow
 #
 # This workflow builds documentation and deploys it to GitHub Pages.
-# The documentation is built as part of the Docker image build process,
-# then extracted and published to GitHub Pages.
+# The documentation is generated using the Build Agent container in the checked-out workspace,
+# then uploaded and deployed to GitHub Pages.
 #
 # Workflow Configuration:
 #   - Name: Docs
@@ -14,16 +14,14 @@
 #
 # Build Process:
 #   1. Checkout repository with submodules
-#   2. Build Docker image (includes documentation build)
-#   3. Extract built documentation from image
-#   4. Upload documentation to GitHub Pages artifact
-#   5. Deploy artifact to GitHub Pages
+#   2. Build docs using `build node-template` in the build-agent container
+#   3. Upload generated static files from `documentation/build`
+#   4. Deploy artifact to GitHub Pages
 #
 # Benefits:
-#   - Documentation version matches image version
-#   - Single source of truth for docs in docker-agent
+#   - Uses the same build tooling as CI/CD and local builds
+#   - Avoids image-internal path coupling for docs output
 #   - Public access via GitHub Pages
-#   - Documentation accessible via `docker run` with built-in dev server
 #
 name: Docs
 
@@ -56,28 +54,20 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      # Build the Docker image (includes documentation build)
-      - name: Build Docker Image
+      # Build documentation in a containerized build-agent environment
+      - name: Build Documentation Site
         run: |
-          docker build \
-            --tag build-agent:docs-build \
-            --label "docs-build=$(date +%s)" \
-            .
-
-      # Extract built documentation from the image
-      - name: Extract Documentation from Image
-        run: |
-          mkdir -p ./docs-output
           docker run --rm \
-            -v ./docs-output:/output \
-            build-agent:docs-build \
-            bash -c "cp -r /app/docs-template/build/* /output/"
+            -v "${{ github.workspace }}:/workspace" \
+            -w /workspace \
+            ghcr.io/the-running-dev/build-agent:latest \
+            build node-template -AppDir documentation
 
       # Upload the documentation artifact for GitHub Pages
       - name: Upload Documentation Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./docs-output
+          path: documentation/build
 
   # Deploy the uploaded artifact to GitHub Pages
   Deploy:
