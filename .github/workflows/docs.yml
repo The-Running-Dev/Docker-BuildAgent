@@ -28,13 +28,6 @@ name: Docs
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'docs-template'
-      - 'docs-template/**'
-      - 'documentation/**'
-      - 'scripts/setup-docs-submodule.ps1'
-      - '.github/workflows/docs.yml'
   push:
     branches:
       - main
@@ -90,7 +83,6 @@ jobs:
   Deploy:
     name: Deploy to GitHub Pages
     needs: Build-and-Deploy
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     
     environment:
