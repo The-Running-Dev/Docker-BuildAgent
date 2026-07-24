@@ -91,7 +91,7 @@ jobs:
 
       # Validate build on main push (keeps notification path before publish)
       - name: Validate Build
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: nuke --type docker --dry-run true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -100,9 +100,30 @@ jobs:
 
       # Build and Publish (main branch push only)
       - name: Build and Publish
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: nuke --type docker --create-github-release false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+
+      # Check if documentation files were modified in this commit
+      - name: Check for Documentation Changes
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: docs-changed
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q '^documentation/'; then
+            echo "Documentation changes detected"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No documentation changes found"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Trigger documentation site rebuild if docs were updated
+      - name: Trigger Documentation Build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.docs-changed.outputs.changed == 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: Update-Documentation
