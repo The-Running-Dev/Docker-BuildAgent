@@ -82,8 +82,7 @@ foreach ($file in $imageFiles) {
         
         # Use --mount for robust cross-platform bind mounts.
         $volumeMounts += "--mount"
-        $volumeMounts += "type=bind,source=`"$absoluteLocalPath`",target=`"$containerPath`""
-
+        $volumeMounts += "type=bind,source=$absoluteLocalPath,target=$containerPath"
         Write-Host "  [+] Mounting local file: $file"
     }
 }
