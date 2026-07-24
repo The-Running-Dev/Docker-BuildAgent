@@ -95,6 +95,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       # Execute shared setup steps (Docker, .NET, GitVersion, etc.)
       - name: Setup Environment

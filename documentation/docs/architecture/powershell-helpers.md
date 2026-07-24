@@ -8,13 +8,13 @@ The Build Agent provides several PowerShell helper modules that simplify build a
 
 ## nuke-helpers.psm1
 
-The core PowerShell helper module that powers Build Agent automation scripts and provides standardized functions for common operations.
+The core PowerShell module that powers Build Agent automation scripts and provides standardized functions for common operations.
 
 ### Key Functions
 
 | Function | Description |
 |----------|-------------|
-| `Copy-Directory` | Recursively copy directories with advanced pattern filtering and optional gitignore management |
+| `Copy-Directory` | Recursively copy directories with advanced pattern filtering and gitignore management |
 | `Invoke-Script` | Execute PowerShell scripts conditionally with standardized messaging |
 | `Invoke-DotNetBuild` | Execute .NET builds with environment-specific configurations |
 | `Initialize-Build` | Set up build paths and validate project structure |
@@ -35,18 +35,18 @@ Copy-Directory -SourceDir './template' -DestinationDir './docs-ui' -Overwrite
 - **Preservation Mode**: Can skip existing files to preserve customizations
 - **Automatic Directory Creation**: Creates destination directory structure as needed
 - **Detailed Logging**: Shows which files are copied, skipped, or ignored
-- **Gitignore Management**: Optionally updates `.gitignore` when `-UpdateGitIgnore` is specified
+- **Gitignore Management**: Automatically updates `.gitignore` with copied files
 
 #### Gitignore Management
 
-When copying files with `-UpdateGitIgnore`, the function:
+When copying files, the function now automatically:
 
 1. Creates `.gitignore` if it doesn't exist in the destination directory
 2. Tracks all copied files
 3. Adds entries to `.gitignore` (using forward slashes for cross-platform compatibility)
 4. Avoids duplicate entries by checking existing patterns
 
-This allows opt-in exclusion behavior for template-generated files while avoiding unexpected changes to repository tracking by default.
+This ensures that template files and generated code don't accidentally get committed to version control.
 
 ### Build Invocation
 
