@@ -115,7 +115,8 @@ function Invoke-Build {
         [ValidateSet('docker', 'node', 'node-in-docker', 'node-template', 'forge')]
         [string]$type,
 
-        [hashtable]$args = @{},
+        [Alias('args')]
+        [hashtable]$buildArgs = @{},
 
         [switch]$validateArgs
     )
@@ -126,8 +127,8 @@ function Invoke-Build {
     foreach ($key in $script:BuildAgentConfig.Parameters.Keys) {
         $mergedArgs[$key] = $script:BuildAgentConfig.Parameters[$key]
     }
-    foreach ($key in $args.Keys) {
-        $mergedArgs[$key] = $args[$key]
+    foreach ($key in $buildArgs.Keys) {
+        $mergedArgs[$key] = $buildArgs[$key]
     }
 
     if (($type -in @('node', 'node-in-docker', 'node-template')) -and
