@@ -13,11 +13,10 @@
 #   - Permissions: pages:write, id-token:write
 #
 # Build Process:
-#   1. Checkout repository
-#   2. Initialize/update docs-template via existing setup script
-#   3. Install docs dependencies and build docs-template directly
-#   4. Upload generated static files from `docs-template/artifacts`
-#   5. Deploy artifact to GitHub Pages
+#   1. Checkout repository (with submodules)
+#   2. Install docs dependencies and build docs-template directly
+#   3. Upload generated static files from `docs-template/artifacts`
+#   4. Deploy artifact to GitHub Pages
 #
 # Benefits:
 #   - Avoids dependency on a prebuilt build-agent image
