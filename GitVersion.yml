@@ -1,5 +1,5 @@
 mode: ContinuousDelivery
-next-version: v0.0.0
+next-version: v2.0.0
 
 branches:
   main:
