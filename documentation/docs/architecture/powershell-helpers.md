@@ -8,7 +8,7 @@ The Build Agent provides several PowerShell helper modules that simplify build a
 
 ## nuke-helpers.psm1
 
-The core PowerShell module that powers Build Agent automation scripts and provides standardized functions for common operations.
+The core PowerShell helper module that powers Build Agent automation scripts and provides standardized functions for common operations.
 
 ### Key Functions
 
@@ -48,57 +48,10 @@ When copying files with `-UpdateGitIgnore`, the function:
 
 This allows opt-in exclusion behavior for template-generated files while avoiding unexpected changes to repository tracking by default.
 
-### Invoke-Build (Preferred)
-
-For user automation, prefer the PowerShell module command `Invoke-Build`:
-
-```powershell
-Invoke-Build -type "docker" -args @{ createRegistry = $true; dryRun = $true }
-```
-
-
-## Docker-BuildAgent PowerShell Module (New)
-
-A new PowerShell module that provides a programmable interface to the Build Agent's functionality.
-
-### Installation
-
-```powershell
-# Install from PowerShell Gallery (coming soon)
-Install-Module -Name Docker-BuildAgent
-
-# Or import directly from the repository
-Import-Module ./scripts/powershell-module/Docker-BuildAgent.psm1
-```
-
-### Configuration
-
-```powershell
-# Configure the module for your environment
-Set-BuildAgentConfig `
-    -DockerImage "ghcr.io/the-running-dev/build-agent:latest" `
-    -DockerHost "tcp://host.docker.internal:2375" `
-    -WorkspacePath "D:\Projects\YourProject" `
-    -ArtifactsDir "./artifacts" `
-    -Environment "development"
-```
-
 ### Build Invocation
 
-The module exposes a single `Invoke-Build` command that accepts a build type and a hashtable of parameters. It provides:
+For user automation, use the unified build command through the root scripts or the container image:
 
-- Optional parameter validation
-- Consistent Docker container execution
-- Automatic workspace mounting
-
-### Parameter Extraction
-
-The module includes a parameter extraction script (`Update-ModuleParameters.ps1`) that:
-
-1. Scans Forge parameter definition files (C# classes)
-2. Extracts parameter metadata including name, type, and documentation
-3. Handles inheritance to combine parameters from base classes
-4. Generates a JSON file with complete parameter definitions
-5. Enables optional validation in `Invoke-Build`
-
-This ensures that the PowerShell module validates parameters against the current state of the Forge build system when requested.
+```powershell
+./build.ps1 -type docker -create-registry true -dry-run true
+```

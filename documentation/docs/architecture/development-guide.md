@@ -461,7 +461,7 @@ docker logs container-id
 docker run -it --entrypoint /bin/bash build-agent:dev
 ```
 
-#### PowerShell Module Issues
+#### Helper Script Issues
 
 ```powershell
 # Reload the module
