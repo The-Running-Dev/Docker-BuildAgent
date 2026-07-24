@@ -84,6 +84,11 @@ public static class GitHub
     internal static string BuildReleaseApiUrl(string repositoryUrl)
     {
         var repo = repositoryUrl.GetGitHubRepoSlug();
+
+        if (string.IsNullOrWhiteSpace(repo) || !repo.Contains('/'))
+        {
+            throw new ArgumentException("Repository URL is invalid. Expected an owner/repo slug or GitHub URL.", nameof(repositoryUrl));
+        }
         
         return $"https://api.github.com/repos/{repo}/releases";
     }
