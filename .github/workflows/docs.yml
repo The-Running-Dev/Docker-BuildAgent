@@ -55,11 +55,9 @@ jobs:
           submodules: recursive
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
-          cache: pnpm
-          cache-dependency-path: docs-template/pnpm-lock.yaml
 
       - name: Setup pnpm
         run: |
