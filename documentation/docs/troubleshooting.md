@@ -20,9 +20,10 @@ This section covers common issues, troubleshooting steps, and frequently asked q
 - **Forge build type errors:**
   - Make sure you specify the correct `-type` argument (e.g., `docker`, `node`, `forge`).
 - **Copy-Directory .gitignore issues:**
+  - `.gitignore` updates are opt-in and only occur when `-UpdateGitIgnore` is specified.
   - If the .gitignore feature isn't working properly, check that the destination directory is writable.
   - Verify that copied files have relative paths that can be properly converted to forward slashes.
-  - If you don't want .gitignore management, you can modify the function in your local copy.
+  - If you do not want `.gitignore` updates, omit `-UpdateGitIgnore`.
 - **PowerShell module parameter detection issues:**
   - Run `Update-ModuleParameters.ps1` if you've updated parameter definitions in C# code.
   - Ensure XML documentation comments exist on parameter properties for proper help text.

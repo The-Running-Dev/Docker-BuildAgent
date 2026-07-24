@@ -45,7 +45,7 @@ if ($LASTEXITCODE -eq 0) {
     if (Test-Path $sourceFile) {
         Write-Host "Copying Changelog to Documentation Site..." -ForegroundColor Yellow
         
-        Move-Item -Path $sourceFile -Destination $destFile -Force
+        Copy-Item -Path $sourceFile -Destination $destFile -Force
         
         Write-Host "Changelog Copied to: $destFile" -ForegroundColor Green
     }

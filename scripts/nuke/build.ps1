@@ -71,22 +71,6 @@ param(
 # Import the helper module for common build operations
 Import-Module (Join-Path $PSScriptRoot 'nuke-helpers.psm1') -Force
 
-# Route based on build type
-switch ($type) {
-    'node-template' {
-        # Node-template has its own workflow (doesn't use Invoke-Forge)
-        Invoke-NodeTemplateBuild
-    }
-    default {
-        # Standard Nuke-based builds (docker, node, node-in-docker, forge)
-        Invoke-Forge `
-            -BuildTypes @($type) `
-            -Arguments $nukeArgs `
-            -WorkingDir $workingDir `
-            -ArtifactsDir $artifactsDir
-    }
-}
-
 function Invoke-NodeTemplateBuild {
     <#
     .SYNOPSIS
@@ -104,7 +88,13 @@ function Invoke-NodeTemplateBuild {
     $templateBuildFile = "template-build.ps1"
     $templateBuildFilePath = Join-Path $workingDir $templateBuildFile
 
-    $appDirPath = Join-Path $workingDir $appDir -Resolve
+    $appDirPath = Join-Path $workingDir $appDir
+
+    if (-not (Test-Path $appDirPath)) {
+        New-Item -ItemType Directory -Path $appDirPath -Force | Out-Null
+    }
+
+    $appDirPath = (Resolve-Path $appDirPath).Path
 
     #region Template Repository Setup
     Write-Host "[CLONE] Cloning Template..." -ForegroundColor Cyan
@@ -241,4 +231,24 @@ function Invoke-NodeTemplateBuild {
         Write-Host "[INFO] Run: $templateBuildFilePath for Local Build" -ForegroundColor White
     }
     #endregion
+}
+
+# Route based on build type
+if ($null -eq $nukeArgs) {
+    $nukeArgs = @()
+}
+
+switch ($type) {
+    'node-template' {
+        # Node-template has its own workflow (doesn't use Invoke-Forge)
+        Invoke-NodeTemplateBuild
+    }
+    default {
+        # Standard Nuke-based builds (docker, node, node-in-docker, forge)
+        Invoke-Forge `
+            -BuildTypes @($type) `
+            -Arguments $nukeArgs `
+            -WorkingDir $workingDir `
+            -ArtifactsDir $artifactsDir
+    }
 }
