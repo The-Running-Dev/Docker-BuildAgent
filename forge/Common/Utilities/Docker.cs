@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Linq;
+using System.Collections.Generic;
 
 using Serilog;
 using Nuke.Common;
@@ -53,8 +54,9 @@ public static class Docker
     public static void Build(DockerParams p)
     {
         var dockerFile = Path.Combine(p.RootDirectory, p.DockerFile);
-        var latestTag = p.Tags.FirstOrDefault(x => x.Contains("latest"));
-        var versionTag = p.Tags.FirstOrDefault(x => !x.Contains("latest"));
+        var tags = p.Tags ?? new List<string>();
+        var latestTag = tags.FirstOrDefault(x => x.Contains("latest"));
+        var versionTag = tags.FirstOrDefault(x => !x.Contains("latest"));
         if (string.IsNullOrWhiteSpace(latestTag) || string.IsNullOrWhiteSpace(versionTag))
         {
             Assert.Fail("Docker tags must include both a 'latest' tag and a version tag.");
@@ -105,8 +107,14 @@ public static class Docker
     {
         Login(p);
 
-        var latestTag = p.Tags.FirstOrDefault(x => x.Contains("latest"));
-        var versionTag = p.Tags.FirstOrDefault(x => !x.Contains("latest"));
+        var tags = p.Tags ?? new List<string>();
+        var latestTag = tags.FirstOrDefault(x => x.Contains("latest"));
+        var versionTag = tags.FirstOrDefault(x => !x.Contains("latest"));
+
+        if (string.IsNullOrWhiteSpace(latestTag) || string.IsNullOrWhiteSpace(versionTag))
+        {
+            Assert.Fail("Docker tags must include both a 'latest' tag and a version tag.");
+        }
 
         DockerTasks.DockerPush(s => s
             .DisableProcessInvocationLogging()
@@ -128,8 +136,14 @@ public static class Docker
     /// <param name="p">The parameters containing the list of tags to be used for tagging the Docker image.</param>
     public static void Tag(DockerParams p)
     {
-        var latestTag = p.Tags.FirstOrDefault(x => x.Contains("latest"));
-        var versionTag = p.Tags.FirstOrDefault(x => !x.Contains("latest"));
+        var tags = p.Tags ?? new List<string>();
+        var latestTag = tags.FirstOrDefault(x => x.Contains("latest"));
+        var versionTag = tags.FirstOrDefault(x => !x.Contains("latest"));
+
+        if (string.IsNullOrWhiteSpace(latestTag) || string.IsNullOrWhiteSpace(versionTag))
+        {
+            Assert.Fail("Docker tags must include both a 'latest' tag and a version tag.");
+        }
 
         DockerTasks.DockerTag(s => s
             .DisableProcessInvocationLogging()

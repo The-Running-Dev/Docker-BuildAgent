@@ -130,6 +130,12 @@ function Invoke-Build {
         $mergedArgs[$key] = $args[$key]
     }
 
+    if (($type -in @('node', 'node-in-docker', 'node-template')) -and
+        -not $mergedArgs.ContainsKey('artifactsDir') -and
+        -not [string]::IsNullOrWhiteSpace($script:BuildAgentConfig.ArtifactsDir)) {
+        $mergedArgs['artifactsDir'] = $script:BuildAgentConfig.ArtifactsDir
+    }
+
     if ($validateArgs) {
         $allowed = Get-AllowedParametersForType -Type $type
         if ($allowed.Count -gt 0) {
@@ -142,10 +148,25 @@ function Invoke-Build {
 
     $argsList = @(
         "run", "--rm",
-        "-v", "`"$($script:BuildAgentConfig.WorkspacePath):/workspace`"",
+        "-v", "$($script:BuildAgentConfig.WorkspacePath):/workspace",
         "-w", "/workspace",
         "-e", "DOCKER_HOST=$($script:BuildAgentConfig.DockerHost)",
-        "$($script:BuildAgentConfig.DockerImage)",
+        "$($script:BuildAgentConfig.DockerImage)"
+    )
+
+    if ($script:BuildAgentConfig.DockerHost -like 'unix:///*') {
+        $socketPath = $script:BuildAgentConfig.DockerHost.Substring('unix://'.Length)
+        $argsList = @(
+            "run", "--rm",
+            "-v", "$($script:BuildAgentConfig.WorkspacePath):/workspace",
+            "-v", "$socketPath`:$socketPath",
+            "-w", "/workspace",
+            "-e", "DOCKER_HOST=$($script:BuildAgentConfig.DockerHost)",
+            "$($script:BuildAgentConfig.DockerImage)"
+        )
+    }
+
+    $argsList += @(
         "build", "$type"
     )
 

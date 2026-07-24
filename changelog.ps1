@@ -40,7 +40,8 @@ if ($LASTEXITCODE -eq 0) {
     
     # Copy the generated changelog to the documentation site
     $sourceFile = Join-Path $PSScriptRoot "CHANGELOG.md"
-    $destFile = Join-Path $PSScriptRoot "documentation\src\pages\CHANGELOG.md"
+    $docsPagesDir = Join-Path (Join-Path (Join-Path $PSScriptRoot "documentation") "src") "pages"
+    $destFile = Join-Path $docsPagesDir "CHANGELOG.md"
     
     if (Test-Path $sourceFile) {
         Write-Host "Copying Changelog to Documentation Site..." -ForegroundColor Yellow

@@ -2,8 +2,12 @@
 param(
     [string]$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "../../")).Path,
     [string]$ModulePath = $PSScriptRoot,
-    [string]$OutputFile = (Join-Path $PSScriptRoot "parameters.json")
+    [string]$OutputFile
 )
+
+if (-not $OutputFile) {
+    $OutputFile = Join-Path $ModulePath "parameters.json"
+}
 
 function Get-ParameterFiles {
     param([string]$RootPath)
@@ -62,12 +66,46 @@ foreach ($file in $paramFiles) {
     }
 }
 
-# Combine base class parameters
-foreach ($config in $allConfigs.Values) {
-    if ($config.Base -and $allConfigs.ContainsKey($config.Base)) {
-        $baseConfig = $allConfigs[$config.Base]
-        $config.Parameters = $baseConfig.Parameters + $config.Parameters
+# Resolve inheritance recursively so multi-level chains are fully merged.
+$resolvedParameters = @{}
+
+function Resolve-ConfigParameters {
+    param(
+        [string]$ConfigName,
+        [System.Collections.Generic.HashSet[string]]$Stack
+    )
+
+    if ($resolvedParameters.ContainsKey($ConfigName)) {
+        return $resolvedParameters[$ConfigName]
     }
+
+    if (-not $allConfigs.ContainsKey($ConfigName)) {
+        return @()
+    }
+
+    if ($Stack.Contains($ConfigName)) {
+        throw "Circular inheritance detected while resolving '$ConfigName'."
+    }
+
+    $null = $Stack.Add($ConfigName)
+
+    $config = $allConfigs[$ConfigName]
+    $baseParams = @()
+    if ($config.Base) {
+        $baseParams = Resolve-ConfigParameters -ConfigName $config.Base -Stack $Stack
+    }
+
+    $null = $Stack.Remove($ConfigName)
+
+    $merged = @($baseParams + $config.Parameters)
+    $resolvedParameters[$ConfigName] = $merged
+
+    return $merged
+}
+
+foreach ($configName in $allConfigs.Keys) {
+    $config = $allConfigs[$configName]
+    $config.Parameters = Resolve-ConfigParameters -ConfigName $configName -Stack ([System.Collections.Generic.HashSet[string]]::new())
 }
 
 $allConfigs.Values | ConvertTo-Json -Depth 5 | Set-Content -Path $OutputFile

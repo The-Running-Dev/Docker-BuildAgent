@@ -11,9 +11,10 @@ ARG ANGULAR_CLI_VERSION=21.1.2
 ARG ANGULAR_GHPAGES_VERSION=3.0.2
 ARG PNPM_VERSION=10.16.0
 ARG QDK_VERSION=2.5.3
+ARG IMAGE_VERSION=2.0.0
 
 LABEL maintainer="ben@subzerodev.com" \
-      version="1.0" \
+    version="${IMAGE_VERSION}" \
       description="Build Agent with Node.js, Angular CLI, TypeScript, Docker, PowerShell, and GitVersion"
 LABEL org.opencontainers.image.source="https://github.com/The-Running-Dev/Docker-BuildAgent"
 
