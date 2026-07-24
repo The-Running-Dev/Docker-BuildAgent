@@ -91,7 +91,7 @@ jobs:
 
       # Validate build on main push (keeps notification path before publish)
       - name: Validate Build
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         run: nuke --type docker --dry-run true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
