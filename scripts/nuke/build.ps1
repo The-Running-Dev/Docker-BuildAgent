@@ -102,10 +102,13 @@ function Invoke-NodeTemplateBuild {
     Write-Host "   Destination: $nodeTemplateDirPath" -ForegroundColor Gray
 
     Invoke-SafeCommand {
+        if (Test-Path $nodeTemplateDirPath) {
+            Remove-Item -Recurse -Force $nodeTemplateDirPath
+        }
+
         if ($nodeTemplateRepositoryUrl -match '^(.+?)#(.+)$') {
             $repoUrl = $Matches[1]
             $branch = $Matches[2].Trim()
-
             if ([string]::IsNullOrWhiteSpace($branch)) {
                 throw "Branch Cannot be Empty"
             }
