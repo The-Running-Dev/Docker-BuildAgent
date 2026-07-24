@@ -60,10 +60,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup docs-template submodule
-        shell: pwsh
-        run: ./scripts/setup-docs-submodule.ps1
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -75,7 +72,7 @@ jobs:
       - name: Setup pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.16.0 --activate
+          corepack prepare pnpm@9.0.0 --activate
 
       # Build documentation directly from the docs-template workspace
       - name: Build Documentation Site
