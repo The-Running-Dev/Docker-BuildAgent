@@ -3,6 +3,7 @@
 .idea/
 .resolved-version
 artifacts/
+psmodule/*
 bin/
 !scripts/nuke/bin/
 !scripts/nuke/bin/**
