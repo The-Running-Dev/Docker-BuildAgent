@@ -89,6 +89,15 @@ jobs:
       - name: Tests & Coverage
         uses: ./.github/actions/tests
 
+      # Validate build on main push (keeps notification path before publish)
+      - name: Validate Build
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: nuke --type docker --dry-run true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+
       # Build and Publish (main branch push only)
       - name: Build and Publish
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
