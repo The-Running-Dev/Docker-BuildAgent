@@ -1,0 +1,4 @@
+[submodule "docs-template"]
+	path = docs-template
+	url = https://github.com/The-Running-Dev/Docusaurus-Template.git
+	ignore = dirty

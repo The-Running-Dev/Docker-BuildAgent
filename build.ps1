@@ -91,6 +91,29 @@ Import-Module (Join-Path $PSScriptRoot 'scripts/nuke/nuke-helpers.psm1') -Force
 Write-Host "Initializing Build Environment..." -ForegroundColor Blue
 Initialize-Build
 
+# Ensure stale Forge hosts from prior runs do not lock shared artifact assemblies.
+$artifactsDllWildcard = "*$artifactsDir\\*.dll*"
+$staleForgeHosts = Get-CimInstance Win32_Process |
+    Where-Object {
+        $_.Name -eq 'dotnet.exe' -and
+        $_.CommandLine -and
+        $_.CommandLine -like $artifactsDllWildcard
+    }
+
+if ($staleForgeHosts) {
+    Write-Host "[CLEAN] Stopping stale Forge host processes..." -ForegroundColor Yellow
+
+    foreach ($proc in $staleForgeHosts) {
+        try {
+            Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
+            Write-Host "[OK] Stopped dotnet process $($proc.ProcessId)" -ForegroundColor Green
+        }
+        catch {
+            Write-Warning "Failed to stop stale process $($proc.ProcessId): $($_.Exception.Message)"
+        }
+    }
+}
+
 # Execute dotnet build to create the artifacts
 Write-Host "Compiling Forge Solution..." -ForegroundColor Blue
 Invoke-DotNetBuild `

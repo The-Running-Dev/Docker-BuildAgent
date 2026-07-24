@@ -8,5 +8,8 @@ $ErrorActionPreference = 'Stop'
 
 & /nuke/scripts/build.ps1 @args
 
-if ($null -eq $LASTEXITCODE) { exit 1 }
+if ($null -eq $LASTEXITCODE) {
+    exit 1
+}
+
 exit $LASTEXITCODE

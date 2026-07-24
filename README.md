@@ -189,14 +189,18 @@ The project uses a **controlled release strategy** to distinguish between develo
 ## Customization
 
 - Modify the `Dockerfile` to add or remove tools as needed for your build environment.
-- To change the base image, edit the `FROM` line in the `Dockerfile`.
+- To change the base image, pass `--build-arg BASE_IMAGE=<image:tag>` when building.
+- If MCR is unavailable, use Docker Hub Node as a fallback:
+  ```pwsh
+  docker buildx build . --build-arg BASE_IMAGE=node:22-bookworm
+  ```
 - To install additional global npm packages, add them to the `npm install -g` command in the `Dockerfile`.
 - Add or update PowerShell/.NET tools as needed using `dotnet tool install --global <tool>`.
 - Use the `Forge/` directory for advanced .NET build automation with Nuke.
 
 ## Image Details
 
-- **Base Image:** `mcr.microsoft.com/devcontainers/javascript-node:latest`
+- **Base Image:** `mcr.microsoft.com/devcontainers/javascript-node:22-bookworm` (overridable with `BASE_IMAGE`)
 - **Installed Tools:**
   - Node.js, npm, Angular CLI, TypeScript, Docker, PowerShell, .NET 8 SDK, Git, GitVersion, Nuke
 - **Default Shell:** PowerShell (`pwsh`)
