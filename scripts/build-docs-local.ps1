@@ -61,6 +61,7 @@ $installResult = & pnpm install
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Failed to Install Dependencies"
 
+    Pop-Location
     exit 1
 }
 
