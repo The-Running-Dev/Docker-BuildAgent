@@ -27,6 +27,9 @@ name: Docs
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types:
+      - Update-Documentation
   push:
     branches:
       - main

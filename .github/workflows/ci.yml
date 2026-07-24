@@ -55,8 +55,6 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
-    paths-ignore:
-      - '.github/**'
 
 permissions:
   packages: write
