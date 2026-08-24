@@ -6,7 +6,7 @@ sidebar_position: 1
 
 ## Quick Start Examples
 
-The Build Agent supports 5 different build types. Here are the most common scenarios to get you started quickly:
+The Build Agent uses a unified `build` command with different types. Here are the most common scenarios to get you started quickly:
 
 > 💡 **Need help choosing?** Check out our comprehensive [Build Types Reference](build-types) for detailed comparisons, parameters, and decision guidance.
 
@@ -17,15 +17,15 @@ Creates a Docker image for your project artifacts (from the default `ArtifactsDi
 1. Map your project directory (`./`) to `/workspace`
 2. Expose the Docker host to the container, either through docker.sock volume bind (on Linux) or DOCKER_HOST environment variable.
 3. Optional: provide a Dockerfile in your project directory, or use a [Docker Template](docker-templates) automatically.
-4. Execute `docker-build`
+4. Execute `build docker`
 
 ```bash
 # Expose Docker host with volume bind
-docker run `
+docker run \
      -v /var/run/docker.sock:/var/run/docker.sock \
      -v ./:/workspace \
      -it ghcr.io/the-running-dev/build-agent:latest \
-     docker-build
+     build docker
 ```
 
 ```pwsh
@@ -34,7 +34,7 @@ docker run `
      -e DOCKER_HOST=tcp://host.docker.internal:2375 `
      -v ./:/workspace `
      -it ghcr.io/the-running-dev/build-agent:latest `
-     docker-build
+     build docker
 ```
 
 This will run the `Docker` forge with all it's [targets](targets#-docker-targets) and default [parameters](parameters#-docker), and build your Docker image.
@@ -43,13 +43,13 @@ This will run the `Docker` forge with all it's [targets](targets#-docker-targets
 
 1. Map your project directory (`./`) to `/workspace`
 2. Define a `build:prod` npm script inside your `package.json`
-3. Execute `node-build`
- 
+3. Execute `build node`
+
 ```pwsh
 & docker run `
     -v ./:/workspace `
     -it ghcr.io/the-running-dev/build-agent:latest `
-    node-build
+    build node
 ```
 
 This will run the `Node` forge with all it's [targets](targets#-node-targets) and default [parameters](parameters#-node), and build your Node application.
@@ -66,14 +66,14 @@ You can customize this by specifying your own `.build.scripts`, see [customizati
 1. Map your project directory (`./`) to `/workspace`
 2. Expose the Docker host to the container, either through docker.sock volume bind (on Linux) or DOCKER_HOST environment variable.
 3. Define a `build:prod` npm script inside your `package.json`
-4. Execute `node-in-docker-build`
+4. Execute `build node-in-docker`
 
 ```pwsh
 & docker run `
     -e DOCKER_HOST=tcp://host.docker.internal:2375 `
-    -v ./:/workspace
+    -v ./:/workspace `
     -it ghcr.io/the-running-dev/build-agent:latest `
-    node-in-docker-build
+    build node-in-docker
 ```
 
 This will run the `Node` forge with all it's [targets](targets#-node-targets) and default [parameters](parameters#-node), and build your Node application. And after that, it will run the `Docker` forge with all it's [targets](targets#-docker-targets) and default [parameters](parameters#-docker), and build your Docker image.
@@ -81,20 +81,20 @@ This will run the `Node` forge with all it's [targets](targets#-node-targets) an
 ### 📝 Changelog Generation
 
 1. Map your project directory (`./`) to `/workspace`
-2. Execute `forge` with the `GenerateChangeLog` target
+2. Execute `build forge` with the changelog options
 
 ```pwsh
 # Generate changelog since last tag (default)
 & docker run `
     -v ./:/workspace `
     -it ghcr.io/the-running-dev/build-agent:latest `
-    forge --target GenerateChangeLog
+    build forge --target GenerateChangeLog
 
 # Generate complete commit history
 & docker run `
     -v ./:/workspace `
     -it ghcr.io/the-running-dev/build-agent:latest `
-    forge --target GenerateChangeLog --change-log-source all
+    build forge --change-log-source all
 ```
 
 This will generate a formatted changelog from Git commit history and save it to `CHANGELOG.md`. The changelog uses the format `yyyy.MM.dd` for dates and groups commits by date in descending order.
@@ -104,5 +104,5 @@ This will generate a formatted changelog from Git commit history and save it to 
 These examples show the most common use cases. For complete information about all build types, parameters, and advanced scenarios:
 
 - **[Build Types Reference](build-types)** - Comprehensive guide to all 5 build commands
-- **[Parameters](parameters)** - Detailed parameter documentation  
+- **[Parameters](parameters)** - Detailed parameter documentation
 - **[Customization](customization)** - Advanced configuration options

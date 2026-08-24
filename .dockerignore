@@ -1,0 +1,27 @@
+# Build output
+**/bin/
+**/obj/
+
+# Node dependencies
+**/node_modules/
+
+# Documentation cache/build
+documentation/.docusaurus/
+documentation/build/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.tmp
+
+# Allow required build inputs
+!artifacts/
+!artifacts/**
+!scripts/nuke/bin/
+!scripts/nuke/bin/**
