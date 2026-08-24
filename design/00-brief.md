@@ -33,8 +33,8 @@ Checkable statements, not aspirations.
 - The public router, solution inventory, PowerShell surface, generated contract, and published
   documentation agree on the five supported build routes and their effective execution paths;
   CI fails when that agreement drifts.
-- Docker login, tag, push, and other required publication failures propagate to a nonzero build
-  result and no success message is emitted for an operation that did not complete.
+- Any failed step required by the selected build route produces a nonzero result and prevents
+  overall success reporting—not only publication failures.
 - Captured CI evidence demonstrates that command logging, notifications, and generated
   environment handling do not disclose credentials, and transient secret-bearing files are
   removed on every controlled completion path.
