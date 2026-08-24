@@ -13,6 +13,15 @@ The Build Agent project uses a **controlled release strategy** to distinguish be
 - **Push to main** → Triggers "Deploy" workflow → Builds and publishes Docker images (no GitHub releases)
 - **Pull requests** → Triggers "CI" workflow → Validation and testing only
 
+### Workflow Types
+
+The repository includes multiple GitHub Actions workflows for different purposes:
+
+- **CI Workflow** (`.github/workflows/ci.yml`): Runs on pull requests and feature branches for validation
+- **Deploy Workflow** (`.github/workflows/release.yml`): Builds and publishes Docker images on every main branch push
+- **Create Release Workflow** (`.github/workflows/create-release.yml`): Manual workflow to create official releases
+- **Tag Release Workflow** (`.github/workflows/tag-release.yml`): Creates releases when version tags are pushed
+
 ### Release Workflow
 
 - **Manual releases**: Use "Create Release" workflow in GitHub Actions
@@ -78,7 +87,7 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -146,7 +155,7 @@ jobs:
 
 ## 🐳 Docker Image
 
-This workflow builds and pushes a Docker image using the Build Agent. It checks out your repository, runs the `docker-build` target, and passes required secrets for authentication.
+This workflow builds and pushes a Docker image using the Build Agent. It checks out your repository, runs the `build docker` command, and passes required secrets for authentication.
 
 ```yaml
 name: Docker-CI
@@ -168,7 +177,7 @@ jobs:
           fetch-depth: 0
 
       - name: Docker CI
-        run: docker-build
+        run: build docker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
@@ -176,7 +185,7 @@ jobs:
 
 ## 🟢 Node.js App
 
-This workflow builds a Node.js application using the Build Agent. It checks out your repository, runs the `node-build` target, and passes required secrets for authentication.
+This workflow builds a Node.js application using the Build Agent. It checks out your repository, runs the `build node` command, and passes required secrets for authentication.
 
 ```yaml
 name: Node-CI
@@ -198,7 +207,7 @@ jobs:
           fetch-depth: 0
 
       - name: Node CI
-        run: node-build
+        run: build node
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
@@ -226,13 +235,13 @@ jobs:
           fetch-depth: 0
 
       - name: Node-in-Docker CI
-        run: node-in-docker-build
+        run: build node-in-docker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
 ```
 
-## � Changelog Generation
+## 📝 Changelog Generation
 
 This workflow generates a changelog from Git commit history using the Forge build system. It can be configured to generate complete history or changes since a specific tag.
 
@@ -264,9 +273,9 @@ jobs:
       - name: Generate Changelog
         run: |
           if [ -n "${{ github.event.inputs.changelog_source }}" ]; then
-            forge --target GenerateChangeLog --change-log-source "${{ github.event.inputs.changelog_source }}"
+            build forge --change-log-source "${{ github.event.inputs.changelog_source }}"
           else
-            forge --target GenerateChangeLog
+            build forge --target GenerateChangeLog
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -281,7 +290,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-## �🛠️ Custom Build
+## 🛠️ Custom Build
 
 Because the build agent has all the tooling, you can run any Bash/PowerShell/NPM/Angular CLI scripts.
 

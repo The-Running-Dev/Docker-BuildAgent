@@ -1,8 +1,6 @@
 using Xunit;
-using Moq;
-using Microsoft.Extensions.Logging;
+
 using Entities;
-using Services;
 
 namespace Common.Tests.Entities;
 
@@ -46,5 +44,32 @@ public class ChangeLogConfigTests
         // Assert
         Assert.Equal(expectedSource, config.Source);
         Assert.Null(config.Tag);
+    }
+
+    [Fact]
+    public void FromString_ReturnsLastTag_ByDefault()
+    {
+        var config = ChangeLogConfig.FromString(null);
+
+        Assert.Equal(ChangeLogSource.LastTag, config.Source);
+        Assert.Null(config.Tag);
+    }
+
+    [Fact]
+    public void FromString_ReturnsAll_ForAllKeyword()
+    {
+        var config = ChangeLogConfig.FromString("all");
+
+        Assert.Equal(ChangeLogSource.All, config.Source);
+        Assert.Null(config.Tag);
+    }
+
+    [Fact]
+    public void FromString_ReturnsSpecificTag_ForOtherValues()
+    {
+        var config = ChangeLogConfig.FromString("v1.2.3");
+
+        Assert.Equal(ChangeLogSource.SpecificTag, config.Source);
+        Assert.Equal("v1.2.3", config.Tag);
     }
 }

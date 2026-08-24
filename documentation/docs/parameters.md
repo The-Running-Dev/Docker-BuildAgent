@@ -180,5 +180,5 @@ Use a NUKE parameter:
      -e DOCKER_HOST=tcp://host.docker.internal:2375 `
      -v ./:/workspace `
      -it ghcr.io/the-running-dev/build-agent:latest `
-     docker-build --create-github-release true
+     build docker --create-github-release true
 ```

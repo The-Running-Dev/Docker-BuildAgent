@@ -73,7 +73,7 @@ npm run build:prod
 
 ## Environment Variables Helper
 
-For local builds, you can create a `set-environment.ps1` script in your project directory. If present, this script is automatically called by `docker-build`, `node-build`, and `node-in-docker-build` before the build starts.
+For local builds, you can create a `set-environment.ps1` script in your project directory. If present, this script is automatically called by `build docker`, `build node`, and `build node-in-docker` before the build starts.
 
 This allows you to set up environment variables or secrets without hardcoding them in your pipeline or Dockerfile.
 
