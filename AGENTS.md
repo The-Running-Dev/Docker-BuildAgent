@@ -3,9 +3,10 @@
 ## Repository identity
 
 Docker-BuildAgent owns the build-agent container image, the Forge/NUKE build system,
-the PowerShell integration, and the documentation sources used to build and publish
-them. It does not own consuming repositories or the `docs-template/` checkout, which
-is a pinned Docusaurus-Template submodule.
+the public command and configuration surfaces, the PowerShell integration, the scoped
+container update health/rollback capability, and the documentation sources used to
+build and publish them. It does not own consuming repositories or the `docs-template/`
+checkout, which is a pinned Docusaurus-Template submodule.
 
 Product architecture, build commands, and development workflow remain canonical in
 `.github/copilot-instructions.md`; read it completely before changing product code.

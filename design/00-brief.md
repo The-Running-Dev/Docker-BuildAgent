@@ -2,60 +2,53 @@
 
 > Written by me, not by a model. A model may interrogate it (`/brief-check`) but not author it.
 
-> **MODEL DRAFT — not yet owned.** Assembled on 2026-09-17 from the tree, the GitHub tracker, and the local graphify graph (`graphify-out/GRAPH_REPORT.md`: 1620 nodes, 129 communities). Statements marked **Observed** were checked against the tree or the tracker. Everything marked **Decide** is a proposal only I can confirm, reject, or rewrite. This file is not a brief until every **Decide** is resolved and this notice is deleted.
-
 ## Problem
 
-**Observed:**
+Docker-BuildAgent is a public build product used by my own repositories and available to outside users, but its compatibility boundary is not controlled end to end.
 
-- **Every consumer takes whatever `main` last published.** Six of my repositories build with the image (Data, Docker-DNSAtHome, Docker-Watchdog, Docs-Template, Portfolio, Wiki), all six name `:latest`, and a push to `main` here republishes that tag. A breaking change in this repository reaches all of them on their next build, with no version boundary and nothing that tests a consumer before it does.
-- **What the product *is* has several competing descriptions and no single owner.** The README, `.github/copilot-instructions.md`, the published `documentation/` site, `PSModule.requirements.md`, `PSModule.specs.md`, `.github/DOCUMENTATION-UPDATES.md`, and two root `.docx` reports all describe overlapping ground. graphify groups the four PowerShell-module documents as one redundant set. They already disagree with the tree: the published architecture page describes a `forge/NodeTemplate/` project that does not exist; that build lives in `scripts/nuke/build.ps1`.
-- **Nothing records what must stay true.** `design/10-design.md` through `30-slices.md` are empty. The only decisions logged are about installing AgentKit. Behaviour consumers depend on, such as the `build <type>` command surface, the `.build/` mapping-file syntax, the Docker-template discovery order, and the PowerShell module's exported members, lives only in code and in whichever document last described it.
-- **The backlog has no decided scope.** Four feature issues have been open since mid-2025: #1 rollback on unhealthy update, #11 YAML/JSON configuration, #12 generic GitHubProject configuration, #14 a unified global CLI. None is accepted or rejected.
-
-**Decide:** which of these is the problem this brief exists to solve. My guess is the first two, but that is intent, and intent is yours.
+- Every published image already receives both a movable `latest` tag and a versioned tag, yet consumers and the documentation predominantly select `latest`. A consumer therefore accepts every change published from `main`, while the repository states no binding rule for immutable tags or for how breaking public-surface changes affect the version.
+- The product has several competing descriptions and no single owner for each public surface. The README, product instructions, published documentation, PowerShell documents, and historical design reports overlap and already disagree with the tree. The AgentKit design, contract, and slice documents are empty, so nothing records the compatibility rules that code alone cannot state.
+- Runtime configuration is fragmented across command-line arguments, environment variables, mapping files, and PowerShell configuration. There is no supported YAML or JSON project configuration and no generic sample that a user can adopt as a template.
+- The unified `build <type>` wrapper is not a distributable global tool and still routes through separate build processes. The public entry point and its compatibility relationship to the underlying build types are not settled.
+- A failed container update has no owned health-validation and rollback path in this product. Docker-BuildAgent will own that capability rather than leaving recovery as an implicit responsibility of a consuming repository.
 
 ## Who it is for
 
-**Observed:** me, sole maintainer and effectively the sole committer. My own repositories, listed above, are the known consumers. The image is public on GHCR, MIT-licensed, and has a public docs site.
+- Maintainers of repositories that use Docker-BuildAgent as their build environment.
+- Public users who rely on the published image, command surface, configuration formats, global tool, or PowerShell module.
 
-**Decide:** are outside users a supported audience, meaning they get a compatibility promise, or only tolerated? That one answer sets how much of the problem above is a defect and how much is acceptable.
+Public use is supported, not merely tolerated. Supported public surfaces receive the same compatibility promise as first-party consumers.
 
 ## Non-goals
 
-**Decide.** These are candidates only; none binds until you keep it.
-
-- Owning or changing consuming repositories. Their workflows are theirs. *(`AGENTS.md` already says this repository does not own them.)*
-- Changing `docs-template/` content from here. It is a pinned submodule of Docusaurus-Template.
-- Multi-architecture images. The image is amd64 today; QDK installs from an `amd64` `.deb`.
-- Build types beyond the current five (`docker`, `node`, `node-in-docker`, `node-template`, `forge`).
-- A general-purpose CI product for third parties.
-- Issue #14, the unified global CLI, and issue #1, rollback on unhealthy update. Keep, defer, or reject each explicitly.
+- Editing or owning consuming repositories from this repository. Docker-BuildAgent owns the artifact and its compatibility contract; each consumer owns when and how it adopts a version.
+- Changing the pinned `docs-template/` content from this repository.
+- Multi-architecture images. The supported image architecture remains amd64 for this work.
+- Adding build types beyond the current five.
+- Becoming a general-purpose CI platform or a general-purpose container orchestrator. The runtime responsibility is limited to the accepted update-health and rollback capability.
+- Supporting configuration formats beyond the existing surfaces plus YAML and JSON.
 
 ## Definition of done
 
-**Decide.** These are proposed, checkable forms of "fixed" for the problems above.
-
-- A consumer can pin an immutable image version, and at least one of my consumer repositories does.
-- A breaking change to the `build` command surface, the `.build/` file syntax, or the PowerShell module's exported members cannot reach `:latest` without a version bump that says so.
-- Each of those three surfaces has exactly one canonical document. Every other document links to it rather than restating it.
-- The published docs describe no path, project, or parameter the tree lacks.
-- Issues #1, #11, #12, and #14 are each either scheduled against a slice or closed as a non-goal.
+- Published versioned image tags are immutable, `latest` is explicitly documented as movable, and public documentation shows how to select a versioned image.
+- Public-surface compatibility follows semantic versioning: a breaking change requires a major version, and the protected surfaces are named in the contract.
+- The `build` command, project configuration, Docker-template discovery, global tool, and PowerShell module each have one canonical contract; other documents reference those contracts rather than restating them.
+- Published documentation names no path, project, command, parameter, or supported behavior that the tree lacks.
+- YAML and JSON project configuration are supported under one documented precedence and validation contract, and a generic sample configuration is provided as a usable template.
+- The packaged global tool exposes all five supported build types without weakening the existing compatibility promise.
+- An update can preserve the prior image, validate the updated container's health, restore the prior image after a failed health check, record the rollback, and report the outcome.
+- Issues #1, #11, #12, and #14 are represented by accepted slices and close only when their corresponding criteria are verified.
+- The AgentKit design, contract, decisions, slices, and tracker agree on the public surface and remaining work.
 
 ## Environment
 
-**Observed:**
-
-- **Image:** Debian bookworm, from the `javascript-node:22` devcontainer base, which can be overridden. It carries .NET SDKs 8, 9, and 10, NUKE, GitVersion, PowerShell, the Docker CLI with buildx, Angular CLI, pnpm, and QDK. Container builds need the host Docker socket mounted.
-- **Forge:** a .NET 8 NUKE solution of four build projects over a shared `Common` library, with xUnit test projects.
-- **CI:** GitHub Actions on `ubuntu-latest`. `ci.yml` runs on pull requests. `build.yml` runs on pushes to `main` and publishes the image. `release.yml` and `release-tag.yml` create releases. `docs.yml` deploys to GitHub Pages.
-- **PowerShell module:** Windows PowerShell 5.1 or later. It drives the container over a Docker host endpoint, by default `tcp://host.docker.internal:2375`.
-- **Scale:** single user. Builds are invoked one at a time per consumer, with no shared state between runs.
-
-**Decide:** is a Windows workstation plus GitHub Actions the whole supported environment, or do other CI hosts count?
+- The container and build surface are supported on Docker-capable hosts. Individual host operating systems are not separately promised merely because Docker runs on them.
+- Container builds require registry and dependency-network access and may require the host Docker socket.
+- The PowerShell module retains its declared PowerShell 5.1-or-later requirements.
+- GitHub Actions on Linux remains a supported CI environment.
+- Each invocation is isolated. Shared mutable build state and coordinated concurrent builds are outside this brief.
+- The supported image architecture for this work is amd64.
 
 ## Lifespan
 
-**Observed:** active since 2025-05-26, 147 commits. The image is a build dependency of at least six other repositories.
-
-**Decide:** proposed as maintained for years. That justifies the full pipeline (contract, slices, tracker) rather than ad-hoc fixes.
+Docker-BuildAgent is maintained for years. Compatibility, migration, deprecation, release discipline, and recovery behavior are durable obligations rather than best-effort conventions.
