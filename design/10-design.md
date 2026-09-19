@@ -33,7 +33,7 @@ The record that settles whether a version exists. It exists so the check does no
 
 A machine-readable description of every protected surface that can be compared mechanically.
 
-- **What it records, for each item:** a name; for parameters and config keys, type and default; and a deprecated flag with the version it was deprecated in.
+- **What it records, for each item:** a name, a comparable value, and a deprecated flag with the version it was deprecated in. For a parameter or a config key the value is its type and default; for every other item it is whatever that surface declares — an entrypoint, a mount point, a position in an ordered list. **An item whose value cannot be recorded is not in the manifest**, because the gate fails on any difference and cannot fail on what it does not hold.
 - **What it covers:**
   - build types, and the parameters and defaults of each;
   - project configuration keys and supported schema versions;
@@ -163,9 +163,11 @@ Steps 1–5 write nothing. The first write is step 6.
 1. Run tests. Compute or validate the version.
 2. **Refuse** if the version exists (derived rule in *Release claim*), if its major is below the current major, or if a version tag already points at a different commit.
 3. Derive the surface manifest. Load the baseline, which is the manifest asset of the highest published release below this version.
-   - **Fail** on any removal, rename, or changed default unless the major increases.
-   - **Fail** on removal of an item the baseline did not already mark deprecated.
+   - **Fail** on *any* difference from the baseline unless the major increases, except the compatible set: adding an item, marking an existing item deprecated, and adding a supported schema version.
+   - **Fail** on removal of an item the baseline did not already mark deprecated, at any major.
    - v2.0.0 has no baseline and is judged only by the migration guide.
+
+   The rule is a whitelist so that it cannot fall behind the manifest: a list of forbidden differences leaves each field later added to the manifest unchecked, and reports nothing when it does.
 4. Assemble release notes. Mechanically detected breaking changes and deprecations are inserted into their sections. **Fail** if either section heading is missing from the final body. An empty section carries an explicit "none".
 5. Build every artifact with the version stamped in. Nothing is pushed yet.
 6. **Claim:** create the draft release bound to the commit SHA, with notes and manifest attached.
@@ -293,10 +295,10 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 
 **Surface comparison gate**
 
-- **What fails:** a removal or rename without a major, or a removal without prior deprecation.
+- **What fails:** a manifest difference step 3 does not place in the compatible set, or a removal without prior deprecation.
 - **Detection:** manifest diff.
 - **System response:** fail before the claim.
-- **User sees:** each offending item and the rule it broke.
+- **User sees:** each differing item, what changed about it, and the rule it broke or the absence of one that admits it.
 
 **Release notes gate**
 
