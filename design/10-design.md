@@ -89,10 +89,13 @@ The app env map file is not a configuration source. It generates an output of th
 
 - **Identity:** a created-but-never-started container whose name is derived deterministically from the **target container's name**, hashed so that any name an operator may pass yields a valid container name. The Docker daemon enforces name uniqueness atomically, so the lock is a mutex at the daemon. It holds across every client of that daemon, not only one machine's processes.
   - The key is the name, not the container id, because the id under that name **changes inside the critical section**: the update renames the original away and creates the replacement under the same name (*Control flow* → *An operator updates a named container*, step 8). A lock keyed on the id would stop naming the same thing part-way through the operation it guards, and a second update resolving the name during the health wait would derive a different lock and acquire it. The brief's invariant is written over the name an operator passes, so the lock is too.
-- **Fields:** carried as labels: owner machine, process, update id, acquisition time, and a deadline (acquisition time plus health timeout plus a fixed margin).
+- **Fields:** carried as labels: owner machine, process, update id, acquisition time, and a deadline (acquisition time plus the stop grace period, the health timeout, and a fixed margin — the phases that remain inside the section once the pull is outside it).
+  - The deadline is **diagnostic, not an authorization**. It is how a refusal words itself, never a licence to act. A clock skew therefore changes only how a message reads, never whether two processes can mutate one container.
 - **Image:** the target's current image, which is always present locally. Taking the lock therefore never pulls.
-- **Lifecycle:** created at update start and removed at update end on every path.
-  - A lock past its deadline is stale. It may be taken over only by removing it **by container id, not by name**, then re-creating it by name. Two takers cannot both succeed, and a taker cannot remove a lock re-created by someone else.
+- **Lifecycle:** created at step 4 and removed at update end on every path.
+  - **A lock is never taken over automatically.** A lock past its deadline is reported — owner machine, process, age, and how far past — and the update refuses. Removing a lock does not stop the process that holds it, so a takeover would put two owners inside a section designed for one; the owner re-reading its own lock cannot close that gap either, because Docker offers no fencing token to make the check and the next container operation one act.
+  - Refusing costs nothing that was previously recovered automatically. A crash from step 6 onward strands a pin, an outcome-less start entry, or a prior container, and *Failure modes* → *Process interruption* already recovers those through the residue refusal rather than through the lock. The only window a takeover ever covered was a crash during the pull, and the pull is now outside the lock.
+  - Clearing the lock of a dead update is an operator action, reported by the refusal and specified as a contract item — the same posture this design already takes for completing a restore from residue.
 - **Persisted:** in the daemon.
 
 ### Prior image pin and prior container
@@ -101,7 +104,7 @@ The app env map file is not a configuration source. It generates an output of th
 - **Prior container:** the target container itself, stopped and renamed to a product-owned name for the duration of an update.
   - Restore renames it back and starts it. Restore is therefore exact: nothing is recreated from inspect output.
   - It is removed when an update ends in success, or ends unhealthy with restore disabled.
-  - A labelled prior container is **residue** of an interrupted update when no live lock is held for the name it was renamed from. That test is sound only because the lock is keyed on the name: the lock outlives the rename, so its presence is what separates an update still running from one that died. The update log cannot make that distinction — it is per-user and per-machine, so another client of the same daemon cannot read it, and a start without an outcome reads identically in both cases.
+  - A labelled prior container is **residue** of an interrupted update when the lock for the name it was renamed from is absent, or is present and past its deadline. That test is sound only because the lock is keyed on the name: the lock outlives the rename, so its presence is what separates an update still running from one that died. The update log cannot make that distinction — it is per-user and per-machine, so another client of the same daemon cannot read it, and a start without an outcome reads identically in both cases.
 
 ## Module boundaries
 
@@ -171,15 +174,16 @@ Steps 1–5 write nothing. The first write is step 6.
 
 ### 3. An operator updates a named container (global tool)
 
-Steps 1–5 are checks; the first change happens at step 6.
+Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 checks; the first change to the target happens at step 6.
 
 1. Resolve the name to a container id and inspect it.
-2. Acquire the lock. **Refuse** if a live lock exists.
-3. **Refuse** if there is residue of an interrupted update, reporting the residue and its log entry.
-4. **Refuse** if the prior configuration cannot be restored exactly: the container is auto-removed on stop, or it is managed by an orchestrator.
-5. Pull the requested image.
-   - A pull failure ends the update with nothing changed.
+2. **Refuse** if the prior configuration cannot be restored exactly: the container is auto-removed on stop, or it is managed by an orchestrator.
+3. Pull the requested image. This happens **before** the lock is taken, so the one unbounded phase of the update is outside the critical section and a slow pull can never be mistaken for a dead owner.
+   - A pull failure ends the update with nothing changed and no lock taken.
    - A new image id equal to the prior one ends with a logged no-op success.
+   - Two updates of the same container may both reach this step. The pull mutates no shared state, so the loser of the race has wasted work and nothing more.
+4. Acquire the lock. **Refuse** if a lock exists. A lock past its deadline is reported as a probable dead update, not taken over.
+5. **Refuse** if there is residue of an interrupted update, reporting the residue and its log entry.
 6. Pin the prior image. **Refuse** if the pin cannot be created ("the prior image cannot be kept").
 7. Write and flush the start entry. **Refuse**, and remove the new pin, if it cannot be written.
 8. Stop the target and rename it to its prior-container name. Create a new container with the original name, the new image and the inspected configuration, then start it.
@@ -334,10 +338,11 @@ Steps 1–5 are checks; the first change happens at step 6.
 
 **Lock**
 
-- **What fails:** a live lock is held, or a stale lock is present.
-- **Detection:** lock creation fails on the name conflict; the deadline label is read.
-- **System response:** live → refuse. Stale → take over by id, and the takeover is logged.
-- **User sees:** the lock's owner machine, process and age.
+- **What fails:** a lock is held, whether by a running update or by one that died holding it.
+- **Detection:** lock creation fails on the name conflict; the deadline label is read to word the message.
+- **System response:** refuse, in both cases. The design cannot distinguish a dead owner from a slow one and does not guess.
+- **User sees:** the lock's owner machine, process and age; past its deadline, that it is probably a dead update, and the operator command that clears it.
+- **State left behind:** none.
 
 **Residue**
 
@@ -351,6 +356,7 @@ Steps 1–5 are checks; the first change happens at step 6.
 - **What fails:** auth, rate limit, network, or an unknown reference.
 - **Detection:** pull status.
 - **System response:** end the update with nothing changed, and log the outcome.
+- **State left behind:** none, and no lock — the pull runs at step 3, before the lock is taken. This is why the update's slowest and least predictable step cannot strand one.
 
 **Prior image pin**
 
@@ -392,8 +398,8 @@ Steps 1–5 are checks; the first change happens at step 6.
 - **What fails:** a signal or crash.
 - **Detection:**
   - **Signal:** a handler. Before step 8 it releases the lock and removes the pin. After step 8 it runs the restore path.
-  - **Crash:** no in-process detection. The lock goes stale at its deadline, and the prior container and log start entry remain as residue.
-- **Outcome:** the next update refuses on the residue.
+  - **Crash:** no in-process detection. A crash before step 4 leaves nothing at all, because the pull is outside the lock. From step 4 the lock remains, and from step 6 a pin, an outcome-less start entry, or a prior container remains with it.
+- **Outcome:** the next update refuses — on the lock, reporting it as past its deadline, and on whatever residue accompanies it. Both are cleared by the operator; neither is reclaimed automatically.
 
 **Notification**
 
@@ -426,7 +432,7 @@ Steps 1–5 are checks; the first change happens at step 6.
   8. publish the release.
 
   This order means a failure before the claim leaves nothing behind, and a failure after it is resumable.
-- **Container updates:** updates of **different** containers may run concurrently; each takes its own lock. Updates of the **same** container must not — same meaning the same container *name*, which is the identity the operator supplies and the identity the lock is keyed on, so the lock holds for the whole update even across step 8's rename and re-create. The daemon-side lock enforces this across processes and across machines using the same daemon. Staleness is decided by a deadline carried in the lock itself, so it does not depend on any clock beyond the lock owner's and the taker's. The margin covers ordinary clock skew; a larger skew makes takeover early or late, never double.
+- **Container updates:** updates of **different** containers may run concurrently; each takes its own lock. Updates of the **same** container must not — same meaning the same container *name*, which is the identity the operator supplies and the identity the lock is keyed on, so the lock holds for the whole update even across step 8's rename and re-create. The daemon-side lock enforces this across processes and across machines using the same daemon. The section the lock covers is bounded, because the registry pull sits outside it. A lock is never taken over while it exists, so there is no path by which two processes both believe they hold it; a past-deadline lock is evidence for an operator, not permission for the next update.
 - **Update steps:** strictly sequential within one update. The start entry is flushed before the first change, and the lock is released only after the outcome entry is written.
 - **Launchers and image version:** a launcher pins one image version per invocation. Concurrent invocations with different launcher versions run different images, which is safe because image versions are immutable.
 
@@ -447,6 +453,7 @@ Steps 1–5 are checks; the first change happens at step 6.
    - **Rejected:** a named volume. Volume creation with an existing name succeeds, so it is not a mutex.
    - **Rejected:** a label on the target container. Labels cannot change after creation.
    - **Rejected:** deriving the lock name from the target's container id. The id under the target name changes at step 8, so the lock would stop identifying the update's own target half-way through the section it protects.
+   - **Rejected:** taking over a lock past its deadline. It excludes other takers but not the owner, which no removal can stop; and once the pull moves outside the lock, every crash it would have recovered is already recovered by the residue refusal.
 4. **Preserving and restoring the prior version.**
    - **Chosen:** stop and rename the original container, pin its image, and restore by renaming it back.
    - **Rejected:** removing the original and re-creating it from inspect output on restore. Faithful re-creation from inspect output is lossy (anonymous volumes, links, some network and runtime options), so restore would be approximate on exactly the path that has to work.
