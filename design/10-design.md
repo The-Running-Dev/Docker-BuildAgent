@@ -177,7 +177,9 @@ Steps 1–5 write nothing. The first write is step 6.
 Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 checks; the first change to the target happens at step 6.
 
 1. Resolve the name to a container id and inspect it.
-2. **Refuse** if the prior configuration cannot be restored exactly: the container is auto-removed on stop, or it is managed by an orchestrator.
+2. **Refuse** on either of two distinct grounds. They fail for different reasons and are two rules, not one list.
+   - The prior configuration cannot be **restored** exactly: the container is auto-removed on stop, or it is managed by an orchestrator.
+   - The replacement cannot be **created faithfully** from the target's inspected configuration, because the target uses configuration that inspect output does not round-trip — anonymous volumes, links, and some network and runtime options. Which shapes are supported and which refuse is a contract item; this document states the rule, not the list.
 3. Pull the requested image. This happens **before** the lock is taken, so the one unbounded phase of the update is outside the critical section and a slow pull can never be mistaken for a dead owner.
    - A pull failure ends the update with nothing changed and no lock taken.
    - A new image id equal to the prior one ends with a logged no-op success.
@@ -187,6 +189,7 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 6. Pin the prior image. **Refuse** if the pin cannot be created ("the prior image cannot be kept").
 7. Write and flush the start entry. **Refuse**, and remove the new pin, if it cannot be written.
 8. Stop the target and rename it to its prior-container name. Create a new container with the original name, the new image and the inspected configuration, then start it.
+   - **The replacement differs from the target in image only.** Inspect output is the only available source for the rest, and it is lossy (*Alternatives considered* → *Preserving and restoring the prior version*), so this invariant is held by the creation refusal at step 2 — not by anything observed here or at step 9.
 9. Wait for the new container's own health status until the timeout:
    - `healthy` → **success**;
    - the container is not running and will not be restarted → **fail**;
@@ -331,10 +334,11 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 
 **Target container**
 
-- **What fails:** it does not exist, is auto-remove, or is orchestrator-managed.
+- **What fails:** it does not exist, is auto-remove, is orchestrator-managed, or carries configuration the replacement cannot be created faithfully from.
 - **Detection:** inspect.
 - **System response:** refuse.
 - **State left behind:** none.
+- **Why this is a refusal and not a check after the fact:** step 9 gates on the new container's own health, and a container that lost an anonymous volume can be entirely healthy. Health is not evidence of configuration fidelity. Success then removes the prior container, so the loss would be both undetected and unrecoverable — which is why the only place to catch it is before anything changes.
 
 **Lock**
 
@@ -457,7 +461,10 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 4. **Preserving and restoring the prior version.**
    - **Chosen:** stop and rename the original container, pin its image, and restore by renaming it back.
    - **Rejected:** removing the original and re-creating it from inspect output on restore. Faithful re-creation from inspect output is lossy (anonymous volumes, links, some network and runtime options), so restore would be approximate on exactly the path that has to work.
+   - The **forward** path has no such alternative: creating the replacement can only read the target's inspected configuration. The same lossiness therefore applies to it, and is handled by **refusing** at step 2 rather than by tolerating an approximation. Restore stays exact because it renames rather than re-creates; creation is made safe by never being attempted on a shape it cannot reproduce.
    - **Rejected:** tagging only (issue #1's `:previous`). A single shared tag name collides across containers using one repository, and it keeps the image but not the container configuration.
+   - **Rejected:** comparing the new container's inspect output against the original's before removing the prior container. The comparison set is large and moves with every Docker version, and a new image legitimately changes image-derived fields, so separating loss in translation from a change the image caused is guesswork; a false positive turns a good update into a spurious rollback. Refusing a known-unsupported shape is checkable, diffing two inspect outputs across Docker versions is not.
+   - **Rejected:** retaining the prior container after success as a rollback window. It needs a third product-owned name and a rename on the success path to stay distinguishable from residue, because labels are immutable after creation and an in-flight marker cannot be flipped to retained. More decisively, rollback after a *successful* update is a capability the brief does not carry: it ties restore to a health check that did not pass.
 5. **One validation contract across C# and PowerShell build types.**
    - **Chosen:** node-template's script flow calls the Config module.
    - **Rejected:** a parallel PowerShell validator. Two implementations of one contract diverge.
