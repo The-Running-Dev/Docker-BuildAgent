@@ -87,7 +87,8 @@ The app env map file is not a configuration source. It generates an output of th
 
 ### Update lock
 
-- **Identity:** a created-but-never-started container whose name is derived deterministically from the target container's id. The Docker daemon enforces name uniqueness atomically, so the lock is a mutex at the daemon. It holds across every client of that daemon, not only one machine's processes.
+- **Identity:** a created-but-never-started container whose name is derived deterministically from the **target container's name**, hashed so that any name an operator may pass yields a valid container name. The Docker daemon enforces name uniqueness atomically, so the lock is a mutex at the daemon. It holds across every client of that daemon, not only one machine's processes.
+  - The key is the name, not the container id, because the id under that name **changes inside the critical section**: the update renames the original away and creates the replacement under the same name (*Control flow* → *An operator updates a named container*, step 8). A lock keyed on the id would stop naming the same thing part-way through the operation it guards, and a second update resolving the name during the health wait would derive a different lock and acquire it. The brief's invariant is written over the name an operator passes, so the lock is too.
 - **Fields:** carried as labels: owner machine, process, update id, acquisition time, and a deadline (acquisition time plus health timeout plus a fixed margin).
 - **Image:** the target's current image, which is always present locally. Taking the lock therefore never pulls.
 - **Lifecycle:** created at update start and removed at update end on every path.
@@ -100,7 +101,7 @@ The app env map file is not a configuration source. It generates an output of th
 - **Prior container:** the target container itself, stopped and renamed to a product-owned name for the duration of an update.
   - Restore renames it back and starts it. Restore is therefore exact: nothing is recreated from inspect output.
   - It is removed when an update ends in success, or ends unhealthy with restore disabled.
-  - A labelled prior container that exists outside an in-progress update is **residue** of an interrupted update.
+  - A labelled prior container is **residue** of an interrupted update when no live lock is held for the name it was renamed from. That test is sound only because the lock is keyed on the name: the lock outlives the rename, so its presence is what separates an update still running from one that died. The update log cannot make that distinction — it is per-user and per-machine, so another client of the same daemon cannot read it, and a start without an outcome reads identically in both cases.
 
 ## Module boundaries
 
@@ -425,7 +426,7 @@ Steps 1–5 are checks; the first change happens at step 6.
   8. publish the release.
 
   This order means a failure before the claim leaves nothing behind, and a failure after it is resumable.
-- **Container updates:** updates of **different** containers may run concurrently; each takes its own lock. Updates of the **same** container must not. The daemon-side lock enforces this across processes and across machines using the same daemon. Staleness is decided by a deadline carried in the lock itself, so it does not depend on any clock beyond the lock owner's and the taker's. The margin covers ordinary clock skew; a larger skew makes takeover early or late, never double.
+- **Container updates:** updates of **different** containers may run concurrently; each takes its own lock. Updates of the **same** container must not — same meaning the same container *name*, which is the identity the operator supplies and the identity the lock is keyed on, so the lock holds for the whole update even across step 8's rename and re-create. The daemon-side lock enforces this across processes and across machines using the same daemon. Staleness is decided by a deadline carried in the lock itself, so it does not depend on any clock beyond the lock owner's and the taker's. The margin covers ordinary clock skew; a larger skew makes takeover early or late, never double.
 - **Update steps:** strictly sequential within one update. The start entry is flushed before the first change, and the lock is released only after the outcome entry is written.
 - **Launchers and image version:** a launcher pins one image version per invocation. Concurrent invocations with different launcher versions run different images, which is safe because image versions are immutable.
 
@@ -445,6 +446,7 @@ Steps 1–5 are checks; the first change happens at step 6.
    - **Rejected:** a lock file on the client machine. It does not exclude a second machine driving the same daemon, and Windows and Linux lock semantics differ.
    - **Rejected:** a named volume. Volume creation with an existing name succeeds, so it is not a mutex.
    - **Rejected:** a label on the target container. Labels cannot change after creation.
+   - **Rejected:** deriving the lock name from the target's container id. The id under the target name changes at step 8, so the lock would stop identifying the update's own target half-way through the section it protects.
 4. **Preserving and restoring the prior version.**
    - **Chosen:** stop and rename the original container, pin its image, and restore by renaming it back.
    - **Rejected:** removing the original and re-creating it from inspect output on restore. Faithful re-creation from inspect output is lossy (anonymous volumes, links, some network and runtime options), so restore would be approximate on exactly the path that has to work.
