@@ -22,10 +22,6 @@ only; `## Landed` is never rewritten. Criterion ids are permanent: they are what
 on, so a withdrawn criterion leaves a gap and the next id continues past it. Ids are never reused
 and never renumbered. Gaps in the numbering below are withdrawn criteria, listed with each slice.
 
-## Landed
-
-*None yet.*
-
 ## Outstanding
 
 ## S1 — The public surface, derived and compared
@@ -430,6 +426,10 @@ Acceptance:
   - S12.6 No document still disagrees with the tree on a name the S10 check covers.
 Out of scope: rewriting reference prose beyond adding the canonical pointer; changing
 `docs-template/`.
+
+## Landed
+
+*None yet.*
 
 ## Blocked
 
