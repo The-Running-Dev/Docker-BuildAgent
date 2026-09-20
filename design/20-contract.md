@@ -96,6 +96,12 @@ Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — no
 **I-REL-14 — Only CI publishes.** No sink accepts a write from a developer machine.
 Owner: Release pipeline. Enforcement: `[instruction]`.
 
+**I-REL-15 — A push to `main` writes no version.** It moves `latest` and nothing else.
+No versioned image tag, tool package or module version is written outside a release
+(2026-09-20 decision).
+Owner: Release pipeline. Enforcement: `[instruction]` — the main-push workflow has no
+path to a versioned sink.
+
 ### Configuration
 
 **I-CFG-1 — One project configuration file.** A project carries at most one
@@ -673,6 +679,13 @@ that clears it. A lock refusal additionally names the lock's owning host, proces
 age, and says whether the deadline has passed and that the deadline does not authorise
 a takeover (I-UPD-3).
 
+**Verification reaches Linux only.** No Windows host running Docker Desktop with Linux
+containers is available as a runner, and GitHub-hosted Windows runners cannot run Linux
+containers (2026-09-20 decision). Every status above is verified automatically on
+Linux. On Windows only what needs no live daemon — argument translation, Docker host
+resolution, path and mount handling — is covered. Live-daemon update behaviour on a
+Windows host is a stated, unverified gap, and no document may describe it as verified.
+
 ### PowerShell module
 
 Canonical contract: [`PSModule.requirements.md`](../PSModule.requirements.md).
@@ -687,7 +700,10 @@ Semantics this document adds:
   protected surface; each exported name and each parameter is a manifest item.
 - `BuildAgentConfig.Parameters` is precedence tier 2 and `-args` is tier 1; that is
   R-INVOKE-002 expressed as `ConfigurationTier`.
-- The module's default `DockerImage` (R-CONFIG-002) is `## Unresolved` U-2.
+- The module's default `DockerImage` is the module's own version, not `latest`
+  (2026-09-20 decision). This amends R-CONFIG-002 and is a breaking change in 2.0.0
+  that the migration guide carries. The reference stays overridable, and an override is
+  used verbatim.
 - The module is tested on Windows PowerShell 5.1 and PowerShell 7, and both are
   release gates rather than best effort.
 
@@ -823,29 +839,18 @@ never becomes a takeover (I-UPD-2).
 Each entry names what it blocks. No entry here may be resolved by an implementing
 slice inventing an answer.
 
+Ids are permanent. An entry resolved by a decision is struck from this list and never
+reused, so the numbering carries gaps.
+
 **U-1 — The global tool's package identifier and command name.** The design fixes the
-tool's responsibilities and not its identity, and `10-design.md` Open question 5 leaves
-ownership of the .NET tool feed and its package identities open.
+tool's responsibilities and not its identity, and `10-design.md` Open question 1 leaves
+ownership of the .NET tool feed and the PowerShell Gallery, and custody of their
+publishing keys, open.
 *Blocks:* the tool's `ToolCommand` manifest items, its published invocation in every
-document, and the CI step that publishes it.
+document, the CI step that publishes it, and the CI step that publishes the PowerShell
+module to the Gallery.
 
-**U-2 — The PowerShell module's default image reference.** `10-design.md` Open question
-2. `PSModule.requirements.md` R-CONFIG-002 currently defaults to
-`ghcr.io/the-running-dev/build-agent:latest`, which sits against the brief's push
-toward pinned versions; pinning it to the module's own version is a breaking change in
-2.0.0.
-*Blocks:* the module's `ModuleParameter` manifest value, the 1.x-to-2.0.0 migration
-guide, and I-BLD-4's practical meaning for the module.
-
-**U-3 — What a push to `main` publishes.** `10-design.md` Open question 1.
-*Blocks:* the release pipeline's trigger surface, the CI concurrency group (I-REL-13),
-and whether `latest` can move outside a release at all.
-
-**U-4 — Whether "direct invocation" means host-native builds.** `10-design.md` Open
-question 3, for issue #14. If it does, the global tool is not only a launcher and the
-Launchers module boundary is wrong.
-*Blocks:* the global tool's module boundary, I-BLD-4 and I-BLD-5, and the slice that
-lands the tool.
+*U-2, U-3 and U-4 were resolved by the 2026-09-20 decisions and are struck.*
 
 **U-5 — How the `node-template` flow reaches Config across the language boundary.** The
 design requires one validator (I-CFG-8) and does not determine whether PowerShell
@@ -884,7 +889,5 @@ round-trip probe per shape.
 *Blocks:* `UpdateErrorCode.TargetShapeUnsupported`'s refusal list and the refusal tests
 the brief requires.
 
-**U-11 — Whether a self-hosted Windows runner with Docker Desktop is available.**
-`10-design.md` Open question 4.
-*Blocks:* the update tests on Windows, which the brief's definition of done requires on
-the supported hosts.
+*U-11 was resolved by the 2026-09-20 decision on Windows verification and is struck.
+The gap it names is now stated under § Global tool rather than pending.*

@@ -140,7 +140,7 @@ Updater ──────────► Notifications    (shared service withi
 ### 1. A consumer runs `build <type>` (in the image, or on the host through the global tool or module)
 
 1. **On the host (launchers only):**
-   - The launcher resolves the image reference: its own version, unless overridden (see Open questions for the module's default).
+   - The launcher resolves the image reference: its own version, unless overridden. Both launchers pin to their own version (2026-09-20 decision).
    - It resolves the Docker host and forwards the explicit arguments. For the module, it also forwards module configuration at its own precedence tier.
    - It runs one container with the workspace mounted, and returns the container's exit status unchanged.
 2. **In the image:** `build` validates the type against the accepted set, and Build types starts the requested type.
@@ -156,7 +156,9 @@ Updater ──────────► Notifications    (shared service withi
    - Push and GitHub publishing happen only under the existing conditions (forced, or non-local and not a dry run).
 6. **Notification** is attempted when configured. Generated environment files are removed on every exit path.
 
-### 2. A maintainer releases a version (CI dispatch, a version tag push, or a main push; see Open questions for main)
+### 2. A maintainer releases a version (CI dispatch or a version tag push)
+
+A push to `main` is not a release: it moves `latest` only, and writes no version to any sink (2026-09-20 decision).
 
 Steps 1–5 write nothing. The first write is step 6.
 
@@ -483,14 +485,6 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 
 ## Open questions
 
-1. **What does a push to `main` publish from 2.0.0 onward?** Main pushes currently publish both `latest` and a versioned tag. Under ContinuousDelivery on `main`, successive commits compute the same version until a release tag exists. The next push would therefore overwrite an existing versioned tag, which the immutability promise forbids, and the claim check would refuse every main push after the first. Options:
-   - **(a)** Main pushes move only `latest`, and versioned tags come only from releases. **Recommended:** it keeps `latest` movable and not discouraged, and never writes a version outside a release.
-   - **(b)** Main pushes publish a unique pre-release version (for example with a commit-count suffix) plus `latest`. Every main push then becomes a full release through the claim, notes and surface gates, and pre-releases accumulate on the tool feed and the Gallery.
-   - **(c)** Main pushes publish nothing, and `latest` moves only on release. `latest` then means "newest release" rather than "newest main".
-2. **Should the PowerShell module's default image stay `latest`, or pin to the module's own version?** The global tool pins to its own version, so that "released together" means a module or tool version runs its matching image.
-   - Changing the module default is a 2.0.0 breaking change; the migration guide must carry it.
-   - Keeping `latest` means a pinned module can run a newer image with a different surface.
-   - **Recommended:** pin, with the image reference still overridable. The brief's non-goal protects `latest` from removal and discouragement, not its use as a launcher default.
-3. **Does "direct invocation" in the 2026-09-17 decision on issue #14 mean the tool must run builds without a container?** This design reads it as "installable and invokable directly from the host shell", and makes the tool a launcher for the versioned image. If it meant in-process builds on the host, *Alternatives considered* 1 reverses and the host toolchain becomes a supported environment.
-4. **Is a Windows machine running Docker Desktop with Linux containers available as a self-hosted runner?** GitHub-hosted Windows runners cannot run Linux containers, so the update tests the brief requires on each supported host cannot run there on hosted runners alone.
-5. **Who owns the package identities and publishing keys on the .NET tool feed and the PowerShell Gallery?** The identities must be reserved and keys stored as CI secrets before the first 2.0.0 release can publish.
+1. **Who owns the package identities and publishing keys on the .NET tool feed and the PowerShell Gallery?** The identities must be reserved and keys stored as CI secrets before the first 2.0.0 release can publish. This is an operational prerequisite, not a design choice; it blocks the first publish, not the slices.
+
+Questions 1–4 of the previous revision are closed and recorded in [`90-decisions.md`](90-decisions.md) under 2026-09-20: main pushes move `latest` only; the module's default image pins to its own version; "direct invocation" means a packaged host-invokable launcher; and automated update-path verification is Linux-only.
