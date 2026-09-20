@@ -38,7 +38,7 @@ Acceptance:
     per Docker template discovery location in discovery order, one per exported PowerShell module
     member, and one per supported project-file schema version.
   - S1.3 Derivation never reads a manifest from the working tree: with every manifest file deleted
-    from the tree, derivation still succeeds and produces the same output as S1.1 (I-REL-8).
+    from the tree, derivation still succeeds and produces the same output as S1.1 (I8).
   - S1.4 An item whose value cannot be produced as a stable ordinal string fails with
     `DerivationFailed` naming the item, and no manifest is written.
   - S1.5 A candidate that only adds an item, only marks an existing item deprecated, or only adds a
@@ -46,13 +46,13 @@ Acceptance:
   - S1.6 Renaming a build parameter reports two differences — one removal and one addition — and the
     removal is a `BlockingDifference`.
   - S1.7 An item present in a published manifest and absent from the candidate is a removal whatever
-    the reason for its absence, including a value that became underivable (I-REL-11).
+    the reason for its absence, including a value that became underivable (I11).
   - S1.8 Changing an existing item's value blocks the release when the major does not increase, and
     the failure names the item, its baseline value and its candidate value.
   - S1.9 Reordering the Docker template discovery locations is a `BlockingDifference` when the major
     does not increase.
   - S1.10 A difference kind the comparison has no compatibility rule for is blocking, not passing
-    (I-REL-9). Adding a field to the manifest without touching the comparison makes releases fail
+    (I9). Adding a field to the manifest without touching the comparison makes releases fail
     loudly rather than pass silently.
   - S1.11 The candidate manifest is attached to the release as an asset, and the gate reads the
     highest published release's manifest asset as its baseline. No baseline asset fails with
@@ -62,7 +62,7 @@ Acceptance:
     sink is written, listing every blocking difference with what changed and the rule it broke.
   - S1.13 Two items sharing a `(Kind, Name)` fail with `DuplicateItem`.
   - S1.14 A manifest whose `manifestSchemaVersion` the reader does not know fails with
-    `ManifestSchemaUnsupported`; it is never treated as an empty or partial baseline (I-REL-12).
+    `ManifestSchemaUnsupported`; it is never treated as an empty or partial baseline (I12).
 Out of scope: the release claim, publishing to any sink, and the release-notes check — S3 owns all
 three. Changing a declaration to make derivation succeed is in scope only where derivation fails;
 renaming or removing a parameter is not.
@@ -83,12 +83,12 @@ Acceptance:
     the original container name still finds the lock and refuses — the lock survives the id behind
     the name changing.
   - S2.3 Acquiring the lock performs no registry pull: with the image already present locally and
-    the daemon unable to reach the registry, the lock is still acquired (I-UPD-4).
+    the daemon unable to reach the registry, the lock is still acquired (I33).
   - S2.4 An image that cannot be obtained fails with `ImageUnavailable`, exits `30`, leaves no lock
     container behind, and changes nothing.
   - S2.5 A lock whose deadline has passed still refuses with `LockHeld` and exit `21`. The message
     names the owning host, the process and the lock's age, says the deadline has passed, and says
-    the deadline does not authorise a takeover. The lock is not removed (I-UPD-2, I-UPD-3).
+    the deadline does not authorise a takeover. The lock is not removed (I31, I32).
   - S2.6 A target running with `--rm` refuses with `TargetAutoRemove` and exit `20`.
   - S2.7 A target carrying orchestrator ownership labels refuses with `TargetOrchestratorManaged`
     and exit `20`.
@@ -102,7 +102,7 @@ Acceptance:
   - S2.11 A prior image that cannot be pinned refuses with `PinFailed` and exit `23` before any
     change.
   - S2.12 A start entry that cannot be flushed refuses with `LogUnwritable` and exit `24` before any
-    change, and removes the prior image pin created moments earlier (I-UPD-7).
+    change, and removes the prior image pin created moments earlier (I36).
   - S2.13 On success the replacement container runs the new image, and its environment, command,
     mounts, ports, restart policy, networks and labels — excluding the product's own — equal the
     target's before the update.
@@ -142,7 +142,7 @@ the CI concurrency group.
 Depends on: S1.
 Acceptance:
   - S3.1 A version already held by a claim, a versioned image tag or a git tag fails with
-    `VersionAlreadyExists` before any write, naming which of the three held it (I-REL-5).
+    `VersionAlreadyExists` before any write, naming which of the three held it (I5).
   - S3.2 A draft claim bound to a different commit fails with `VersionAlreadyExists`, naming that
     commit.
   - S3.3 A candidate major below the highest published major fails with `MajorBelowCurrent` before
@@ -150,17 +150,17 @@ Acceptance:
   - S3.4 A git tag for the version on another commit fails with `TagPointsElsewhere`.
   - S3.5 Release notes lacking either the breaking-changes or the deprecations heading fail with
     `NotesSectionMissing` before any write. An empty section under a present heading passes
-    (I-REL-7).
+    (I7).
   - S3.6 The claim is the first write of a release: with every publish step forced to fail, the
-    draft claim exists and no sink holds the version (I-REL-3).
+    draft claim exists and no sink holds the version (I3).
   - S3.7 The version is computed once and stamped into every artifact the release produces, which
-    carry byte-identical version strings (I-REL-1).
+    carry byte-identical version strings (I1).
   - S3.10 A publish attempted outside the CI publishing context fails with `NotPublishedByCi` and
-    writes nothing (I-REL-14).
+    writes nothing (I14).
   - S3.11 A single CI concurrency group spans every publishing workflow and queues rather than
-    cancels, so at most one run publishes at a time (I-REL-13).
+    cancels, so at most one run publishes at a time (I13).
   - S3.12 A push to `main` moves `latest` and writes no version to any versioned sink — no tag, no
-    package, no module version (I-REL-15).
+    package, no module version (I15).
   - S3.13 No failure path deletes a tag, a package or a release.
   - S3.14 A sink that rejects a write fails with `SinkPublishFailed` naming the sink, and leaves the
     claim open rather than deleting it.
@@ -221,7 +221,7 @@ Acceptance:
   - S5.1 `update --clear-lock <container>` removes exactly that target's lock and reports the lock's
     owning host, process, update id, acquisition time and age.
   - S5.2 It leaves the target container, the prior container, the prior image pin and the update log
-    untouched, and takes no other action (I-UPD-2).
+    untouched, and takes no other action (I31).
   - S5.3 It is the only operator action that removes a lock it does not own, and no update path
     invokes it.
   - S5.4 A refusal naming a lock names this command as the action that clears it.
@@ -255,7 +255,7 @@ Acceptance:
   - S6.7 A secret-declared parameter present in the file fails with `SecretKeyRejected`, naming the
     key and the tiers that may supply it, and its value appears in no output stream.
   - S6.8 A value that cannot convert to the parameter's declared type fails with `ValueTypeMismatch`
-    naming the key, the declared type and the value's shape — never the value itself (I-BLD-2).
+    naming the key, the declared type and the value's shape — never the value itself (I25).
   - S6.9 A `buildType` that is absent or outside the five fails with `UnknownBuildType` naming the
     accepted five.
   - S6.10 A non-nullable parameter with no value at any tier fails with `RequiredValueMissing`
@@ -264,7 +264,7 @@ Acceptance:
     with `MalformedDocument` naming the path and position.
   - S6.12 A file that exists but cannot be opened fails with `FileUnreadable`.
   - S6.13 A file containing four distinct errors reports all four in one pass, before any build step
-    runs (I-CFG-3).
+    runs (I18).
   - S6.14 Every error above exits `2` and runs no build step.
   - S6.15 Resolution creates and modifies no file: the resolved configuration is never written to
     disk.
@@ -297,13 +297,13 @@ Acceptance:
     when the process is terminated by a signal.
   - S7.7 A secret-declared parameter is redacted in every output stream whichever tier supplied it,
     and redaction covers every secret-declared parameter rather than values matching a token-shaped
-    pattern (I-BLD-2).
+    pattern (I25).
   - S7.8 Config exposes no overload or flag that returns on the first error, and no member that
     writes the resolved configuration.
   - S7.9 Nothing in the resolution request reorders the tiers.
   - S7.10 The accepted key set is in bijection with the build parameter vocabulary: adding a
     parameter makes its kebab-case key accepted, and no accepted key exists without a matching
-    parameter (I-CFG-2).
+    parameter (I17).
 Out of scope: adding or removing any configuration source; changing what the existing mapping files
 mean; persisting the resolved configuration in any form.
 
@@ -345,10 +345,10 @@ Acceptance:
   - S9.5 The module's tests pass on Windows PowerShell 5.1 and on PowerShell 7, and both are release
     gates rather than best effort.
   - S9.6 A configured image that cannot be obtained fails with `ImageUnavailable` and exit `5`, with
-    no substitution of another version (I-BLD-4).
+    no substitution of another version (I27).
   - S9.7 A workspace path that is absent or not a directory fails with `WorkspaceInvalid` and
     exit `3`.
-  - S9.8 A non-zero container exit is propagated unchanged rather than remapped (I-BLD-5).
+  - S9.8 A non-zero container exit is propagated unchanged rather than remapped (I28).
   - S9.9 The exported set remains exactly `Set-BuildAgentConfig`, `Invoke-Build` and
     `BuildAgentConfig`, and each exported name and parameter is a manifest item.
 Out of scope: publishing the module to the PowerShell Gallery, which is blocked on key custody; any
@@ -363,9 +363,9 @@ Depends on: S1.
 Acceptance:
   - S10.1 The check runs on every pull request and fails it on a violation.
   - S10.2 A documented path, command, parameter, build type or discovery location the tree and
-    manifest lack fails with `UnknownName`, naming the document and the name (I-DOC-1).
+    manifest lack fails with `UnknownName`, naming the document and the name (I45).
   - S10.3 A document covering a protected surface that names no canonical contract fails with
-    `CanonicalSourceMissing` (I-DOC-2).
+    `CanonicalSourceMissing` (I46).
   - S10.4 Two documents claiming to be canonical for one surface fail with
     `CanonicalSourceConflict`.
   - S10.5 The check covers the documentation site sources, the README and the PowerShell help.
@@ -452,7 +452,7 @@ artifact came from that claim, and the check-then-create window permits two draf
 `latest`-ordering criteria are withdrawn rather than written against an assumed answer.
 
 **The `latest` move's position in the publish order (U-9).** `10-design.md` § Control flow 2 moves
-`latest` before the last fallible step, which contradicts I-REL-4. One of the two has to give, and
+`latest` before the last fallible step, which contradicts I4. One of the two has to give, and
 that is an adjudication, not a slice.
 
 **The Updater's dependency on Notifications (U-8).** The tool is declared to share no Build-types
