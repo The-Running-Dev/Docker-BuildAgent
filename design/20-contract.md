@@ -1,546 +1,893 @@
-# Contract — Docker-BuildAgent
+# Contract — Docker-BuildAgent v2.0.0
 
-Input: [`10-design.md`](10-design.md). That document carries intent; this one carries the
-semantics an implementing agent is checked against. Names, config keys, exit-code values and
-message rules live here and nowhere else.
+Derived from `design/10-design.md`. This document constrains every implementing
+session; downstream work is checked against it.
 
-**Semantics, not shape.** Where the tree already declares something, this document points at the
-declaration and states only what the declaration cannot. Where the code does not exist yet, a
-declaration appears here as a **scaffold** — signatures only, no bodies — and the slice that
-materialises it replaces the scaffold with a pointer in the same commit. That replacement is
-descriptive drift corrected where found, not a contract amendment.
+**How to read an entry.** Where the declaration exists in the tree, the entry points
+at it and states only what the declaration cannot carry. Where it does not exist, the
+entry carries a scaffold — declarations in the project's language, types and
+signatures only, no bodies. A slice that materialises a scaffold replaces it with a
+pointer in the same commit.
 
-`PSModule.requirements.md` remains the canonical contract for the PowerShell module surface
-(`AGENTS.md`, *Repository identity*). This document does not restate it; it states only the
-module obligations that arise from *this* design and are absent there.
+**Language and nullability.** C# declarations are `#nullable enable`: a reference type
+without `?` is non-null and construction rejects null. No `object`, no `dynamic`, no
+untyped dictionary crosses a module boundary. PowerShell declarations carry explicit
+parameter types and `[ValidateSet]` where the accepted set is closed.
 
 ---
 
 ## Invariants
 
-Each is written so it could become an assertion. **Enforced by code** means a reader may trust it
-without checking; **enforced by instruction** means only a human or a review step holds it.
+Each invariant names the module responsible for maintaining it and its enforcement
+today. **`[code]`** means a reader may trust it without checking, and cites the
+enforcing declaration. **`[instruction]`** means nothing enforces it yet; a reader
+must check, and the slice that lands the owning module makes it `[code]`.
 
-### Release
+### Release and versioning
 
-| # | Invariant | Owner | Enforced by |
-|---|---|---|---|
-| I1 | At most one release claim exists for a version at any time. | Release pipeline | Code — one queued CI concurrency group across every publishing workflow, with the claim check as backstop |
-| I2 | No sink is written before the claim exists. | Release pipeline | Code — fixed step order; steps 1–5 are read-only |
-| I3 | The image versioned tag, the global tool package and the PowerShell module of one release carry byte-identical version strings. | Release pipeline | Code — the version is computed once and stamped into all three |
-| I4 | A version tag published from 2.0.0 onward is never overwritten, deleted or expired. | Release pipeline | Code for the refusal path (the claim check refuses a re-publish); **instruction** for deletion — nothing in the product can delete a published tag, and no product code may acquire that ability |
-| I5 | `latest` moves only after every versioned sink holds the release. | Release pipeline | Code — `latest` is last in the fixed publish order |
-| I6 | Every surface manifest is derived from declarations at release time, never hand-written and never read from the tree. | Surface model | Code |
-| I7 | Every manifest item carries a comparable value. An item whose value cannot be recorded is absent from the manifest. | Surface model | Code — derivation drops what it cannot value, and the drop is reported |
-| I8 | A release fails before the claim on any manifest difference from its baseline that is not in the compatible set, unless the major increases. | Release pipeline | Code |
-| I9 | A release fails before the claim if either required release-notes section heading is absent. | Release pipeline | Code |
-| I10 | A release's major is never lower than the highest published major. | Release pipeline | Code |
-| I11 | A push to `main` writes no version to any sink. It moves `latest` only. | Release pipeline | Code — the main-push workflow has no path to a versioned sink |
+**I-REL-1 — One version, three sinks.** A release stamps exactly one version value
+into the versioned image tag, the global tool package and the PowerShell module
+manifest. No sink derives, defaults or increments its own version.
+Owner: Release pipeline. Enforcement: `[instruction]`.
+
+**I-REL-2 — A published versioned image tag is immutable.** From v2.0.0 onward, a
+versioned tag's content never changes and the tag is never deleted or expired.
+Owner: Release pipeline. Enforcement: `[instruction]` — the registry does not enforce
+it, and the design does not rely on the registry to.
+
+**I-REL-3 — No sink is written before the claim exists.** Version selection, existence
+checking, the surface gate and notes validation write nothing. The first write of a
+release is the claim.
+Owner: Release pipeline. Enforcement: `[instruction]`.
+
+**I-REL-4 — A partial release never moves `latest`.** `latest` moves only after every
+versioned sink holds the version.
+Owner: Release pipeline. Enforcement: `[instruction]`. **This invariant is in tension
+with the step order in `10-design.md` § Control flow 2; see `## Unresolved` U-9.**
+
+**I-REL-5 — A version that exists is never republished.** Existence is the disjunction
+of: a claim for that version, a versioned image tag for that version, or a git tag for
+that version. Any one of the three makes the version taken, including when the
+operator supplies it manually.
+Owner: Release pipeline. Enforcement: `[instruction]`.
+
+**I-REL-6 — Major never decreases.** A candidate whose major is below the highest
+published major fails before any write.
+Owner: Release pipeline. Enforcement: `[instruction]`.
+
+**I-REL-7 — Notes carry both required sections.** Every published release's notes
+contain a breaking-changes section and a deprecations section, present when empty. A
+release cannot publish without them.
+Owner: Release pipeline. Enforcement: `[instruction]`.
+
+**I-REL-8 — The baseline is what shipped.** The surface gate's baseline is the manifest
+asset of the highest published release below the candidate. It is never regenerated
+from source and never read from the working tree.
+Owner: Release pipeline. Enforcement: `[instruction]`.
+
+**I-REL-9 — The gate is a whitelist.** Any manifest difference outside the enumerated
+compatible set fails the release when the major does not increase. An unrecognised
+difference kind fails; it does not pass by default.
+Owner: Surface model. Enforcement: `[instruction]`.
+
+**I-REL-10 — The manifest holds only comparable values.** An item whose value cannot be
+recorded as a stable ordinal string is absent from the manifest, and its compatibility
+is carried by release notes instead.
+Owner: Surface model. Enforcement: `[instruction]`.
+
+**I-REL-11 — Once recorded, an item leaves only by the removal rule.** An item present
+in a published manifest and absent from the candidate is a removal, whatever the
+reason for its absence. Making a surface unrecordable is not an exit from the gate
+after its first release.
+Owner: Surface model. Enforcement: `[instruction]`.
+
+**I-REL-12 — Every published manifest stays readable.** The manifest reader accepts
+every `manifestSchemaVersion` ever published, because baselines are immutable release
+assets and the gate must keep comparing against them for the product's lifespan.
+Owner: Surface model. Enforcement: `[instruction]`.
+
+**I-REL-13 — One publisher at a time.** At most one release-pipeline run publishes at
+any moment, held by a single CI concurrency group spanning every publishing workflow,
+queued rather than cancelled.
+Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — no
+`concurrency:` key exists in `.github/workflows/release.yml` or
+`.github/workflows/release-tag.yml` today.
+
+**I-REL-14 — Only CI publishes.** No sink accepts a write from a developer machine.
+Owner: Release pipeline. Enforcement: `[instruction]`.
+
+**I-REL-15 — A push to `main` writes no version.** It moves `latest` and nothing else.
+No versioned image tag, tool package or module version is written outside a release
+(2026-09-20 decision).
+Owner: Release pipeline. Enforcement: `[instruction]` — the main-push workflow has no
+path to a versioned sink.
 
 ### Configuration
 
-| # | Invariant | Owner | Enforced by |
-|---|---|---|---|
-| I12 | At most one project configuration file exists for a project. Two or more is a validation failure, never a precedence decision. | Config | Code |
-| I13 | Every validation error found in one resolution pass is reported together, before any build step runs. | Config | Code |
-| I14 | The resolved configuration is never written to disk. | Config | Code |
-| I15 | A parameter marked secret is rejected in the project file, and never appears unredacted in any output stream. | Config | Code — rejection at validation; redaction over **every** secret-marked parameter, not only token-shaped patterns |
-| I16 | Configuration precedence holds exactly as ordered in *Resolution order*, and every resolved value records the tier it came from. | Config | Code |
-| I17 | A project configuration key exists if and only if a build parameter of that name exists. | Config, Surface model | Code — keys are projected from the same declarations the manifest reads |
-| I18 | Map-derived environment never overwrites a variable already set in the process environment. | Config | Code |
-| I19 | Generated environment files are removed on every exit path, including failure and signal. | Build types | Code |
+**I-CFG-1 — One project configuration file.** A project carries at most one
+configuration file. Two files differing only in format are an error, reported before
+anything is built.
+Owner: Config. Enforcement: `[instruction]`.
+
+**I-CFG-2 — Keys and parameters are in bijection.** A configuration key exists if and
+only if a build parameter exists. Adding a parameter adds a key; removing a key
+requires removing the parameter, under the deprecation rules.
+Owner: Config. Enforcement: `[instruction]`.
+
+**I-CFG-3 — Nothing is built on a configuration error.** Every configuration error
+found in one pass is reported together, and no build step runs.
+Owner: Config. Enforcement: `[instruction]`.
+
+**I-CFG-4 — Precedence is total and attributed.** Every resolved value carries the tier
+it came from. No two tiers tie, and no value has an unknown source.
+Owner: Config. Enforcement: `[instruction]`.
+
+**I-CFG-5 — Secrets are not project-file values.** A parameter declared secret is
+rejected when it appears in the project configuration file. It is supplied by
+argument, environment variable or mapping file only.
+Owner: Config. Enforcement: `[instruction]`.
+
+**I-CFG-6 — Resolved configuration is never persisted.** The resolved set exists for
+the duration of one invocation. Any display of it redacts secret-declared values.
+Owner: Config. Enforcement: `[instruction]`.
+
+**I-CFG-7 — Map-derived environment does not overwrite the process environment.** A
+value already present in the process environment wins over a value the mapping file
+produces.
+Owner: Config, Build types. Enforcement: `[instruction]` — `forge/Common/Base.cs:209`
+loads the generated file into the process with the library's default overwrite
+behaviour, which the slice must pin explicitly.
+
+**I-CFG-8 — One validator.** The `node-template` flow resolves configuration by calling
+Config. No second validation implementation exists.
+Owner: Config. Enforcement: `[instruction]` — `scripts/nuke/build.ps1` calls no
+configuration module today.
+
+### Build and launch
+
+**I-BLD-1 — Generated environment files do not outlive the build.** Every environment
+file the build generates is removed on every exit path, success or failure.
+Owner: Build types. Enforcement: **partial `[code]`** — `forge/Common/Base.cs:244-250`
+removes `.build/.build.env` from `OnBuildFinished`, which NUKE runs on both outcomes.
+The application environment file generated at
+`forge/Common/Components/INodeComponent.cs:48` into the repository root is **not**
+removed by any path; closing that is a slice obligation, not an existing property.
+
+**I-BLD-2 — No secret value reaches output or an image.** No secret-declared value
+appears on stdout, on stderr, in a log line, or in a layer of an image the product
+builds.
+Owner: Build types, PowerShell module. Enforcement: partial `[code]` for the module
+(`PSModule.requirements.md` R-SEC-001, R-SEC-002); `[instruction]` elsewhere.
+
+**I-BLD-3 — Deprecation warns, never fails.** Use of a deprecated item emits a warning
+naming the item, the release that deprecated it and its replacement, and the
+invocation continues.
+Owner: Config, Build types. Enforcement: `[instruction]`.
+
+**I-BLD-4 — A launcher never substitutes an image version.** When the configured image
+cannot be obtained the launcher fails. It never falls back to another version or to
+`latest`.
+Owner: Launchers. Enforcement: `[instruction]`.
+
+**I-BLD-5 — A launcher does not reinterpret the build's outcome.** The global tool
+returns the container's exit status unchanged. The PowerShell module surfaces a
+non-zero status as a terminating error carrying that status
+(`PSModule.requirements.md` R-INVOKE-005). Neither maps one status onto another.
+Owner: Launchers. Enforcement: partial `[code]` for the module
+(`scripts/powershell-module/Docker-BuildAgent.psm1:111`); `[instruction]` for the tool.
+
+**I-BLD-6 — The accepted build-type set is closed.** Exactly five build types are
+accepted: `docker`, `node`, `node-in-docker`, `node-template`, `forge`. Every entry
+point accepts the same five and no entry point defaults the type.
+Owner: Build types. Enforcement: `[code]` — `scripts/nuke/build.ps1:4` (`ValidateSet`,
+`Position = 0, Mandatory`) and `PSModule.requirements.md` R-INVOKE-001 realised at
+`scripts/powershell-module/Docker-BuildAgent.psm1:111`.
 
 ### Container update
 
-| # | Invariant | Owner | Enforced by |
-|---|---|---|---|
-| I20 | At most one update of a given container **name** is in its critical section at any time, across every client of the daemon. | Updater | Code — daemon-side name uniqueness on the lock container |
-| I21 | A lock is never removed by any process other than the one that created it, except by the explicit operator command. A lock past its deadline is reported, never taken over. | Updater | Code |
-| I22 | The registry pull completes before the lock is acquired. | Updater | Code — step order |
-| I23 | The replacement container differs from the target in image only. | Updater | Code — by refusal at `RefuseUnfaithfulCreate` before anything changes, **not** by any check afterwards; health is not evidence of configuration fidelity |
-| I24 | Nothing about the target changes before the start log entry is written and flushed. | Updater | Code |
-| I25 | Exactly one prior image pin exists per target container. | Updater | Code |
-| I26 | Restore renames the retained prior container back. It never re-creates a container from inspect output. | Updater | Code |
-| I27 | The lock is released only after the outcome entry is written, or after that write has failed and been reported. | Updater | Code |
-| I28 | An update record contains no container environment, command or mount data. | Updater | Code — the record type has no field to hold it |
-| I29 | An interrupted update is never reclaimed automatically. The next update refuses on the residue and names the operator action. | Updater | Code |
+**I-UPD-1 — One update per container at a time.** At most one update of a given target
+container name is in progress, enforced by a created-but-never-started container whose
+name derives deterministically from the target's name.
+Owner: Updater. Enforcement: `[instruction]`.
 
-### Documentation
+**I-UPD-2 — A lock is never taken over automatically.** Only the owning process, or an
+operator running the explicit lock-clearing command, removes a lock. Age alone never
+removes one.
+Owner: Updater. Enforcement: `[instruction]`.
 
-| # | Invariant | Owner | Enforced by |
-|---|---|---|---|
-| I30 | Published documentation, README and module help name no command, parameter, build type, discovery location, repository path or linked tree file absent from the manifest or the tree. | Docs check | Code — PR gate. Behavioural claims are **instruction** only, and the gate does not claim otherwise |
+**I-UPD-3 — The deadline is diagnostic, not an authorization.** A lock past its
+recorded deadline changes the message and nothing else. It does not permit the update
+to proceed and does not permit an automatic takeover.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-4 — The pull happens outside the lock.** The target image is obtained before
+the lock is created, so a slow pull never holds the lock.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-5 — The replacement differs from the target in image only.** Every other
+element of the container's configuration is reproduced exactly. Where the daemon
+cannot reproduce an element from inspect output, creation refuses and the update
+refuses; it never proceeds with an approximation.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-6 — Health is never evidence of fidelity.** The result of the health wait is
+never used to decide whether the replacement reproduces the target's configuration.
+Fidelity is decided solely by I-UPD-5's creation refusal.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-7 — The log brackets every change.** The start entry is durably flushed before
+the first change to the target, and the outcome entry is written after the last. A log
+that cannot be written refuses the update before any change.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-8 — The lock outlives the outcome write.** The lock is released only after the
+outcome entry write has been attempted, so no other update starts while the record is
+still open.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-9 — Exactly one prior-image pin per target.** A target container has at most
+one prior-image pin at any time. Creating a new pin replaces the previous one, and the
+pin is removed only when the update reaches a terminal outcome.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-10 — Restore renames, it does not rebuild.** Restoring returns the retained
+prior container to its original name. It never recreates a container from inspect
+output, because that is the operation I-UPD-5 already declares unsafe.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-11 — The update record holds no consumer secret.** No field of an update record
+carries the target container's environment, command or mounts.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-12 — A refusal changes nothing.** Every refusal before the first change to the
+target leaves no residue: no renamed container, no pin, no lock, and no open start
+entry.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-13 — Attribution comes from labels, not from names.** The lock, the pin and the
+prior container carry the target's full name in a label. Their own names carry only a
+truncated hash, which exists to be a valid unique identifier and is never the
+authority for which target they belong to.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-14 — An update restores the image and its container, nothing else.** Volumes,
+data, host configuration and consumer state are never restored.
+Owner: Updater. Enforcement: `[instruction]`.
+
+**I-UPD-15 — Notification never changes the outcome.** A failed or slow notification
+does not change the exit status, and the webhook URL never appears in any output.
+Owner: Updater, Notifications. Enforcement: `[instruction]`.
+
+### Documentation and ownership
+
+**I-DOC-1 — Published documentation names nothing the product lacks.** The
+documentation site, the README and PowerShell help name no path, project, command,
+parameter, build type or discovery location absent from the tree or the manifest.
+Owner: Docs check. Enforcement: `[instruction]`.
+
+**I-DOC-2 — One canonical contract per protected surface.** Each protected surface has
+exactly one canonical contract, and every other document naming that surface names its
+canonical source. `PSModule.requirements.md` is the PowerShell module's.
+Owner: Docs check. Enforcement: `[instruction]`.
+
+**I-SURF-1 — The manifest is derived, never authored.** The candidate manifest is
+generated from declarations in the tree. It is never hand-edited and never committed
+as the baseline.
+Owner: Surface model. Enforcement: `[instruction]`.
 
 ---
 
 ## Types
 
-### Carried by the tree — pointers
+### Release version
 
-| Entity | Declared in | What the declaration cannot say |
-|---|---|---|
-| Build parameters per type | [`Forge/Common/Parameters/ForgeParams.cs`](../Forge/Common/Parameters/ForgeParams.cs), [`DockerParams.cs`](../Forge/Common/Parameters/DockerParams.cs), [`NodeParams.cs`](../Forge/Common/Parameters/NodeParams.cs), [`NodeInDockerParams.cs`](../Forge/Common/Parameters/NodeInDockerParams.cs), [`NotificationParams.cs`](../Forge/Common/Parameters/NotificationParams.cs) | These classes are the **sole source** of the parameter vocabulary. The manifest and the project-file key set are both projected from them (I17), so a property added here becomes public surface on the next release whether or not anyone intended it. A property that must not become public surface does not belong in these classes. `NotificationParams.NotificationsWebHookUrl` is secret-marked: rejected in the project file, redacted in all output (I15). |
-| Build-time paths and generated file names | [`Forge/Common/Entities/BuildConfig.cs`](../Forge/Common/Entities/BuildConfig.cs) | `EnvFile`, `EnvMapFile`, `AppEnvFile` and `AppEnvMapFile` are build **outputs**, not configuration sources. `AppEnvMapFile` generates the built app's environment from resolved configuration and is therefore outside the precedence order entirely. |
-| Build version information | [`Forge/Common/Entities/VersionInfo.cs`](../Forge/Common/Entities/VersionInfo.cs) | This is the build's view of a version and is **not** the release version. It carries no major-ordering constraint and no claim binding. The release version is a distinct type below. |
-| Docker-template discovery order | [`Forge/Common/Services/DockerService.cs`](../Forge/Common/Services/DockerService.cs) | The **order** is a protected surface and a manifest item. The list may be appended to in a minor release and reordered only in a major. On discovery failure every location searched is reported, in order. |
-| PowerShell module surface | [`PSModule.requirements.md`](../PSModule.requirements.md) | Canonical, with one change from 2.0.0: the module's default image reference is the module's **own version**, not `latest` (2026-09-20 decision). This amends `R-CONFIG-002` and is a breaking change the migration guide carries. |
-
-### Scaffolds — no code yet
-
-Written in the project's C# with nullable reference types, matching
-[`VersionInfo.cs`](../Forge/Common/Entities/VersionInfo.cs). Each is replaced by a pointer when its
-slice lands.
+The product version. One value per release (I-REL-1), semantic, without build
+metadata.
 
 ```csharp
-namespace Entities;
+namespace Release;
 
-// Release version. Distinct from VersionInfo.
-public sealed record ReleaseVersion
+public sealed record ReleaseVersion(int Major, int Minor, int Patch, string? PreRelease)
 {
-    public required string Value { get; init; }          // SemVer 2, no leading "v"
-    public required int Major { get; init; }
-    public string TagName => "v" + Value;
+    public static ReleaseVersion Parse(string value);
+    public string ToTagString();      // "v2.0.0"
+    public string ToPackageString();  // "2.0.0"
+}
+```
+
+Semantics a declaration cannot carry: `ToTagString` produces the git tag and the
+GitHub release tag; `ToPackageString` produces the image tag, the tool package version
+and the module manifest version. The two forms differ by the `v` prefix and by nothing
+else, so a change to either is a change to both.
+
+### Release claim
+
+The record that settles whether a version exists (I-REL-5). A GitHub draft release
+bound to a commit SHA.
+
+```csharp
+namespace Release;
+
+public enum ClaimState { Draft, Published }
+
+public enum ReleaseSink
+{
+    ImageVersionedTag = 1,
+    GlobalTool = 2,
+    PowerShellModule = 3,
+    ImageLatestTag = 4,
 }
 
-public enum ClaimState { Claimed, Published }
+public sealed record ReleaseClaim(
+    ReleaseVersion Version,
+    string CommitSha,
+    ClaimState State,
+    string Notes,
+    SurfaceManifest CandidateManifest);
+```
 
-public sealed record ReleaseClaim
+Semantics: the enum's numeric values are the publication order and are load-bearing —
+`ImageLatestTag` is last (I-REL-4). The claim carries no per-sink completion state;
+what that costs, and what a resume may therefore assume, is `## Unresolved` U-6.
+
+### Surface manifest
+
+The mechanical compatibility record, published as a release asset.
+
+```csharp
+namespace Surface;
+
+public enum SurfaceItemKind
 {
-    public required ReleaseVersion Version { get; init; }
-    public required string CommitSha { get; init; }
-    public required ClaimState State { get; init; }
-    public required string ReleaseNotes { get; init; }
-    public required SurfaceManifest Manifest { get; init; }
+    BuildType,
+    BuildParameter,
+    ConfigKey,
+    ConfigSchemaVersion,
+    ToolCommand,
+    ToolParameter,
+    ModuleCommand,
+    ModuleParameter,
+    TemplateLocation,
+    ImageInvocation,
+    ImageMountPoint,
+    ImageEnvironmentInput,
 }
 
-public sealed record SurfaceItem
+public sealed record SurfaceItem(
+    SurfaceItemKind Kind,
+    string Name,
+    string Value,
+    string? DeprecatedSince,
+    string? RemoveIn);
+
+public sealed record SurfaceManifest(
+    int ManifestSchemaVersion,
+    string ProductVersion,
+    IReadOnlyList<SurfaceItem> Items);
+
+public enum SurfaceDifferenceKind
 {
-    public required string Name { get; init; }           // stable identity across releases
-    public required string Value { get; init; }          // comparable; never null — an item
-                                                         // without a value is not in the manifest
-    public string? DeprecatedInVersion { get; init; }    // null means not deprecated
+    ItemAdded,
+    ItemRemoved,
+    ValueChanged,
+    DeprecationAdded,
+    DeprecationRemoved,
+    RemovalTargetChanged,
 }
 
-public sealed record SurfaceManifest
-{
-    public required ReleaseVersion Version { get; init; }
-    public required IReadOnlyList<SurfaceItem> Items { get; init; }
-}
+public sealed record SurfaceDifference(
+    SurfaceDifferenceKind Kind,
+    SurfaceItemKind ItemKind,
+    string Name,
+    string? BaselineValue,
+    string? CandidateValue);
 
-public enum SurfaceDifferenceKind { Added, Removed, ValueChanged, DeprecationAdded, Reordered }
+public sealed record SurfaceComparison(
+    IReadOnlyList<SurfaceDifference> All,
+    IReadOnlyList<SurfaceDifference> Blocking);
+```
 
-public sealed record SurfaceDifference
-{
-    public required string ItemName { get; init; }
-    public required SurfaceDifferenceKind Kind { get; init; }
-    public string? BaselineValue { get; init; }
-    public string? CandidateValue { get; init; }
-}
+Semantics a declaration cannot carry:
+
+- `(Kind, Name)` identifies an item. `Name` is a stable identifier, not a display
+  string; renaming a `Name` is a removal plus an addition, which is how a rename
+  becomes visible to the gate.
+- `Value` is compared as an ordinal string. For a parameter it is the declared type
+  and the declared default joined by `|`; a parameter with no default records the
+  empty default, and acquiring one is therefore a `ValueChanged`. For a
+  `TemplateLocation` it is the location's zero-based position, so reordering discovery
+  is a change.
+- The compatible set — the only differences that pass without a major increase — is
+  `ItemAdded` and `DeprecationAdded`. Everything else is blocking (I-REL-9), including
+  a `SurfaceDifferenceKind` a future reader does not recognise.
+- `DeprecatedSince` and `RemoveIn` are `ToPackageString()` forms. `RemoveIn` is never
+  below the next major.
+
+### Project configuration and precedence
+
+```csharp
+namespace Config;
 
 public enum ConfigurationTier
 {
     InvocationArgument = 1,
     ModuleConfiguration = 2,
     ProcessEnvironment = 3,
-    MapDerivedEnvironment = 4,
-    ProjectFile = 5,
+    MappingFileEnvironment = 4,
+    ProjectConfigurationFile = 5,
     DeclaredDefault = 6,
 }
 
-public sealed record ResolvedValue
-{
-    public required string Key { get; init; }
-    public required string? Value { get; init; }
-    public required ConfigurationTier Source { get; init; }
-    public required bool IsSecret { get; init; }
-}
+public sealed record ResolvedValue(
+    string Key,
+    string? Value,
+    ConfigurationTier Tier,
+    bool IsSecret);
 
-public enum UpdateOutcome
+public sealed record ResolvedConfiguration(
+    IReadOnlyDictionary<string, ResolvedValue> Values)
 {
-    Succeeded, NoOp, UnhealthyRestored, UnhealthyNotRestored, RestoreFailed, Refused,
-}
-
-public sealed record UpdateRecord
-{
-    public required string UpdateId { get; init; }
-    public required string ContainerName { get; init; }
-    public required string ContainerId { get; init; }
-    public required string PriorImageId { get; init; }
-    public required string RequestedImageReference { get; init; }
-    public string? NewImageId { get; init; }
-    public required string PriorContainerName { get; init; }
-    public required int HealthTimeoutSeconds { get; init; }
-    public required bool RestoreEnabled { get; init; }
-    public required DateTimeOffset StartedAt { get; init; }
-    public DateTimeOffset? EndedAt { get; init; }
-    public UpdateOutcome? Outcome { get; init; }
-    // No field for environment, command or mounts. I28 is held by the type, not by a caller
-    // remembering to omit them.
+    public override string ToString();  // secret values redacted (I-CFG-6)
 }
 ```
 
-**The update lock has no code representation of its own** — it is a created-but-never-started
-container at the daemon. Its constraints instead:
+Semantics: the numeric values are the precedence order, lowest wins. Tier 3 above
+tier 4 is what makes I-CFG-7 true. `Value` is null only when a parameter is declared
+nullable; a non-nullable parameter with no value at any tier is a
+`ConfigErrorCode.RequiredValueMissing`, not a null.
 
-- Its name is `buildagent-lock-<h>`, where `<h>` is the lowercase hex of the first 16 bytes of
-  SHA-256 over the **target container's name** in UTF-8. Derivation from the name, not the id, is
-  load-bearing: the id behind that name changes at rename time, inside the section the lock guards.
-- Its image is the target's current image id, which is always present locally. **Taking the lock
-  never pulls.**
-- Its labels carry `dev.buildagent.role=lock`, `.target-name`, `.update-id`, `.owner-machine`,
-  `.owner-process`, `.acquired-at` (ISO 8601), `.deadline` (ISO 8601).
-- `.deadline` is **diagnostic, never an authorization.** It may be read to word a refusal. It may
-  never be compared in order to decide that acting is permitted. Clock skew must be able to change
-  only message text, never whether two processes mutate one container.
+### Container update
+
+```csharp
+namespace Update;
+
+public enum UpdateOutcome
+{
+    Succeeded,
+    AlreadyCurrent,
+    RestoredAfterUnhealthy,
+    UnhealthyNotRestored,
+    RestoreFailed,
+    Refused,
+}
+
+public sealed record UpdateOptions(
+    TimeSpan HealthTimeout,
+    bool RestoreOnFailure);
+
+public sealed record UpdateRecord(
+    int RecordSchemaVersion,
+    Guid UpdateId,
+    string ContainerName,
+    DateTimeOffset StartedAt,
+    string PriorImageId,
+    string TargetImageReference,
+    UpdateOptions Options,
+    DateTimeOffset? CompletedAt,
+    UpdateOutcome? Outcome,
+    string? FailureCode);
+
+public sealed record UpdateLock(
+    Guid UpdateId,
+    string ContainerName,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset Deadline,
+    string OwnerHost,
+    int OwnerProcessId);
+```
+
+Semantics a declaration cannot carry:
+
+- `UpdateRecord` deliberately has no field for the target's environment, command or
+  mounts (I-UPD-11). Adding one is a contract change, not an implementation detail.
+- `CompletedAt` and `Outcome` are null exactly while the record is open. An open
+  record is residue (I-UPD-12) — this is the field pair residue detection reads.
+- `UpdateOptions` is recorded as given, before any defaulting, so a record says what
+  the operator asked for.
+- `Deadline` is written for the operator's benefit only (I-UPD-3).
+- `AlreadyCurrent` is a success, not a refusal: the target already runs the target
+  image and the update takes no lock and writes no record.
+
+### Prior image pin and prior container
+
+These have no type. They are Docker objects, and their contract is their naming and
+labelling:
+
+| Object | Name | Labels |
+| --- | --- | --- |
+| Lock | `buildagent-lock-<h>` | `com.buildagent.role=lock`, `com.buildagent.container=<target>`, `com.buildagent.update-id=<guid>` |
+| Prior container | `buildagent-prior-<h>` | `com.buildagent.role=prior`, `com.buildagent.container=<target>`, `com.buildagent.update-id=<guid>` |
+| Prior image pin | tag `buildagent-prior:<h>` | — |
+
+`<h>` is the first 32 lowercase hex characters of the SHA-256 of the target container
+name in UTF-8. It makes the object name valid and unique; the
+`com.buildagent.container` label is the authority for which target the object belongs
+to (I-UPD-13).
 
 ---
 
 ## Persisted schemas
 
+### Surface manifest asset
+
+A release asset named `surface-manifest.json`, JSON, UTF-8 without BOM, LF endings,
+items sorted by `(Kind, Name)` ordinal so the file is byte-stable for a given surface.
+
+```json
+{
+  "manifestSchemaVersion": 1,
+  "productVersion": "2.0.0",
+  "items": [
+    {
+      "kind": "BuildType",
+      "name": "node-template",
+      "value": "accepted",
+      "deprecatedSince": null,
+      "removeIn": null
+    }
+  ]
+}
+```
+
+Migration: `manifestSchemaVersion` increments when the file's shape changes
+incompatibly. Every version ever published stays readable forever (I-REL-12), because
+baselines are immutable assets. A manifest whose version the reader does not know
+fails the release; it is never treated as an empty baseline.
+
 ### Project configuration file
 
-- **Location:** project root. **Base name:** `buildagent`. **Extensions:** `.yaml`, `.yml`, `.json`.
-- **More than one match is a validation failure** (I12), not a precedence decision, and the error
-  names every file found.
-- **Required key:** `schemaVersion` (string). A file without it, or with a version outside the
-  release's supported set, fails validation.
-- **Remaining keys:** the build parameter vocabulary, camelCase, one key per parameter (I17).
-  Unknown keys fail. Secret-marked keys fail (I15).
-- **Schema version is independent of the product version.** It is bumped only when the file's own
-  shape changes incompatibly. The supported set is itself a manifest item, and adding to it is a
-  compatible difference.
-- **Migration: none, deliberately.** The file is consumer-owned and read-only to the product. The
-  product never rewrites a consumer's file to a newer schema; a consumer migrates by editing,
-  guided by the migration guide. Silent rewriting is forbidden — it would edit a consuming
-  repository, which the brief's non-goals rule out.
+One file at the project root, base name `buildagent`, extension `.yml`, `.yaml` or
+`.json`. Two or more present is `ConfigErrorCode.MultipleConfigurationFiles`
+(I-CFG-1); `.yml` and `.yaml` are two files, not one format with two spellings.
+
+```yaml
+schemaVersion: 1
+buildType: node
+parameters:
+  artifacts-dir: artifacts
+  notifications: false
+```
+
+- `schemaVersion` is a required integer. Its absence is
+  `ConfigErrorCode.SchemaVersionMissing`; a value the reader does not support is
+  `ConfigErrorCode.SchemaVersionUnsupported`. It increments only when the file's own
+  shape changes incompatibly, never when a parameter is added or removed.
+- `buildType` is required and is one of the five (I-BLD-6).
+- Every key under `parameters` corresponds to a build parameter of that build type
+  (I-CFG-2). An unknown key is `ConfigErrorCode.UnknownKey` and is fatal; it is never
+  forwarded.
+- Keys are the kebab-case CLI flag names without the `--` prefix, produced by the
+  conversion the module already applies (`PSModule.requirements.md` R-INVOKE-003). A
+  key has exactly one accepted spelling, and it is the spelling the manifest records.
+- The JSON form is the same document. YAML-only constructs — anchors, multiple
+  documents, non-string keys — are `ConfigErrorCode.MalformedDocument`.
+
+Migration: a project file at a supported older `schemaVersion` is read under that
+version's rules. There is no in-place rewriting and no silent upgrade.
 
 ### Update log
 
-- **Location:** per-user state on the machine running the command.
-  - Linux/macOS: `$XDG_STATE_HOME/docker-buildagent/updates.jsonl`, defaulting to
-    `~/.local/state/docker-buildagent/updates.jsonl`.
-  - Windows: `%LOCALAPPDATA%\docker-buildagent\updates.jsonl`.
-- **Format:** JSON Lines, append-only, one serialised `UpdateRecord` per line.
-- **Write discipline:** the start entry is written **and flushed** before the first change (I24);
-  the outcome entry after the last. A start line with no matching outcome line is the durable
-  evidence of an interruption.
-- **Key:** `UpdateId`. Entries are never rewritten or removed by the product; a start line is
-  resolved by appending its outcome, not by editing it.
-- **Not a lock and not shared state.** It is per-user and per-machine, so another client of the
-  same daemon cannot read it. Residue detection therefore keys on the **lock**, never on this log.
-- **Migration: none.** An unparseable line is skipped with a warning and never blocks an update —
-  the log is evidence, not control flow.
+A per-user append-only file, one JSON object per line, flushed and synced before the
+first change to the target (I-UPD-7).
 
-### Prior image pin
+- Linux and macOS: `${XDG_STATE_HOME:-$HOME/.local/state}/docker-buildagent/updates.jsonl`
+- Windows: `%LOCALAPPDATA%\Docker-BuildAgent\updates.jsonl`
 
-- **Tag:** `buildagent-prior:<h>`, same `<h>` derivation as the lock.
-- Exactly one pin per target container (I25). A successful update replaces it.
-- Its only purpose is to keep the prior image from being pruned once the prior container is gone.
+Each line is an `UpdateRecord`. A start writes the record with `completedAt`,
+`outcome` and `failureCode` null; the terminal write appends a second line with the
+same `updateId` and those fields populated. The later line for an `updateId` wins.
 
-### Prior container
-
-- **Name:** `buildagent-prior-<h>`, same `<h>` derivation.
-- **Labels:** `dev.buildagent.role=prior`, `.target-name`, `.update-id`.
-- It is the original container, stopped and renamed — never a re-creation (I26).
-- It is **residue** when no lock exists for the name it was renamed from, or a lock exists and is
-  past its deadline. That test is sound only because the lock is keyed on the name and so outlives
-  the rename.
+Migration: `recordSchemaVersion` is per record, not per file, so one file mixes
+versions. A record at an unknown version is still read for `updateId`,
+`containerName` and the presence of `outcome`, which is all residue detection needs. A
+line that cannot be parsed at all is treated as an open record for an unknown
+container and refuses every update on that host until an operator clears it — the log
+is evidence that something changed, and an unreadable line is evidence that cannot be
+dismissed.
 
 ---
 
 ## Public surface
 
+### `build <type>` inside the image
+
+Declared at [`scripts/nuke/bin/build`](../scripts/nuke/bin/build) and
+[`scripts/nuke/build.ps1`](../scripts/nuke/build.ps1).
+
+Semantics the declarations cannot carry:
+
+- `-type` is positional and mandatory and never acquires a default. A default would
+  run a build the caller did not name.
+- `-artifactsDir` defaults to `/nuke/forge`, an image-internal path. That default is a
+  manifest item: changing it is a documented-behaviour change on a protected surface.
+- `-nodeTemplateRepositoryUrl` accepts `<url>#<branch>`. The `#` separator is part of
+  the surface.
+- Remaining arguments pass to the underlying build verbatim, in order. The wrapper
+  neither reorders nor de-duplicates them.
+- The wrapper propagates the inner exit status and substitutes `1` only when no status
+  is available (`scripts/nuke/bin/build:11-15`).
+
+Exit statuses — documented behaviour, not manifest items:
+
+| Status | Meaning |
+| --- | --- |
+| 0 | The build succeeded |
+| 2 | Configuration is invalid; nothing was built (I-CFG-3) |
+| 3 | A required discovery target was not found |
+| 4 | An external template could not be fetched |
+| 5 | The Docker daemon was unavailable or rejected the request |
+| 6 | A registry operation failed |
+| 1 | Any other failure |
+
 ### Image invocation
 
-Declared by [`Dockerfile`](../Dockerfile). Protected, and each item below is a manifest item.
+Declared at [`Dockerfile`](../Dockerfile).
 
-- Workdir `/workspace`; the consumer workspace is mounted there.
-- `build <type>` is the build entry. Accepted types, exactly: `docker`, `node`, `node-in-docker`,
-  `node-template`, `forge`. The set is **closed** — the brief's non-goals rule out adding build
-  types.
-- The container's exit status is the build's result, and both launchers return it unchanged.
-- Environment inputs the image reads are manifest items. A newly read variable is an added item
-  (compatible); a variable that stops being read is a removal and needs prior deprecation.
+Semantics the declaration cannot carry:
 
-**Must never:** fall back to another image version, another tag, or a cached layer when the
-requested version cannot be pulled. A launcher reports and exits non-zero instead.
+- The image declares **no `ENTRYPOINT`**. The invocation surface is
+  `docker run <image> build <type> [args]`, resting on `CMD ["pwsh"]` being overridden
+  by the command the caller supplies and on `build` being on `PATH` from
+  `/usr/local/bin/`. The manifest records the effective invocation, not an
+  `ENTRYPOINT` instruction that does not exist.
+- `/workspace` is the mount point and the working directory. It is a manifest item.
+- `EXPOSE 3000` and the `HEALTHCHECK` belong to the documentation server this image
+  can run. They are not the health check the Updater waits on — that is the *target*
+  container's own declared check.
+- The build argument `IMAGE_VERSION` carries the value from I-REL-1; the image never
+  defaults it at release time.
 
-### Config module — scaffold
+### Global tool
 
-```csharp
-namespace Services;
+Greenfield. The tool package identifier and the invoked command name are
+`## Unresolved` U-1; the command surface below is determined regardless of the name.
 
-public interface IConfigurationResolver
-{
-    // Locates, parses and validates the project file, then merges every tier.
-    // Reports EVERY error found, not the first (I13).
-    ResolutionResult Resolve(ResolutionRequest request);
-}
-
-public sealed record ResolutionRequest
-{
-    public required string RootDirectory { get; init; }
-    public required IReadOnlyDictionary<string, string?> InvocationArguments { get; init; }
-    public required IReadOnlyDictionary<string, string?> ModuleConfiguration { get; init; }
-    public required IReadOnlyDictionary<string, string?> ProcessEnvironment { get; init; }
-}
-
-public sealed record ResolutionResult
-{
-    public required IReadOnlyList<ResolvedValue> Values { get; init; }
-    public required IReadOnlyList<ConfigurationError> Errors { get; init; }
-    public bool IsValid => Errors.Count == 0;
-}
+```text
+<tool> build <type> [--<parameter> <value>]...
+<tool> update <container> [--image <reference>] [--health-timeout <duration>]
+                          [--no-restore] [--notify <url>]
+<tool> update --clear-lock <container>
 ```
 
-**Constraints the declaration cannot express:**
+- `build` accepts the same five types and the same parameter names as the in-image
+  command (I-BLD-6). It launches the versioned image matching the tool's own version
+  and never substitutes another (I-BLD-4).
+- `update` defaults `--image` to the target container's image reference resolved
+  afresh against the registry, and `--health-timeout` to 120 seconds.
+- `--no-restore` disables automatic restore; restore is the default.
+- `--clear-lock` is the only operator action that removes a lock it does not own
+  (I-UPD-2). It takes no other action and never touches the target.
 
-- `Resolve` **must not** acquire an overload or a flag that returns on first error. Reporting every
-  error in one pass is I13, and a fail-fast overload would defeat it at every call site that chose
-  it.
-- `ResolutionRequest` **must not** acquire a parameter that changes precedence. Precedence is fixed
-  (I16); a caller that can reorder tiers makes the order a suggestion.
-- The result is in-memory only (I14). No overload writes it, and no `Save`-shaped member may be
-  added.
-- `node-template`'s script flow **calls this module**. It must not reimplement validation — one
-  validation contract is the reason this module exists.
+Exit statuses:
 
-**Resolution order** (highest first; each tier shadows everything below):
+| Status | Outcome |
+| --- | --- |
+| 0 | `Succeeded` or `AlreadyCurrent` |
+| 10 | `RestoredAfterUnhealthy` |
+| 11 | `UnhealthyNotRestored` |
+| 12 | `RestoreFailed` |
+| 20 | Refused — the target is absent or its shape is unsupported |
+| 21 | Refused — a lock is held |
+| 22 | Refused — residue from an earlier update is present |
+| 23 | Refused — the prior image cannot be kept |
+| 24 | Refused — the update log cannot be written |
+| 30 | The target image could not be obtained |
+| 1 | Any other failure |
 
-1. Invocation arguments, including those a launcher passes through on a caller's behalf.
-2. Module configuration (`Set-BuildAgentConfig`).
-3. Process environment, including values `set-environment.ps1` sets.
-4. Map-derived environment — which never overwrites an already-set variable (I18).
-5. Project configuration file.
-6. Declared defaults.
+Every refusal message names the target container, the reason, and the operator action
+that clears it. A lock refusal additionally names the lock's owning host, process and
+age, and says whether the deadline has passed and that the deadline does not authorise
+a takeover (I-UPD-3).
 
-### Surface model — scaffold
+**Verification reaches Linux only.** No Windows host running Docker Desktop with Linux
+containers is available as a runner, and GitHub-hosted Windows runners cannot run Linux
+containers (2026-09-20 decision). Every status above is verified automatically on
+Linux. On Windows only what needs no live daemon — argument translation, Docker host
+resolution, path and mount handling — is covered. Live-daemon update behaviour on a
+Windows host is a stated, unverified gap, and no document may describe it as verified.
 
-```csharp
-namespace Services;
+### PowerShell module
 
-public interface ISurfaceModel
-{
-    SurfaceManifest Derive();
-    SurfaceComparison Compare(SurfaceManifest baseline, SurfaceManifest candidate);
-}
+Canonical contract: [`PSModule.requirements.md`](../PSModule.requirements.md).
+Declared at
+[`scripts/powershell-module/Docker-BuildAgent.psd1`](../scripts/powershell-module/Docker-BuildAgent.psd1)
+and
+[`scripts/powershell-module/Docker-BuildAgent.psm1`](../scripts/powershell-module/Docker-BuildAgent.psm1).
 
-public sealed record SurfaceComparison
-{
-    public required IReadOnlyList<SurfaceDifference> Differences { get; init; }
-    public required IReadOnlyList<SurfaceDifference> Incompatible { get; init; }
-}
-```
+Semantics this document adds:
 
-**The comparison is a whitelist, and this is load-bearing.** `Incompatible` is every difference
-**except** the enumerated compatible set:
+- The exported set — `Set-BuildAgentConfig`, `Invoke-Build`, `BuildAgentConfig` — is a
+  protected surface; each exported name and each parameter is a manifest item.
+- `BuildAgentConfig.Parameters` is precedence tier 2 and `-args` is tier 1; that is
+  R-INVOKE-002 expressed as `ConfigurationTier`.
+- The module's default `DockerImage` is the module's own version, not `latest`
+  (2026-09-20 decision). This amends R-CONFIG-002 and is a breaking change in 2.0.0
+  that the migration guide carries. The reference stays overridable, and an override is
+  used verbatim.
+- The module is tested on Windows PowerShell 5.1 and PowerShell 7, and both are
+  release gates rather than best effort.
 
-- adding an item;
-- marking an existing item deprecated;
-- adding a supported schema version.
+### Docker template discovery
 
-Removal of an item the baseline did not already mark deprecated is incompatible **at any major**.
-Everything else is incompatible unless the major increases.
+Declared at
+[`forge/Docker/Docker.cs`](../forge/Docker/Docker.cs) and
+[`forge/Common/Utilities/Docker.cs`](../forge/Common/Utilities/Docker.cs).
 
-`Compare` **must not** acquire a list of forbidden difference kinds. A blacklist leaves each field
-later added to the manifest unchecked and reports nothing when it does; a whitelist's failure mode
-is a loud false failure a maintainer answers by naming the difference compatible.
+Semantics this document adds: the ordered discovery locations are a protected surface.
+Each location is a `TemplateLocation` manifest item whose `Value` is its position, so
+adding a location at the end is compatible and inserting one anywhere else is not.
+Today's order is the explicit templates directory when it exists as a directory, then
+that same value resolved under the root directory; a Dockerfile is taken from
+`<templates>/Dockerfile.<appType>` when no Dockerfile exists at the configured path.
 
-`Derive` **must not** read a manifest from the tree or accept one as input (I6). Its only inputs
-are the declarations themselves.
+### Build parameters
 
-### Updater — scaffold
+Declared at [`forge/Common/Parameters/`](../forge/Common/Parameters/) —
+`ForgeParams`, `DockerParams`, `NodeParams`, `NodeInDockerParams`.
 
-```csharp
-namespace Services;
-
-public interface IContainerUpdater
-{
-    UpdateResult Update(UpdateRequest request);
-}
-
-public sealed record UpdateRequest
-{
-    public required string ContainerName { get; init; }
-    public required string ImageReference { get; init; }
-    public int HealthTimeoutSeconds { get; init; } = 120;
-    public bool Restore { get; init; } = true;
-}
-
-public sealed record UpdateResult
-{
-    public required UpdateOutcome Outcome { get; init; }
-    public required UpdateExitCode ExitCode { get; init; }
-    public string? UpdateId { get; init; }
-    public UpdateError? Error { get; init; }
-}
-```
-
-- `Restore` **must not** change its default to `false`. Automatic restore as the default is a brief
-  commitment; flipping it turns every unattended failed update into an outage.
-- `HealthTimeoutSeconds` is configurable but has no unbounded or zero setting: a non-positive value
-  is a refusal, not "wait forever".
-- `Update` **must never** remove a lock it did not create (I21), and **must never** re-create a
-  container from inspect output on the restore path (I26).
-
-**Ordered obligations:** the pull precedes the lock (I22); the start entry is flushed before the
-first change (I24); the lock is released only after the outcome entry (I27).
-
-**Configuration shapes that refuse before anything changes.** The design delegates this list here.
-Two distinct refusals, which fail for different reasons and are never merged into one check:
-
-*Cannot be restored exactly* — the target is auto-removed on stop (`HostConfig.AutoRemove`), or is
-managed by an orchestrator (a `com.docker.swarm.*` or `io.kubernetes.*` label, or
-`com.docker.compose.oneoff=True`).
-
-*Cannot be created faithfully from inspect output* — the target has any anonymous volume (a mount
-of type `volume` whose name the daemon generated), any legacy container link (`HostConfig.Links`
-non-empty), more than one network attached at creation time, a network alias or static IP that
-inspect output cannot round-trip, or any runtime option the client's API version does not surface
-on create.
-
-This list is a **floor, not a ceiling**: a shape whose fidelity cannot be established refuses.
-Adding a shape to it is a compatible manifest difference; removing one is not.
-
-### Operator commands — scaffold
-
-Two commands exist solely because nothing is reclaimed automatically (I29). A command has no
-separate declaration to point at, so each states its surface in full.
-
-**Clear a lock.**
-- Reads: the lock container's labels.
-- Writes: removes exactly that lock container.
-- Outputs: the lock's owner machine, process, update id, acquisition time and age.
-- **Must not** touch the target container, the prior container, the pin or the log, and must not
-  run as part of an update — only an operator invokes it.
-
-**Complete a restore from residue.**
-- Reads: the prior container's labels and the update log.
-- Writes: removes the replacement if present, renames the prior container back, starts it, appends
-  an outcome entry.
-- Outputs: the interrupted update's id and the resulting container state.
-- **Must not** run automatically, and **must not** proceed while a live lock for that name exists —
-  a live lock means an owner may still be running.
-
-### Global tool and PowerShell module
-
-Both are launchers. Each translates one host invocation into one image invocation and returns the
-container's exit status unchanged.
-
-- Both pin the image to **their own version** by default (2026-09-20 decision). The reference stays
-  overridable.
-- Neither shares code with Build types. The dependency is on the image's published invocation
-  surface only.
-- Credentials in a Docker host URL are stripped from every message.
-- The module's surface is [`PSModule.requirements.md`](../PSModule.requirements.md). The global tool
-  additionally hosts the update and operator commands above.
+Semantics this document adds: every public property of a `*Params` class is a
+`BuildParameter` manifest item and a configuration key (I-CFG-2), derived by the
+existing extractor (`PSModule.requirements.md` R-EXTRACT-001 to R-EXTRACT-005).
+`RegistryToken`, `RegistryUser` and `NotificationsWebHookUrl` are secret-declared:
+rejected in the project configuration file (I-CFG-5) and redacted in every display
+(I-CFG-6). The classes carry no nullability annotations today; the slice that lands
+Config annotates them, and an annotation that changes a parameter's declared type is a
+`ValueChanged` the gate will see.
 
 ---
 
 ## Error semantics
 
-No bare exceptions and no string errors anywhere in this contract's surface.
+Every module raises exactly one enumerated error type. No bare exception and no string
+error crosses a module boundary. Retryable means an unchanged retry may succeed
+without operator action.
 
-### `ConfigurationError` — Config
+### Config — `ConfigError(ConfigErrorCode Code, string? File, string? Key, string Message)`
 
-```csharp
-public enum ConfigurationErrorKind
-{
-    MultipleFilesPresent, Malformed, SchemaVersionMissing, SchemaVersionUnsupported,
-    UnknownKey, SecretKeyRejected, ValueTypeMismatch, MapEntryUnresolved,
-}
+| Code | Raised when | Retryable | Caller does |
+| --- | --- | --- | --- |
+| `MultipleConfigurationFiles` | More than one `buildagent.*` file is at the project root | No | Report every path found; exit 2 |
+| `FileUnreadable` | The file exists but cannot be opened | Yes | Report the path; exit 2 |
+| `MalformedDocument` | The file is not well-formed, or uses a construct with no JSON equivalent | No | Report the path and position; exit 2 |
+| `SchemaVersionMissing` | `schemaVersion` is absent | No | Report the supported versions; exit 2 |
+| `SchemaVersionUnsupported` | `schemaVersion` is not a supported value | No | Report the supported versions; exit 2 |
+| `UnknownBuildType` | `buildType` is absent or outside the five | No | Report the accepted five; exit 2 |
+| `UnknownKey` | A key under `parameters` has no build parameter | No | Report the key and the nearest known key; exit 2 |
+| `SecretKeyRejected` | A secret-declared parameter appears in the file | No | Report the key and the tiers that may supply it; exit 2 |
+| `ValueTypeMismatch` | A value cannot convert to the parameter's declared type | No | Report key, declared type and the value's shape, never the value (I-BLD-2); exit 2 |
+| `RequiredValueMissing` | A non-nullable parameter has no value at any tier | No | Report the key and the tiers consulted; exit 2 |
 
-public sealed record ConfigurationError
-{
-    public required ConfigurationErrorKind Kind { get; init; }
-    public required string FilePath { get; init; }
-    public string? Key { get; init; }
-    public required string Rule { get; init; }   // the rule broken, as the user sees it
-}
-```
+All Config errors are accumulated and reported in one pass (I-CFG-3).
 
-| Variant | Raised when | Retryable | Caller does |
-|---|---|---|---|
-| `MultipleFilesPresent` | more than one `buildagent.*` file at the root | No | abort; the message names every file found |
-| `Malformed` | the file does not parse | No | abort |
-| `SchemaVersionMissing` | `schemaVersion` absent | No | abort |
-| `SchemaVersionUnsupported` | outside the release's supported set | No | abort; the message names the supported set |
-| `UnknownKey` | a key with no matching build parameter | No | abort |
-| `SecretKeyRejected` | a secret-marked parameter appears in the file | No | abort; **the value is never echoed** |
-| `ValueTypeMismatch` | a value does not match the parameter's declared type | No | abort |
-| `MapEntryUnresolved` | a map-file entry resolves to empty | No | abort; the generated env file is removed |
+### Surface model — `SurfaceError(SurfaceErrorCode Code, string Message)`
 
-All are collected, never thrown one at a time (I13). None is retryable: each is a defect in
-committed input, and a retry reproduces it exactly.
+| Code | Raised when | Retryable | Caller does |
+| --- | --- | --- | --- |
+| `BaselineMissing` | The baseline release has no manifest asset | No | Fail the release; a human decides whether this is the first gated release |
+| `BaselineUnreadable` | The asset cannot be downloaded or parsed | Yes | Fail the release |
+| `ManifestSchemaUnsupported` | A manifest's `manifestSchemaVersion` is unknown to the reader | No | Fail the release (I-REL-12); never treat as empty |
+| `DerivationFailed` | The candidate manifest cannot be derived from the tree | No | Fail the release |
+| `DuplicateItem` | Two items share `(Kind, Name)` | No | Fail the release |
+| `BlockingDifference` | A difference outside the compatible set with no major increase | No | Fail the release, listing every blocking difference (I-REL-9) |
 
-### `ReleaseError` — Release pipeline
+### Release pipeline — `ReleaseError(ReleaseErrorCode Code, ReleaseSink? Sink, string Message)`
 
-| Variant | Raised when | Retryable | Caller does |
-|---|---|---|---|
-| `VersionExists` | a published release, a draft for another SHA, or any sink holds the version without a matching claim | No | fail; the message names **which record** showed it |
-| `MajorRegressed` | the candidate major is below the highest published major | No | fail |
-| `TagPointsElsewhere` | the version tag exists on a different commit | No | fail |
-| `SurfaceGate` | any manifest difference outside the compatible set | No | fail before the claim; list each item, what changed, and the rule it broke |
-| `NotesSectionMissing` | a required section heading is absent | No | fail before the claim |
-| `ManifestItemUnvaluable` | derivation cannot produce a comparable value for an item | No | fail; the item is reported rather than silently dropped (I7) |
-| `SinkPublishFailed` | a sink fails after the claim exists | **Yes — same commit only** | stop, leave the claim a draft. A re-run for the same SHA resumes and skips sinks already holding the version under this claim. A re-run from a different SHA is refused |
+| Code | Raised when | Retryable | Caller does |
+| --- | --- | --- | --- |
+| `VersionAlreadyExists` | A claim, image tag or git tag holds the version | No | Fail before any write (I-REL-5) |
+| `MajorBelowCurrent` | The candidate major is below the highest published | No | Fail before any write |
+| `TagPointsElsewhere` | A git tag for the version exists on another commit | No | Fail; a human resolves it |
+| `NotesSectionMissing` | Notes lack breaking-changes or deprecations | No | Fail before any write (I-REL-7) |
+| `SurfaceGateFailed` | The comparison returned blocking differences | No | Fail before any write |
+| `ClaimCreationFailed` | The draft release cannot be created | Yes | Fail; nothing was written |
+| `SinkPublishFailed` | A sink rejected the write | Yes | Fail naming `Sink`; leave the claim open for a resume |
+| `NotPublishedByCi` | The run is not the CI publishing context | No | Fail (I-REL-14) |
 
-Nothing is deleted on failure. Tags are immutable and published packages cannot be withdrawn
-cleanly, so a partial publish is resumed, never rolled back.
+`SinkPublishFailed` is the only error that leaves state behind. What a resume may
+conclude from an existing sink artifact is `## Unresolved` U-6.
 
-### `UpdateError` — Updater
+### Updater — `UpdateError(UpdateErrorCode Code, string ContainerName, string Message)`
 
-```csharp
-public enum UpdateErrorKind
-{
-    ContainerNotFound, RefuseNotRestorable, RefuseUnfaithfulCreate, LockHeld,
-    ResiduePresent, PullFailed, PinFailed, LogWriteFailed, DockerApiFailed, RestoreFailed,
-}
-```
+| Code | Raised when | Retryable | Caller does |
+| --- | --- | --- | --- |
+| `TargetNotFound` | No container has that name | No | Exit 20 |
+| `TargetAutoRemove` | The target is `--rm` | No | Exit 20; nothing can be preserved |
+| `TargetOrchestratorManaged` | The target carries orchestrator ownership labels | No | Exit 20; the orchestrator owns updates |
+| `TargetShapeUnsupported` | The configuration contains an element that cannot be reproduced | No | Exit 20 naming the element (I-UPD-5) |
+| `ImageUnavailable` | The target image cannot be obtained | Yes | Exit 30; no lock was taken (I-UPD-4) |
+| `LockHeld` | A lock exists for the target | Yes | Exit 21 naming owner, process and age (I-UPD-3) |
+| `ResiduePresent` | A prior container or an open record exists | No | Exit 22 naming the object and the clearing command |
+| `LogUnwritable` | The start entry cannot be flushed | Yes | Exit 24 before any change (I-UPD-7) |
+| `PinFailed` | The prior image cannot be pinned | Yes | Exit 23 before any change |
+| `ReplacementCreateFailed` | The daemon rejected creation | No | Restore, then exit per outcome |
+| `HealthCheckAbsent` | The target declares no health check | No | Treat as unhealthy; restore per `RestoreOnFailure` |
+| `HealthTimedOut` | The check did not pass within the timeout | Yes | Restore per `RestoreOnFailure`; exit 10 or 11 |
+| `ReplacementExited` | The replacement exited before becoming healthy | No | Restore per `RestoreOnFailure`; exit 10 or 11 |
+| `RestoreFailed` | The prior container cannot be returned to its name | No | Exit 12 naming the prior container and its labels |
 
-| Variant | Raised when | Retryable | Caller does |
-|---|---|---|---|
-| `ContainerNotFound` | the name resolves to nothing | No | refuse; nothing changed |
-| `RefuseNotRestorable` | auto-remove or orchestrator-managed | No | refuse; nothing changed |
-| `RefuseUnfaithfulCreate` | a shape listed under *Updater* | No | refuse; nothing changed. This is the **only** guard on I23 |
-| `LockHeld` | a lock exists | No | refuse. Report owner machine, process and age; past the deadline, say it is probably a dead update and name the clear command. **Never take it over** |
-| `ResiduePresent` | a labelled prior container with no live lock, or an outcome-less start entry | No | refuse; report the residue and the interrupted update id |
-| `PullFailed` | auth, rate limit, network, or an unknown reference | **Yes** | end with nothing changed and **no lock taken** — the pull is at step 3 |
-| `PinFailed` | the pin tag operation fails | No | refuse ("the prior image cannot be kept"); nothing changed |
-| `LogWriteFailed` — start entry | the state location is unwritable | No | refuse **and remove the pin just created** |
-| `LogWriteFailed` — outcome entry | the state location is unwritable | No | the outcome still decides the exit status; stderr says the log write failed, and the stranded start entry becomes residue next run |
-| `DockerApiFailed` | the API fails between the stop and the replacement starting | No | take the restore path **even when restore is disabled** — no updated container exists to keep |
-| `RestoreFailed` | remove, rename-back or start fails during restore | No | stop. Write a `RestoreFailed` outcome, release the lock, leave the prior container as residue so the next update refuses rather than acting on broken state |
+`LockHeld` is retryable in the sense that the same invocation may succeed later. It
+never becomes a takeover (I-UPD-2).
 
-**Notification failure is never an error variant.** It warns, leaves the exit status unchanged, and
-never puts the webhook URL in output.
+### Launchers — `LauncherError(LauncherErrorCode Code, string Message)`
 
-### Exit codes — update command
+| Code | Raised when | Retryable | Caller does |
+| --- | --- | --- | --- |
+| `DockerUnavailable` | The daemon cannot be reached | Yes | Exit 5 |
+| `ImageUnavailable` | The configured image cannot be obtained | Yes | Exit 5; never substitute a version (I-BLD-4) |
+| `WorkspaceInvalid` | The workspace path is absent or not a directory | No | Exit 3 |
+| `BuildFailed` | The container exited non-zero | No | Propagate the status unchanged (I-BLD-5) |
 
-```csharp
-public enum UpdateExitCode
-{
-    Success = 0,
-    Refused = 10,
-    UnhealthyRestored = 20,
-    UnhealthyNotRestored = 21,
-    RestoreFailed = 22,
-}
-```
+### Docs check — `DocsCheckError(DocsCheckErrorCode Code, string Document, string Name, string Message)`
 
-Each is a distinct observable outcome, because an operator script must be able to tell "I did
-nothing" from "I changed things and put them back" from "I changed things and could not put them
-back". `1` is reserved for an unexpected internal fault and is never a designed outcome. A no-op
-update — the new image id equals the prior — is `Success` with outcome `NoOp`.
+| Code | Raised when | Retryable | Caller does |
+| --- | --- | --- | --- |
+| `UnknownName` | A document names a path, command, parameter, build type or location the tree and manifest lack | No | Fail the PR check naming document and name (I-DOC-1) |
+| `CanonicalSourceMissing` | A document covering a protected surface names no canonical contract | No | Fail the PR check (I-DOC-2) |
+| `CanonicalSourceConflict` | Two documents claim to be canonical for one surface | No | Fail the PR check |
+
+### Notifications — `NotificationError(NotificationErrorCode Code, string Message)`
+
+| Code | Raised when | Retryable | Caller does |
+| --- | --- | --- | --- |
+| `DeliveryFailed` | The webhook did not accept the payload | Yes | Warn without the URL; do not change the exit status (I-UPD-15) |
+| `NotConfigured` | Notification was requested with no URL | No | Warn; do not change the exit status |
 
 ---
 
 ## Unresolved
 
-1. **The global tool's .NET package id and its invoked command name.** The design fixes the tool's
-   *subcommands* and their semantics, but neither the design nor the brief names the executable,
-   and it becomes a protected surface the moment it first publishes — so guessing it here would
-   mint a compatibility commitment out of nothing. Blocked on `10-design.md` Open question 1
-   (package identity ownership and key custody), an operational prerequisite to the first 2.0.0
-   publish. **No slice that declares the tool's public entry point can be written until this is
-   decided**; slices for the updater's internals are not blocked by it.
+Each entry names what it blocks. No entry here may be resolved by an implementing
+slice inventing an answer.
+
+Ids are permanent. An entry resolved by a decision is struck from this list and never
+reused, so the numbering carries gaps.
+
+**U-1 — The global tool's package identifier and command name.** The design fixes the
+tool's responsibilities and not its identity, and `10-design.md` Open question 1 leaves
+ownership of the .NET tool feed and the PowerShell Gallery, and custody of their
+publishing keys, open.
+*Blocks:* the tool's `ToolCommand` manifest items, its published invocation in every
+document, the CI step that publishes it, and the CI step that publishes the PowerShell
+module to the Gallery.
+
+*U-2, U-3 and U-4 were resolved by the 2026-09-20 decisions and are struck.*
+
+**U-5 — How the `node-template` flow reaches Config across the language boundary.** The
+design requires one validator (I-CFG-8) and does not determine whether PowerShell
+calls Config in-process, through a tool subcommand, or through a JSON-emitting
+invocation. Each is a different public surface.
+*Blocks:* Config's public surface, I-CFG-8's enforcement, and the `node-template`
+slice.
+
+**U-6 — The claim carries no per-sink artifact identity.** Red-team finding F4,
+unadjudicated. Nothing in a claim proves an existing sink artifact was produced by that
+claim, and resume safety depends on exactly that.
+*Blocks:* the resume rule after `SinkPublishFailed`, and the strength of I-REL-3 and
+I-REL-5.
+
+**U-7 — Claim checking and claim creation are not atomic.** Red-team finding F5,
+unadjudicated. The design permits two drafts in the window between the check and the
+creation, so the claim is not by itself a concurrency backstop.
+*Blocks:* I-REL-13's sufficiency, and whether a second backstop is needed.
+
+**U-8 — The global tool hosts the Updater, which depends on Notifications.** Red-team
+finding F6, unadjudicated. The tool is declared to share no Build-types code, yet
+Notifications is declared to live within Build types.
+*Blocks:* the Updater's module boundary and the tool's package references.
+
+**U-9 — `latest` moves before the release is published.** Red-team finding F8,
+unadjudicated. `10-design.md` § Control flow 2 moves `latest` at step 7, before the
+fallible step 8, which contradicts I-REL-4.
+*Blocks:* I-REL-4, and the `ReleaseSink` ordering that encodes it.
+
+**U-10 — The enumerated set of unsupported container shapes.** `10-design.md` states
+the rule and delegates the list here, but the list cannot be written from the design:
+it is whatever the Docker API fails to reproduce from inspect output, which is a
+verified fact about the daemon rather than a design choice. Anonymous volumes and
+legacy container links are in it on the design's own statement; the rest needs a
+round-trip probe per shape.
+*Blocks:* `UpdateErrorCode.TargetShapeUnsupported`'s refusal list and the refusal tests
+the brief requires.
+
+*U-11 was resolved by the 2026-09-20 decision on Windows verification and is struck.
+The gap it names is now stated under § Global tool rather than pending.*
