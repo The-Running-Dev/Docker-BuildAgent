@@ -100,6 +100,20 @@ is why no id does. Ids are never reused, so the numbering may carry gaps.
 | **I46** | **One canonical contract per protected surface.** Each protected surface has exactly one canonical contract, and every other document naming that surface names its canonical source. `PSModule.requirements.md` is the PowerShell module's. | Docs check | `[instruction]` |
 | **I47** | **The manifest is derived, never authored.** The candidate manifest is generated from declarations in the tree. It is never hand-edited and never committed as the baseline. | Surface model | `[instruction]` |
 
+### Generated
+
+This repository has not yet written `Invariant` unit records under `design/state/`
+(`design/state-index.md`), so the table below — a **projected** marked region
+(`AGENTS.shared.md` § *Marked regions*), rendered by `tools/Update-DesignProjection.ps1`
+and overwritten on every regeneration — is empty for that reason, not because none of
+the invariants above are real. It fills in as those records are written; nothing here
+is written by hand.
+
+<!-- invariants:start -->
+| | Statement | Owner | Enforcement | Evidence |
+|---|---|---|---|---|
+<!-- invariants:end -->
+
 ---
 
 ## Types
