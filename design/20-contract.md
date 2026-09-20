@@ -25,93 +25,61 @@ must check, and the slice that lands the owning module makes it `[code]`.
 
 The `Id` column is also the invariant's design-state unit id, and the rows below are
 the invariant unit set per § *Artifacts of a unit kind*. Ids are permanent and
-sequential across every subsection; the subsection heading carries the domain, which
-is why no id does. Ids are never reused, so the numbering may carry gaps.
-
-### Release and versioning
-
-| Id | Invariant | Owner | Enforcement |
-|---|---|---|---|
-| **I1** | **One version, three sinks.** A release stamps exactly one version value into the versioned image tag, the global tool package and the PowerShell module manifest. No sink derives, defaults or increments its own version. | Release pipeline | `[instruction]` |
-| **I2** | **A published versioned image tag is immutable.** From v2.0.0 onward, a versioned tag's content never changes and the tag is never deleted or expired. | Release pipeline | `[instruction]` — the registry does not enforce it, and the design does not rely on the registry to |
-| **I3** | **No sink is written before the claim exists.** Version selection, existence checking, the surface gate and notes validation write nothing. The first write of a release is the claim. | Release pipeline | `[instruction]` |
-| **I4** | **A partial release never moves `latest`.** `latest` moves only after every versioned sink holds the version. **In tension with the step order in `10-design.md` § Control flow 2; see § Unresolved U-9.** | Release pipeline | `[instruction]` |
-| **I5** | **A version that exists is never republished.** Existence is the disjunction of: a claim for that version, a versioned image tag for that version, or a git tag for that version. Any one of the three makes the version taken, including when the operator supplies it manually. | Release pipeline | `[instruction]` |
-| **I6** | **Major never decreases.** A candidate whose major is below the highest published major fails before any write. | Release pipeline | `[instruction]` |
-| **I7** | **Notes carry both required sections.** Every published release's notes contain a breaking-changes section and a deprecations section, present when empty. A release cannot publish without them. | Release pipeline | `[instruction]` |
-| **I8** | **The baseline is what shipped.** The surface gate's baseline is the manifest asset of the highest published release below the candidate. It is never regenerated from source and never read from the working tree. | Release pipeline | `[instruction]` |
-| **I9** | **The gate is a whitelist.** Any manifest difference outside the enumerated compatible set fails the release when the major does not increase. An unrecognised difference kind fails; it does not pass by default. | Surface model | `[instruction]` |
-| **I10** | **The manifest holds only comparable values.** An item whose value cannot be recorded as a stable ordinal string is absent from the manifest, and its compatibility is carried by release notes instead. | Surface model | `[instruction]` |
-| **I11** | **Once recorded, an item leaves only by the removal rule.** An item present in a published manifest and absent from the candidate is a removal, whatever the reason for its absence. Making a surface unrecordable is not an exit from the gate after its first release. | Surface model | `[instruction]` |
-| **I12** | **Every published manifest stays readable.** The manifest reader accepts every `manifestSchemaVersion` ever published, because baselines are immutable release assets and the gate must keep comparing against them for the product's lifespan. | Surface model | `[instruction]` |
-| **I13** | **One publisher at a time.** At most one release-pipeline run publishes at any moment, held by a single CI concurrency group spanning every publishing workflow, queued rather than cancelled. | Release pipeline (CI configuration) | `[instruction]` — no `concurrency:` key exists in `.github/workflows/release.yml` or `.github/workflows/release-tag.yml` today |
-| **I14** | **Only CI publishes.** No sink accepts a write from a developer machine. | Release pipeline | `[instruction]` |
-| **I15** | **A push to `main` writes no version.** It moves `latest` and nothing else. No versioned image tag, tool package or module version is written outside a release (2026-09-20 decision). | Release pipeline | `[instruction]` — the main-push workflow has no path to a versioned sink |
-
-### Configuration
-
-| Id | Invariant | Owner | Enforcement |
-|---|---|---|---|
-| **I16** | **One project configuration file.** A project carries at most one configuration file. Two files differing only in format are an error, reported before anything is built. | Config | `[instruction]` |
-| **I17** | **Keys and parameters are in bijection.** A configuration key exists if and only if a build parameter exists. Adding a parameter adds a key; removing a key requires removing the parameter, under the deprecation rules. | Config | `[instruction]` |
-| **I18** | **Nothing is built on a configuration error.** Every configuration error found in one pass is reported together, and no build step runs. | Config | `[instruction]` |
-| **I19** | **Precedence is total and attributed.** Every resolved value carries the tier it came from. No two tiers tie, and no value has an unknown source. | Config | `[instruction]` |
-| **I20** | **Secrets are not project-file values.** A parameter declared secret is rejected when it appears in the project configuration file. It is supplied by argument, environment variable or mapping file only. | Config | `[instruction]` |
-| **I21** | **Resolved configuration is never persisted.** The resolved set exists for the duration of one invocation. Any display of it redacts secret-declared values. | Config | `[instruction]` |
-| **I22** | **Map-derived environment does not overwrite the process environment.** A value already present in the process environment wins over a value the mapping file produces. | Config, Build types | `[instruction]` — `forge/Common/Base.cs:209` loads the generated file into the process with the library's default overwrite behaviour, which the slice must pin explicitly |
-| **I23** | **One validator.** The `node-template` flow resolves configuration by calling Config. No second validation implementation exists. | Config | `[instruction]` — `scripts/nuke/build.ps1` calls no configuration module today |
-
-### Build and launch
-
-| Id | Invariant | Owner | Enforcement |
-|---|---|---|---|
-| **I24** | **Generated environment files do not outlive the build.** Every environment file the build generates is removed on every exit path, success or failure. | Build types | **partial `[code]`** — `forge/Common/Base.cs:244-250` removes `.build/.build.env` from `OnBuildFinished`, which NUKE runs on both outcomes. The application environment file generated at `forge/Common/Components/INodeComponent.cs:48` into the repository root is **not** removed by any path; closing that is a slice obligation, not an existing property |
-| **I25** | **No secret value reaches output or an image.** No secret-declared value appears on stdout, on stderr, in a log line, or in a layer of an image the product builds. | Build types, PowerShell module | partial `[code]` for the module (`PSModule.requirements.md` R-SEC-001, R-SEC-002); `[instruction]` elsewhere |
-| **I26** | **Deprecation warns, never fails.** Use of a deprecated item emits a warning naming the item, the release that deprecated it and its replacement, and the invocation continues. | Config, Build types | `[instruction]` |
-| **I27** | **A launcher never substitutes an image version.** When the configured image cannot be obtained the launcher fails. It never falls back to another version or to `latest`. | Launchers | `[instruction]` |
-| **I28** | **A launcher does not reinterpret the build's outcome.** The global tool returns the container's exit status unchanged. The PowerShell module surfaces a non-zero status as a terminating error carrying that status (`PSModule.requirements.md` R-INVOKE-005). Neither maps one status onto another. | Launchers | partial `[code]` for the module (`scripts/powershell-module/Docker-BuildAgent.psm1:111`); `[instruction]` for the tool |
-| **I29** | **The accepted build-type set is closed.** Exactly five build types are accepted: `docker`, `node`, `node-in-docker`, `node-template`, `forge`. Every entry point accepts the same five and no entry point defaults the type. | Build types | `[code]` — `scripts/nuke/build.ps1:4` (`ValidateSet`, `Position = 0, Mandatory`) and `PSModule.requirements.md` R-INVOKE-001 realised at `scripts/powershell-module/Docker-BuildAgent.psm1:111` |
-
-### Container update
-
-| Id | Invariant | Owner | Enforcement |
-|---|---|---|---|
-| **I30** | **One update per container at a time.** At most one update of a given target container name is in progress, enforced by a created-but-never-started container whose name derives deterministically from the target's name. | Updater | `[instruction]` |
-| **I31** | **A lock is never taken over automatically.** Only the owning process, or an operator running the explicit lock-clearing command, removes a lock. Age alone never removes one. | Updater | `[instruction]` |
-| **I32** | **The deadline is diagnostic, not an authorization.** A lock past its recorded deadline changes the message and nothing else. It does not permit the update to proceed and does not permit an automatic takeover. | Updater | `[instruction]` |
-| **I33** | **The pull happens outside the lock.** The target image is obtained before the lock is created, so a slow pull never holds the lock. | Updater | `[instruction]` |
-| **I34** | **The replacement differs from the target in image only.** Every other element of the container's configuration is reproduced exactly. Where the daemon cannot reproduce an element from inspect output, creation refuses and the update refuses; it never proceeds with an approximation. | Updater | `[instruction]` |
-| **I35** | **Health is never evidence of fidelity.** The result of the health wait is never used to decide whether the replacement reproduces the target's configuration. Fidelity is decided solely by I34's creation refusal. | Updater | `[instruction]` |
-| **I36** | **The log brackets every change.** The start entry is durably flushed before the first change to the target, and the outcome entry is written after the last. A log that cannot be written refuses the update before any change. | Updater | `[instruction]` |
-| **I37** | **The lock outlives the outcome write.** The lock is released only after the outcome entry write has been attempted, so no other update starts while the record is still open. | Updater | `[instruction]` |
-| **I38** | **Exactly one prior-image pin per target.** A target container has at most one prior-image pin at any time. Creating a new pin replaces the previous one, and the pin is removed only when the update reaches a terminal outcome. | Updater | `[instruction]` |
-| **I39** | **Restore renames, it does not rebuild.** Restoring returns the retained prior container to its original name. It never recreates a container from inspect output, because that is the operation I34 already declares unsafe. | Updater | `[instruction]` |
-| **I40** | **The update record holds no consumer secret.** No field of an update record carries the target container's environment, command or mounts. | Updater | `[instruction]` |
-| **I41** | **A refusal changes nothing.** Every refusal before the first change to the target leaves no residue: no renamed container, no pin, no lock, and no open start entry. | Updater | `[instruction]` |
-| **I42** | **Attribution comes from labels, not from names.** The lock, the pin and the prior container carry the target's full name in a label. Their own names carry only a truncated hash, which exists to be a valid unique identifier and is never the authority for which target they belong to. | Updater | `[instruction]` |
-| **I43** | **An update restores the image and its container, nothing else.** Volumes, data, host configuration and consumer state are never restored. | Updater | `[instruction]` |
-| **I44** | **Notification never changes the outcome.** A failed or slow notification does not change the exit status, and the webhook URL never appears in any output. | Updater, Notifications | `[instruction]` |
-
-### Documentation and ownership
-
-| Id | Invariant | Owner | Enforcement |
-|---|---|---|---|
-| **I45** | **Published documentation names nothing the product lacks.** The documentation site, the README and PowerShell help name no path, project, command, parameter, build type or discovery location absent from the tree or the manifest. | Docs check | `[instruction]` |
-| **I46** | **One canonical contract per protected surface.** Each protected surface has exactly one canonical contract, and every other document naming that surface names its canonical source. `PSModule.requirements.md` is the PowerShell module's. | Docs check | `[instruction]` |
-| **I47** | **The manifest is derived, never authored.** The candidate manifest is generated from declarations in the tree. It is never hand-edited and never committed as the baseline. | Surface model | `[instruction]` |
-
-### Generated
-
-This repository has not yet written `Invariant` unit records under `design/state/`
-(`design/state-index.md`), so the table below — a **projected** marked region
-(`AGENTS.shared.md` § *Marked regions*), rendered by `tools/Update-DesignProjection.ps1`
-and overwritten on every regeneration — is empty for that reason, not because none of
-the invariants above are real. It fills in as those records are written; nothing here
-is written by hand.
+sequential; they are never reused, so the numbering may carry gaps. The table is a
+**projected** marked region (`AGENTS.shared.md` § *Marked regions*), rendered by
+`tools/Update-DesignProjection.ps1` from `design/state/invariants/*.md` and
+overwritten on every regeneration — it is not written by hand.
 
 <!-- invariants:start -->
 | | Statement | Owner | Enforcement | Evidence |
 |---|---|---|---|---|
+| **I1** | **One version, three sinks.** A release stamps exactly one version value into the versioned image tag, the global tool package and the PowerShell module manifest. No sink derives, defaults or increments its own version. Owner: Release pipeline. Enforcement: `[instruction]` | `` | instruction | — |
+| **I2** | **A published versioned image tag is immutable.** From v2.0.0 onward, a versioned tag's content never changes and the tag is never deleted or expired. Owner: Release pipeline. Enforcement: `[instruction]` — the registry does not enforce it, and the design does not rely on the registry to | `` | instruction | — |
+| **I3** | **No sink is written before the claim exists.** Version selection, existence checking, the surface gate and notes validation write nothing. The first write of a release is the claim. Owner: Release pipeline. Enforcement: `[instruction]` | `` | instruction | — |
+| **I4** | **A partial release never moves `latest`.** `latest` moves only after every versioned sink holds the version. **In tension with the step order in `10-design.md` § Control flow 2; see § Unresolved U-9.** Owner: Release pipeline. Enforcement: `[instruction]` | `` | instruction | — |
+| **I5** | **A version that exists is never republished.** Existence is the disjunction of: a claim for that version, a versioned image tag for that version, or a git tag for that version. Any one of the three makes the version taken, including when the operator supplies it manually. Owner: Release pipeline. Enforcement: `[instruction]` | `` | instruction | — |
+| **I6** | **Major never decreases.** A candidate whose major is below the highest published major fails before any write. Owner: Release pipeline. Enforcement: `[instruction]` | `` | instruction | — |
+| **I7** | **Notes carry both required sections.** Every published release's notes contain a breaking-changes section and a deprecations section, present when empty. A release cannot publish without them. Owner: Release pipeline. Enforcement: `[instruction]` | `` | instruction | — |
+| **I8** | **The baseline is what shipped.** The surface gate's baseline is the manifest asset of the highest published release below the candidate. It is never regenerated from source and never read from the working tree. Owner: Release pipeline. Enforcement: `[instruction]` | `` | instruction | — |
+| **I9** | **The gate is a whitelist.** Any manifest difference outside the enumerated compatible set fails the release when the major does not increase. An unrecognised difference kind fails; it does not pass by default. Owner: Surface model. Enforcement: `[instruction]` | `` | instruction | — |
+| **I10** | **The manifest holds only comparable values.** An item whose value cannot be recorded as a stable ordinal string is absent from the manifest, and its compatibility is carried by release notes instead. Owner: Surface model. Enforcement: `[instruction]` | `` | instruction | — |
+| **I11** | **Once recorded, an item leaves only by the removal rule.** An item present in a published manifest and absent from the candidate is a removal, whatever the reason for its absence. Making a surface unrecordable is not an exit from the gate after its first release. Owner: Surface model. Enforcement: `[instruction]` | `` | instruction | — |
+| **I12** | **Every published manifest stays readable.** The manifest reader accepts every `manifestSchemaVersion` ever published, because baselines are immutable release assets and the gate must keep comparing against them for the product's lifespan. Owner: Surface model. Enforcement: `[instruction]` | `` | instruction | — |
+| **I13** | **One publisher at a time.** At most one release-pipeline run publishes at any moment, held by a single CI concurrency group spanning every publishing workflow, queued rather than cancelled. Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — no `concurrency:` key exists in `.github/workflows/release.yml` or `.github/workflows/release-tag.yml` today | `` | instruction | — |
+| **I14** | **Only CI publishes.** No sink accepts a write from a developer machine. Owner: Release pipeline. Enforcement: `[instruction]` | `` | instruction | — |
+| **I15** | **A push to `main` writes no version.** It moves `latest` and nothing else. No versioned image tag, tool package or module version is written outside a release (2026-09-20 decision). Owner: Release pipeline. Enforcement: `[instruction]` — the main-push workflow has no path to a versioned sink | `` | instruction | — |
+| **I16** | **One project configuration file.** A project carries at most one configuration file. Two files differing only in format are an error, reported before anything is built. Owner: Config. Enforcement: `[instruction]` | `` | instruction | — |
+| **I17** | **Keys and parameters are in bijection.** A configuration key exists if and only if a build parameter exists. Adding a parameter adds a key; removing a key requires removing the parameter, under the deprecation rules. Owner: Config. Enforcement: `[instruction]` | `` | instruction | — |
+| **I18** | **Nothing is built on a configuration error.** Every configuration error found in one pass is reported together, and no build step runs. Owner: Config. Enforcement: `[instruction]` | `` | instruction | — |
+| **I19** | **Precedence is total and attributed.** Every resolved value carries the tier it came from. No two tiers tie, and no value has an unknown source. Owner: Config. Enforcement: `[instruction]` | `` | instruction | — |
+| **I20** | **Secrets are not project-file values.** A parameter declared secret is rejected when it appears in the project configuration file. It is supplied by argument, environment variable or mapping file only. Owner: Config. Enforcement: `[instruction]` | `` | instruction | — |
+| **I21** | **Resolved configuration is never persisted.** The resolved set exists for the duration of one invocation. Any display of it redacts secret-declared values. Owner: Config. Enforcement: `[instruction]` | `` | instruction | — |
+| **I22** | **Map-derived environment does not overwrite the process environment.** A value already present in the process environment wins over a value the mapping file produces. Owner: Config, Build types. Enforcement: `[instruction]` — `forge/Common/Base.cs:209` loads the generated file into the process with the library's default overwrite behaviour, which the slice must pin explicitly | `` | instruction | — |
+| **I23** | **One validator.** The `node-template` flow resolves configuration by calling Config. No second validation implementation exists. Owner: Config. Enforcement: `[instruction]` — `scripts/nuke/build.ps1` calls no configuration module today | `` | instruction | — |
+| **I24** | **Generated environment files do not outlive the build.** Every environment file the build generates is removed on every exit path, success or failure. Owner: Build types. Enforcement: **partial `[code]`** — `forge/Common/Base.cs:244-250` removes `.build/.build.env` from `OnBuildFinished`, which NUKE runs on both outcomes. The application environment file generated at `forge/Common/Components/INodeComponent.cs:48` into the repository root is **not** removed by any path; closing that is a slice obligation, not an existing property | `` | instruction | — |
+| **I25** | **No secret value reaches output or an image.** No secret-declared value appears on stdout, on stderr, in a log line, or in a layer of an image the product builds. Owner: Build types, PowerShell module. Enforcement: partial `[code]` for the module (`PSModule.requirements.md` R-SEC-001, R-SEC-002); `[instruction]` elsewhere | `` | instruction | — |
+| **I26** | **Deprecation warns, never fails.** Use of a deprecated item emits a warning naming the item, the release that deprecated it and its replacement, and the invocation continues. Owner: Config, Build types. Enforcement: `[instruction]` | `` | instruction | — |
+| **I27** | **A launcher never substitutes an image version.** When the configured image cannot be obtained the launcher fails. It never falls back to another version or to `latest`. Owner: Launchers. Enforcement: `[instruction]` | `` | instruction | — |
+| **I28** | **A launcher does not reinterpret the build's outcome.** The global tool returns the container's exit status unchanged. The PowerShell module surfaces a non-zero status as a terminating error carrying that status (`PSModule.requirements.md` R-INVOKE-005). Neither maps one status onto another. Owner: Launchers. Enforcement: partial `[code]` for the module (`scripts/powershell-module/Docker-BuildAgent.psm1:111`); `[instruction]` for the tool | `` | instruction | — |
+| **I29** | **The accepted build-type set is closed.** Exactly five build types are accepted: `docker`, `node`, `node-in-docker`, `node-template`, `forge`. Every entry point accepts the same five and no entry point defaults the type. Owner: Build types. Enforcement: `[code]` — `scripts/nuke/build.ps1:4` (`ValidateSet`, `Position = 0, Mandatory`) and `PSModule.requirements.md` R-INVOKE-001 realised at `scripts/powershell-module/Docker-BuildAgent.psm1:111` | `` | code | scripts/nuke/build.ps1, scripts/powershell-module/Docker-BuildAgent.psm1, PSModule.requirements.md |
+| **I30** | **One update per container at a time.** At most one update of a given target container name is in progress, enforced by a created-but-never-started container whose name derives deterministically from the target's name. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I31** | **A lock is never taken over automatically.** Only the owning process, or an operator running the explicit lock-clearing command, removes a lock. Age alone never removes one. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I32** | **The deadline is diagnostic, not an authorization.** A lock past its recorded deadline changes the message and nothing else. It does not permit the update to proceed and does not permit an automatic takeover. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I33** | **The pull happens outside the lock.** The target image is obtained before the lock is created, so a slow pull never holds the lock. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I34** | **The replacement differs from the target in image only.** Every other element of the container's configuration is reproduced exactly. Where the daemon cannot reproduce an element from inspect output, creation refuses and the update refuses; it never proceeds with an approximation. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I35** | **Health is never evidence of fidelity.** The result of the health wait is never used to decide whether the replacement reproduces the target's configuration. Fidelity is decided solely by I34's creation refusal. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I36** | **The log brackets every change.** The start entry is durably flushed before the first change to the target, and the outcome entry is written after the last. A log that cannot be written refuses the update before any change. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I37** | **The lock outlives the outcome write.** The lock is released only after the outcome entry write has been attempted, so no other update starts while the record is still open. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I38** | **Exactly one prior-image pin per target.** A target container has at most one prior-image pin at any time. Creating a new pin replaces the previous one, and the pin is removed only when the update reaches a terminal outcome. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I39** | **Restore renames, it does not rebuild.** Restoring returns the retained prior container to its original name. It never recreates a container from inspect output, because that is the operation I34 already declares unsafe. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I40** | **The update record holds no consumer secret.** No field of an update record carries the target container's environment, command or mounts. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I41** | **A refusal changes nothing.** Every refusal before the first change to the target leaves no residue: no renamed container, no pin, no lock, and no open start entry. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I42** | **Attribution comes from labels, not from names.** The lock, the pin and the prior container carry the target's full name in a label. Their own names carry only a truncated hash, which exists to be a valid unique identifier and is never the authority for which target they belong to. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I43** | **An update restores the image and its container, nothing else.** Volumes, data, host configuration and consumer state are never restored. Owner: Updater. Enforcement: `[instruction]` | `` | instruction | — |
+| **I44** | **Notification never changes the outcome.** A failed or slow notification does not change the exit status, and the webhook URL never appears in any output. Owner: Updater, Notifications. Enforcement: `[instruction]` | `` | instruction | — |
+| **I45** | **Published documentation names nothing the product lacks.** The documentation site, the README and PowerShell help name no path, project, command, parameter, build type or discovery location absent from the tree or the manifest. Owner: Docs check. Enforcement: `[instruction]` | `` | instruction | — |
+| **I46** | **One canonical contract per protected surface.** Each protected surface has exactly one canonical contract, and every other document naming that surface names its canonical source. `PSModule.requirements.md` is the PowerShell module's. Owner: Docs check. Enforcement: `[instruction]` | `` | instruction | — |
+| **I47** | **The manifest is derived, never authored.** The candidate manifest is generated from declarations in the tree. It is never hand-edited and never committed as the baseline. Owner: Surface model. Enforcement: `[instruction]` | `` | instruction | — |
 <!-- invariants:end -->
 
 ---
