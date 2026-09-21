@@ -233,7 +233,7 @@ function Get-AgentProjectionContent {
         $lines.Add("- **Criteria mirrored:** $($criteria -join ', ')")
     }
     $lines.Add('')
-    $lines.Add('Stop conditions and procedure: `.claude/commands/slice.md`. Not restated here.')
+    $lines.Add('Stop conditions and procedure: run `/slice`. Not restated here.')
     ,@($lines)
 }
 

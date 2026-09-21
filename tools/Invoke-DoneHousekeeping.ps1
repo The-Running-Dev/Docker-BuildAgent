@@ -1,7 +1,7 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-    The mechanical half of /done (.claude/commands/done.md): switch to the default branch,
+    The mechanical half of /done: switch to the default branch,
     prune stale remote-tracking refs, and report which local branches are safe to delete.
 
 .DESCRIPTION
