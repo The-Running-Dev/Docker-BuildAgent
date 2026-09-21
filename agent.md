@@ -41,6 +41,14 @@ and preferences belong in `AGENTS.md`.
   silently when a document is restructured. Positional numbering makes this worse: inserting
   a document between existing ones means renumbering everything after it and rewriting every
   link. **Prefer appending.**
+- **A deferral whose stated blocker is later removed is not re-checked by anything.** Two
+  slices left four absorptions undone, each naming the same grammar limit as its sole reason
+  and recording that reason only in a commit message. The issue that removed the limit swept
+  the three cases it had been filed for and closed. The other four sat in place across two
+  further sync runs until a reconciliation pass re-derived both the deferrals and the fact
+  their blocker was gone. **When work is deferred on a named blocker, the change that removes
+  that blocker owes a sweep of everything citing it** — and the citations live in commit
+  messages, which nothing reads.
 
 ## Verification
 
