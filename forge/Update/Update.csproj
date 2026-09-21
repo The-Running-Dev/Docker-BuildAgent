@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace></RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NukeRootDirectory>..</NukeRootDirectory>
+    <NukeScriptDirectory>..</NukeScriptDirectory>
+    <NukeTelemetryVersion>1</NukeTelemetryVersion>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>
