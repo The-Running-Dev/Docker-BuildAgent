@@ -46,7 +46,7 @@ BeforeAll {
             [hashtable] $Scalars = @{},
             [hashtable] $Lists = @{},
             [hashtable] $Prose = @{},
-            [string] $Path = 'design/state/units/command/placeholder.md'
+            [string] $Path = 'design/state/units/script/placeholder.md'
         )
         New-DesignRecord -Id $Id -Kind $Kind -Path $Path -Scalars $Scalars -Lists $Lists -Prose $Prose
     }
@@ -56,10 +56,10 @@ BeforeAll {
     # way and differ only in the one number under test.
     function New-ExactSizeRecord {
         param([Parameter(Mandatory)][string] $Slug, [Parameter(Mandatory)][int] $TotalBytes)
-        $header = "# unit/command/$Slug`nKind: command`n"
+        $header = "# unit/script/$Slug`nKind: script`n"
         $pad = $TotalBytes - [System.Text.Encoding]::UTF8.GetByteCount($header)
         $content = $header + ('z' * $pad)
-        $full = Join-Path $TestDrive "design/state/units/command/$Slug.md"
+        $full = Join-Path $TestDrive "design/state/units/script/$Slug.md"
         New-Item -ItemType Directory -Path (Split-Path $full -Parent) -Force | Out-Null
         [System.IO.File]::WriteAllText($full, $content, [System.Text.UTF8Encoding]::new($false))
         $full
@@ -76,9 +76,8 @@ BeforeAll {
 
 | Kind | Glob | Excluded |
 |---|---|---|
-| command | `.claude/commands/*.md` | `*-local.md` |
 | script | `tools/*.ps1` | `*.Tests.ps1` |
-| document | `design/*.md`, `templates/design/*.md`, `*.md`, `.claude/COMPANIONS.md`, `.github/ISSUE_TEMPLATE/*.md`, `codex/PROFILES.md` | `design/FROZEN.md`, `CLAUDE.md` |
+| document | `design/*.md`, `templates/design/*.md`, `*.md`, `.github/ISSUE_TEMPLATE/*.md`, `codex/PROFILES.md` | `design/FROZEN.md`, `CLAUDE.md` |
 | invariant | not a tree path | — |
 
 ### The divergence classes
@@ -142,47 +141,47 @@ AfterAll {
 Describe 'Test-DesignState: id resolution and record-level classes' {
 
     It 'S5.1: UnresolvedId fires when a list field names an id with no record' -Tag 'Fires','UnresolvedId' {
-        $a = New-Record -Id 'unit/command/a' -Lists @{ Binds = @('I999') }
-        $findings = Test-UnresolvedId -ById @{ 'unit/command/a' = $a } -Records @($a)
+        $a = New-Record -Id 'unit/script/a' -Lists @{ Binds = @('I999') }
+        $findings = Test-UnresolvedId -ById @{ 'unit/script/a' = $a } -Records @($a)
         $findings.Count | Should -Be 1
         $findings[0].Class | Should -Be 'UnresolvedId'
-        $findings[0].Subject | Should -Be 'unit/command/a'
+        $findings[0].Subject | Should -Be 'unit/script/a'
     }
 
     It 'UnresolvedId does not fire for a retired id a live record names (still resolvable)' -Tag 'NearMiss','UnresolvedId' {
-        $a = New-Record -Id 'unit/command/a' -Lists @{ Live = @('decision/x') }
+        $a = New-Record -Id 'unit/script/a' -Lists @{ Live = @('decision/x') }
         $d = New-Record -Id 'decision/x' -Kind 'Decision' -Scalars @{ Status = 'retired' }
-        $findings = Test-UnresolvedId -ById @{ 'unit/command/a' = $a; 'decision/x' = $d } -Records @($a, $d)
+        $findings = Test-UnresolvedId -ById @{ 'unit/script/a' = $a; 'decision/x' = $d } -Records @($a, $d)
         $findings.Count | Should -Be 0
     }
 
     It 'UnresolvedId does not check Work or Evidence - they are not design-state ids' -Tag 'NearMiss','UnresolvedId' {
-        $a = New-Record -Id 'unit/command/a' -Lists @{ Work = @('42'); Evidence = @('tools/x.ps1') }
-        $findings = Test-UnresolvedId -ById @{ 'unit/command/a' = $a } -Records @($a)
+        $a = New-Record -Id 'unit/script/a' -Lists @{ Work = @('42'); Evidence = @('tools/x.ps1') }
+        $findings = Test-UnresolvedId -ById @{ 'unit/script/a' = $a } -Records @($a)
         $findings.Count | Should -Be 0
     }
 
     It 'S5.1: UnresolvedId also checks scalar id fields (Owner, SupersededBy, AnsweredBy)' -Tag 'Fires','UnresolvedId' {
-        $c = New-Record -Id 'contract/x' -Kind 'Contract' -Scalars @{ Owner = 'unit/command/nobody' }
+        $c = New-Record -Id 'contract/x' -Kind 'Contract' -Scalars @{ Owner = 'unit/script/nobody' }
         $findings = Test-UnresolvedId -ById @{ 'contract/x' = $c } -Records @($c)
         $findings.Count | Should -Be 1
         $findings[0].Detail | Should -Match 'Owner'
     }
 
     It 'S5.1/module boundaries: AnchorMissing fires only for an active Unit whose Anchor is not in the tree' -Tag 'Fires','AnchorMissing' {
-        $active = New-Record -Id 'unit/command/a' -Scalars @{ Status = 'active'; Kind = 'command'; Anchor = '.claude/commands/nope.md' }
-        $retired = New-Record -Id 'unit/command/b' -Scalars @{ Status = 'retired'; Kind = 'command'; Anchor = '.claude/commands/also-nope.md' }
+        $active = New-Record -Id 'unit/script/a' -Scalars @{ Status = 'active'; Kind = 'script'; Anchor = 'tools/Nope.ps1' }
+        $retired = New-Record -Id 'unit/script/b' -Scalars @{ Status = 'retired'; Kind = 'script'; Anchor = 'tools/AlsoNope.ps1' }
         $invariant = New-Record -Id 'I1' -Kind 'Invariant' -Scalars @{ Status = 'active'; Anchor = 'I1'; Kind = 'invariant' }
 
         $findings = Test-AnchorMissing -Records @($active, $retired, $invariant) -RepoPath $TestDrive
 
         $findings.Count | Should -Be 1
-        $findings[0].Subject | Should -Be 'unit/command/a'
+        $findings[0].Subject | Should -Be 'unit/script/a'
     }
 
     It 'AnchorMissing does not fire when the anchor exists' -Tag 'NearMiss','AnchorMissing' {
-        New-TreeFile -RelativePath '.claude/commands/real.md' -Content 'hi'
-        $active = New-Record -Id 'unit/command/a' -Scalars @{ Status = 'active'; Kind = 'command'; Anchor = '.claude/commands/real.md' }
+        New-TreeFile -RelativePath 'tools/Real.ps1' -Content 'hi'
+        $active = New-Record -Id 'unit/script/a' -Scalars @{ Status = 'active'; Kind = 'script'; Anchor = 'tools/Real.ps1' }
         $findings = Test-AnchorMissing -Records @($active) -RepoPath $TestDrive
         $findings.Count | Should -Be 0
     }
@@ -197,7 +196,7 @@ Describe 'Test-DesignState: id resolution and record-level classes' {
 
     It 'AnchorMissing does not fire for a Contract Declaration of the literal prose, or one that resolves' -Tag 'NearMiss','AnchorMissing' {
         New-TreeFile -RelativePath 'tools/Present.ps1' -Content 'x'
-        $prose = New-Record -Id 'contract/p' -Kind 'Contract' -Scalars @{ Status = 'active'; Owner = 'unit/command/a'; Declaration = 'prose' }
+        $prose = New-Record -Id 'contract/p' -Kind 'Contract' -Scalars @{ Status = 'active'; Owner = 'unit/script/a'; Declaration = 'prose' }
         $real = New-Record -Id 'contract/r' -Kind 'Contract' -Scalars @{ Status = 'active'; Owner = 'unit/script/a'; Declaration = 'tools/Present.ps1' }
         $retired = New-Record -Id 'contract/g' -Kind 'Contract' -Scalars @{ Status = 'retired'; Owner = 'unit/script/a'; Declaration = 'tools/Gone.ps1' }
         $findings = Test-AnchorMissing -Records @($prose, $real, $retired) -RepoPath $TestDrive
@@ -205,46 +204,46 @@ Describe 'Test-DesignState: id resolution and record-level classes' {
     }
 
     It 'AnchorMissing fires for an Evidence entry that is not in the tree, on a Unit and on an Invariant' -Tag 'Fires','AnchorMissing' {
-        New-TreeFile -RelativePath '.claude/commands/anchored.md' -Content 'x'
-        $unit = New-Record -Id 'unit/command/e' -Scalars @{ Status = 'active'; Kind = 'command'; Anchor = '.claude/commands/anchored.md' } -Lists @{ Evidence = @('tools/Nothing.Tests.ps1') }
+        New-TreeFile -RelativePath 'tools/Anchored.ps1' -Content 'x'
+        $unit = New-Record -Id 'unit/script/e' -Scalars @{ Status = 'active'; Kind = 'script'; Anchor = 'tools/Anchored.ps1' } -Lists @{ Evidence = @('tools/Nothing.Tests.ps1') }
         $inv = New-Record -Id 'I2' -Kind 'Invariant' -Scalars @{ Status = 'active'; Anchor = 'I2'; Kind = 'invariant'; Enforcement = 'code' } -Lists @{ Evidence = @('tools/AlsoNothing.Tests.ps1') }
 
         $findings = Test-AnchorMissing -Records @($unit, $inv) -RepoPath $TestDrive
 
         $findings.Count | Should -Be 2
-        @($findings | ForEach-Object { $_.Subject }) | Should -Contain 'unit/command/e'
+        @($findings | ForEach-Object { $_.Subject }) | Should -Contain 'unit/script/e'
         @($findings | ForEach-Object { $_.Subject }) | Should -Contain 'I2'
         @($findings | ForEach-Object { $_.Detail }) | Should -Not -Contain $null
         $findings[0].Detail | Should -Match 'Evidence'
     }
 
     It 'AnchorMissing does not fire for an Evidence entry that resolves, or an empty Evidence list' -Tag 'NearMiss','AnchorMissing' {
-        New-TreeFile -RelativePath '.claude/commands/anchored2.md' -Content 'x'
+        New-TreeFile -RelativePath 'tools/Anchored2.ps1' -Content 'x'
         New-TreeFile -RelativePath 'tools/Something.Tests.ps1' -Content 'x'
-        $withEvidence = New-Record -Id 'unit/command/f' -Scalars @{ Status = 'active'; Kind = 'command'; Anchor = '.claude/commands/anchored2.md' } -Lists @{ Evidence = @('tools/Something.Tests.ps1') }
-        $empty = New-Record -Id 'unit/command/g' -Scalars @{ Status = 'active'; Kind = 'command'; Anchor = '.claude/commands/anchored2.md' } -Lists @{ Evidence = @() }
+        $withEvidence = New-Record -Id 'unit/script/f' -Scalars @{ Status = 'active'; Kind = 'script'; Anchor = 'tools/Anchored2.ps1' } -Lists @{ Evidence = @('tools/Something.Tests.ps1') }
+        $empty = New-Record -Id 'unit/script/g' -Scalars @{ Status = 'active'; Kind = 'script'; Anchor = 'tools/Anchored2.ps1' } -Lists @{ Evidence = @() }
         $findings = Test-AnchorMissing -Records @($withEvidence, $empty) -RepoPath $TestDrive
         $findings.Count | Should -Be 0
     }
 
     It 'S5.1: OwnerMismatch fires when nobody exposes the contract' -Tag 'Fires','OwnerMismatch' {
-        $c = New-Record -Id 'contract/x' -Kind 'Contract' -Scalars @{ Owner = 'unit/command/a'; Status = 'active' }
+        $c = New-Record -Id 'contract/x' -Kind 'Contract' -Scalars @{ Owner = 'unit/script/a'; Status = 'active' }
         $findings = Test-OwnerMismatch -Records @($c)
         $findings.Count | Should -Be 1
         $findings[0].Detail | Should -Match 'nobody'
     }
 
     It 'OwnerMismatch fires when two units expose the same contract' -Tag 'Fires','OwnerMismatch' {
-        $c = New-Record -Id 'contract/x' -Kind 'Contract' -Scalars @{ Owner = 'unit/command/a'; Status = 'active' }
-        $a = New-Record -Id 'unit/command/a' -Scalars @{ Status = 'active' } -Lists @{ Exposes = @('contract/x') }
-        $b = New-Record -Id 'unit/command/b' -Scalars @{ Status = 'active' } -Lists @{ Exposes = @('contract/x') }
+        $c = New-Record -Id 'contract/x' -Kind 'Contract' -Scalars @{ Owner = 'unit/script/a'; Status = 'active' }
+        $a = New-Record -Id 'unit/script/a' -Scalars @{ Status = 'active' } -Lists @{ Exposes = @('contract/x') }
+        $b = New-Record -Id 'unit/script/b' -Scalars @{ Status = 'active' } -Lists @{ Exposes = @('contract/x') }
         $findings = Test-OwnerMismatch -Records @($c, $a, $b)
         $findings.Count | Should -Be 1
     }
 
     It 'OwnerMismatch does not fire for the unique active exposer matching Owner' -Tag 'NearMiss','OwnerMismatch' {
-        $c = New-Record -Id 'contract/x' -Kind 'Contract' -Scalars @{ Owner = 'unit/command/a'; Status = 'active' }
-        $a = New-Record -Id 'unit/command/a' -Scalars @{ Status = 'active' } -Lists @{ Exposes = @('contract/x') }
+        $c = New-Record -Id 'contract/x' -Kind 'Contract' -Scalars @{ Owner = 'unit/script/a'; Status = 'active' }
+        $a = New-Record -Id 'unit/script/a' -Scalars @{ Status = 'active' } -Lists @{ Exposes = @('contract/x') }
         $findings = Test-OwnerMismatch -Records @($c, $a)
         $findings.Count | Should -Be 0
     }
@@ -292,25 +291,25 @@ Describe 'Test-DesignState: id resolution and record-level classes' {
 Describe 'Test-DesignState: IdCollision' {
 
     It 'S5.1: fires when two records claim the same id' -Tag 'Fires','IdCollision' {
-        # a-again.md's own path implies id 'unit/command/a-again', which also disagrees with
+        # a-again.md's own path implies id 'unit/script/a-again', which also disagrees with
         # the record's declared id - that is a second, independent IdCollision (a record whose
-        # id disagrees with its file path), so both records claiming 'unit/command/a' produce
+        # id disagrees with its file path), so both records claiming 'unit/script/a' produce
         # two findings here, not one.
-        $a = New-Record -Id 'unit/command/a' -Path 'design/state/units/command/a.md'
-        $b = New-Record -Id 'unit/command/a' -Path 'design/state/units/command/a-again.md'
+        $a = New-Record -Id 'unit/script/a' -Path 'design/state/units/script/a.md'
+        $b = New-Record -Id 'unit/script/a' -Path 'design/state/units/script/a-again.md'
         $findings = Test-RecordIdCollision -Records @($a, $b)
         (@($findings | Where-Object { $_.Detail -match 'claimed by more than one file' })).Count | Should -Be 1
     }
 
     It 'S4.7: fires when a record''s own id disagrees with the id its file path implies' -Tag 'Fires','IdCollision' {
-        $a = New-Record -Id 'unit/command/wrong' -Path 'design/state/units/command/right.md'
+        $a = New-Record -Id 'unit/script/wrong' -Path 'design/state/units/script/right.md'
         $findings = Test-RecordIdCollision -Records @($a)
         $findings.Count | Should -Be 1
         $findings[0].Detail | Should -Match 'right'
     }
 
     It 'does not fire when a single record''s id agrees with its path' -Tag 'NearMiss','IdCollision' {
-        $a = New-Record -Id 'unit/command/right' -Path 'design/state/units/command/right.md'
+        $a = New-Record -Id 'unit/script/right' -Path 'design/state/units/script/right.md'
         $findings = Test-RecordIdCollision -Records @($a)
         $findings.Count | Should -Be 0
     }
@@ -338,7 +337,7 @@ Describe 'Test-DesignState: IdCollision' {
 Describe 'Test-DesignState: marked regions (RegionMalformed)' {
 
     It 'balanced projected and declared regions raise nothing' -Tag 'NearMiss','RegionMalformed' {
-        New-TreeFile -RelativePath '.claude/commands/ok.md' -Content @'
+        New-TreeFile -RelativePath 'design/ok.md' -Content @'
 before
 <!-- companion:start -->
 body
@@ -348,29 +347,29 @@ hand-written
 <!-- extra:declared:end -->
 after
 '@
-        $result = Get-MarkedRegions -RepoPath $TestDrive -Files @('.claude/commands/ok.md')
+        $result = Get-MarkedRegions -RepoPath $TestDrive -Files @('design/ok.md')
         $result.Findings.Count | Should -Be 0
         $result.Inventory.Count | Should -Be 2
     }
 
     It 'S5.1: an unterminated region is RegionMalformed' -Tag 'Fires','RegionMalformed' {
-        New-TreeFile -RelativePath '.claude/commands/unterminated.md' -Content @'
+        New-TreeFile -RelativePath 'design/unterminated.md' -Content @'
 <!-- companion:start -->
 never closed
 '@
-        $result = Get-MarkedRegions -RepoPath $TestDrive -Files @('.claude/commands/unterminated.md')
+        $result = Get-MarkedRegions -RepoPath $TestDrive -Files @('design/unterminated.md')
         $result.Findings.Count | Should -Be 1
         $result.Findings[0].Class | Should -Be 'RegionMalformed'
     }
 
     It 'S5.1: a nested region of the same id is RegionMalformed' -Tag 'Fires','RegionMalformed' {
-        New-TreeFile -RelativePath '.claude/commands/nested.md' -Content @'
+        New-TreeFile -RelativePath 'design/nested.md' -Content @'
 <!-- x:start -->
 <!-- x:start -->
 <!-- x:end -->
 <!-- x:end -->
 '@
-        $result = Get-MarkedRegions -RepoPath $TestDrive -Files @('.claude/commands/nested.md')
+        $result = Get-MarkedRegions -RepoPath $TestDrive -Files @('design/nested.md')
         $result.Findings.Count | Should -BeGreaterThan 0
     }
 
@@ -384,11 +383,11 @@ This paragraph mentions `<!-- agent:start -->` as an example of the syntax, inli
     }
 
     It 'a mismatched closing marker is RegionMalformed' -Tag 'Fires','RegionMalformed' {
-        New-TreeFile -RelativePath '.claude/commands/mismatch.md' -Content @'
+        New-TreeFile -RelativePath 'design/mismatch.md' -Content @'
 <!-- a:start -->
 <!-- b:end -->
 '@
-        $result = Get-MarkedRegions -RepoPath $TestDrive -Files @('.claude/commands/mismatch.md')
+        $result = Get-MarkedRegions -RepoPath $TestDrive -Files @('design/mismatch.md')
         $result.Findings.Count | Should -BeGreaterThan 0
     }
 }
@@ -443,29 +442,29 @@ Describe 'Test-DesignState: DecisionAnchorAmbiguous and LogEntryUnrecorded' {
 
 Describe 'Test-DesignState: UnrecordedArtifact' {
 
-    It 'fires for a command-glob file with no active unit record naming it as Anchor' -Tag 'Fires','UnrecordedArtifact' {
-        New-TreeFile -RelativePath '.claude/commands/lonely.md' -Content 'x'
+    It 'fires for a script-glob file with no active unit record naming it as Anchor' -Tag 'Fires','UnrecordedArtifact' {
+        New-TreeFile -RelativePath 'tools/Lonely.ps1' -Content 'x'
         $findings = Test-UnrecordedArtifact -Records @() -RepoPath $TestDrive
-        (@($findings | Where-Object { $_.Subject -eq '.claude/commands/lonely.md' })).Count | Should -Be 1
+        (@($findings | Where-Object { $_.Subject -eq 'tools/Lonely.ps1' })).Count | Should -Be 1
     }
 
-    It 'excludes a *-local.md companion file from the command glob' -Tag 'NearMiss','UnrecordedArtifact' {
-        New-TreeFile -RelativePath '.claude/commands/foo-local.md' -Content 'x'
+    It 'excludes a *.Tests.ps1 companion file from the script glob' -Tag 'NearMiss','UnrecordedArtifact' {
+        New-TreeFile -RelativePath 'tools/Foo.Tests.ps1' -Content 'x'
         $findings = Test-UnrecordedArtifact -Records @() -RepoPath $TestDrive
-        (@($findings | Where-Object { $_.Subject -eq '.claude/commands/foo-local.md' })).Count | Should -Be 0
+        (@($findings | Where-Object { $_.Subject -eq 'tools/Foo.Tests.ps1' })).Count | Should -Be 0
     }
 
     It 'does not fire when an active unit record names the artifact as its Anchor' -Tag 'NearMiss','UnrecordedArtifact' {
-        New-TreeFile -RelativePath '.claude/commands/known.md' -Content 'x'
-        $unit = New-Record -Id 'unit/command/known' -Scalars @{ Status = 'active'; Kind = 'command'; Anchor = '.claude/commands/known.md' }
+        New-TreeFile -RelativePath 'tools/Known.ps1' -Content 'x'
+        $unit = New-Record -Id 'unit/script/known' -Scalars @{ Status = 'active'; Kind = 'script'; Anchor = 'tools/Known.ps1' }
         $findings = Test-UnrecordedArtifact -Records @($unit) -RepoPath $TestDrive
-        (@($findings | Where-Object { $_.Subject -eq '.claude/commands/known.md' })).Count | Should -Be 0
+        (@($findings | Where-Object { $_.Subject -eq 'tools/Known.ps1' })).Count | Should -Be 0
     }
 
     It 'reverse direction: fires when an active unit record''s Anchor is not matched by its kind''s glob' -Tag 'Fires','UnrecordedArtifact' {
-        $unit = New-Record -Id 'unit/command/ghost' -Scalars @{ Status = 'active'; Kind = 'command'; Anchor = '.claude/commands/does-not-exist.md' }
+        $unit = New-Record -Id 'unit/script/ghost' -Scalars @{ Status = 'active'; Kind = 'script'; Anchor = 'tools/DoesNotExist.ps1' }
         $findings = Test-UnrecordedArtifact -Records @($unit) -RepoPath $TestDrive
-        (@($findings | Where-Object { $_.Subject -eq 'unit/command/ghost' })).Count | Should -Be 1
+        (@($findings | Where-Object { $_.Subject -eq 'unit/script/ghost' })).Count | Should -Be 1
     }
 
     It 'invariant kind: fires for a contract row with no record, and for a record that is no row' -Tag 'Fires','UnrecordedArtifact' {
@@ -541,9 +540,9 @@ Describe 'Test-DesignState: Get-ContractInvariantIds' {
 Describe 'Test-DesignState: the budget meter (S5.5, S5.7)' {
 
     It 'S5.5: closure excludes Archival and excludes any named record whose Status is retired' {
-        New-StateFile -RelativePath 'units/command/root.md' -Content @'
-# unit/command/root
-Kind: command
+        New-StateFile -RelativePath 'units/script/root.md' -Content @'
+# unit/script/root
+Kind: script
 Status: active
 Live: decision/live-one
 Archival: decision/archival-one
@@ -565,21 +564,21 @@ Status: retired
         $graph = Read-DesignStateGraph -Path $TestDrive
         $byId = @{}
         foreach ($r in $graph.Records) { $byId[$r.Id] = $r }
-        $root = $byId['unit/command/root']
+        $root = $byId['unit/script/root']
 
         $members = Get-DesignClosure -Root $root -ById $byId
         $ids = @($members | ForEach-Object { $_.Id })
 
-        $ids | Should -Contain 'unit/command/root'
+        $ids | Should -Contain 'unit/script/root'
         $ids | Should -Contain 'decision/live-one'
         $ids | Should -Not -Contain 'decision/archival-one'
         $ids | Should -Not -Contain 'I1'
     }
 
     It 'S5.5: a live record naming a retired one raises no UnresolvedId finding' {
-        New-StateFile -RelativePath 'units/command/root.md' -Content @'
-# unit/command/root
-Kind: command
+        New-StateFile -RelativePath 'units/script/root.md' -Content @'
+# unit/script/root
+Kind: script
 Live: decision/retired-one
 '@
         New-StateFile -RelativePath 'decisions/retired-one.md' -Content @'
@@ -602,7 +601,7 @@ Status: retired
         foreach ($r in $graph.Records) { $byId[$r.Id] = $r }
 
         $result = Test-ClosureBudget -Records $graph.Records -ById $byId -RepoPath $TestDrive
-        (@($result.Findings | Where-Object { $_.Subject -eq 'unit/command/big-over' })).Count | Should -Be 1
+        (@($result.Findings | Where-Object { $_.Subject -eq 'unit/script/big-over' })).Count | Should -Be 1
     }
 
     It 'S5.7: ClosureOverBudget does not fire at exactly 16,384 bytes - the ceiling is inclusive' -Tag 'NearMiss','ClosureOverBudget' {
@@ -614,13 +613,13 @@ Status: retired
         foreach ($r in $graph.Records) { $byId[$r.Id] = $r }
 
         $result = Test-ClosureBudget -Records $graph.Records -ById $byId -RepoPath $TestDrive
-        (@($result.Findings | Where-Object { $_.Subject -eq 'unit/command/big-under' })).Count | Should -Be 0
+        (@($result.Findings | Where-Object { $_.Subject -eq 'unit/script/big-under' })).Count | Should -Be 0
     }
 
     It 'S5.6: names the largest closure, its unit, and its largest contributor' {
-        New-StateFile -RelativePath 'units/command/small.md' -Content @'
-# unit/command/small
-Kind: command
+        New-StateFile -RelativePath 'units/script/small.md' -Content @'
+# unit/script/small
+Kind: script
 '@
         $graph = Read-DesignStateGraph -Path $TestDrive
         $byId = @{}
@@ -672,12 +671,11 @@ Describe 'Test-DesignState: GlobDisagreement (#74)' {
         # every case below varies only the contract table against a tree that does not move.
         $script:GlobRoot = Join-Path $TestDrive 'globfixture'
         foreach ($rel in @(
-            '.claude/commands/alpha.md', '.claude/commands/beta-local.md',
             'tools/Thing.ps1', 'tools/Thing.Tests.ps1',
             'design/10-design.md', 'design/FROZEN.md',
             'templates/design/00-brief.md', 'templates/design/CLAUDE.md',
             'README.md', 'CLAUDE.md',
-            '.claude/COMPANIONS.md', '.github/ISSUE_TEMPLATE/bug.md', 'codex/PROFILES.md'
+            '.github/ISSUE_TEMPLATE/bug.md', 'codex/PROFILES.md'
         )) {
             $full = Join-Path $script:GlobRoot $rel
             New-Item -ItemType Directory -Path (Split-Path $full -Parent) -Force | Out-Null
@@ -688,9 +686,8 @@ Describe 'Test-DesignState: GlobDisagreement (#74)' {
         $script:GlobTable = @'
 | Kind | Glob | Excluded |
 |---|---|---|
-| command | `.claude/commands/*.md` | `*-local.md` |
 | script | `tools/*.ps1` | `*.Tests.ps1` |
-| document | `design/*.md`, `templates/design/*.md`, `*.md`, `.claude/COMPANIONS.md`, `.github/ISSUE_TEMPLATE/*.md`, `codex/PROFILES.md` | `design/FROZEN.md`, `CLAUDE.md` |
+| document | `design/*.md`, `templates/design/*.md`, `*.md`, `.github/ISSUE_TEMPLATE/*.md`, `codex/PROFILES.md` | `design/FROZEN.md`, `CLAUDE.md` |
 | invariant | not a tree path | — |
 
 trailing prose
@@ -713,13 +710,13 @@ trailing prose
     }
 
     It 'fires when the contract drops an exclusion the checker still applies' -Tag 'Fires','GlobDisagreement' {
-        $table = $script:GlobTable -replace '\| `\*-local\.md` \|', '| — |'
-        $path = New-GlobContract -Name 'no-local-exclusion' -Table $table
+        $table = $script:GlobTable -replace '\| `\*\.Tests\.ps1` \|', '| — |'
+        $path = New-GlobContract -Name 'no-tests-exclusion' -Table $table
         $result = Test-GlobDisagreement -RepoPath $script:GlobRoot -ContractPath $path
         $result.Findings.Class | Should -Contain 'GlobDisagreement'
-        $finding = @($result.Findings | Where-Object { $_.Subject -eq 'command' })[0]
+        $finding = @($result.Findings | Where-Object { $_.Subject -eq 'script' })[0]
         $finding.Detail | Should -Match 'the contract''s patterns reach'
-        $finding.Detail | Should -Match 'beta-local\.md'
+        $finding.Detail | Should -Match 'Thing\.Tests\.ps1'
         $finding.Blocking | Should -BeTrue
     }
 
@@ -987,9 +984,9 @@ Describe 'Test-DesignState: end-to-end (S5.2, S5.3, S5.4, S5.9)' {
     }
 
     It 'S5.3: exit code is 2 (could-not-evaluate) even when a blocking finding also exists, in a run with records' {
-        New-StateFile -RelativePath 'units/command/a.md' -Content @'
-# unit/command/a
-Kind: command
+        New-StateFile -RelativePath 'units/script/a.md' -Content @'
+# unit/script/a
+Kind: script
 Status: active
 Binds: I999
 '@
@@ -1011,9 +1008,9 @@ Binds: I999
             & git add -A 2>$null
             & git commit --quiet -m 'seed' 2>$null
 
-            New-StateFile -RelativePath 'units/command/a.md' -Content @'
-# unit/command/a
-Kind: command
+            New-StateFile -RelativePath 'units/script/a.md' -Content @'
+# unit/script/a
+Kind: script
 Status: active
 Binds: I999
 '@
@@ -1037,9 +1034,9 @@ Frozen at: abc1234, 2026-08-19
 Frozen because: escaping the generative loop
 Lifts when: tier one is code-complete
 '@
-        New-StateFile -RelativePath 'units/command/a.md' -Content @'
-# unit/command/a
-Kind: command
+        New-StateFile -RelativePath 'units/script/a.md' -Content @'
+# unit/script/a
+Kind: script
 Status: active
 Binds: I999
 '@
@@ -1075,12 +1072,12 @@ Describe 'Test-DesignState against this repository''s own tree' -Skip:$script:Sk
         $script:RealResult.LargestClosure.LargestContributor | Should -Not -BeNullOrEmpty
     }
 
-    It 'S5.12: neither S4.6 closure (unit/command/track, unit/document/agents-md) exceeds the 16,384-byte ceiling' {
+    It 'S5.12: neither S4.6 closure (unit/script/track, unit/document/agents-md) exceeds the 16,384-byte ceiling' {
         $graph = Read-DesignStateGraph -Path $script:RepoRoot
         $byId = @{}
         foreach ($r in $graph.Records) { $byId[$r.Id] = $r }
         $result = Test-ClosureBudget -Records $graph.Records -ById $byId -RepoPath $script:RepoRoot
-        (@($result.Findings | Where-Object { $_.Subject -eq 'unit/command/track' })).Count | Should -Be 0
+        (@($result.Findings | Where-Object { $_.Subject -eq 'unit/script/track' })).Count | Should -Be 0
         (@($result.Findings | Where-Object { $_.Subject -eq 'unit/document/agents-md' })).Count | Should -Be 0
     }
 
@@ -1114,7 +1111,7 @@ Describe 'Test-DesignState against this repository''s own tree' -Skip:$script:Sk
     It 'S16.5: design/state-index.md''s consumers region lists real consumers, not the empty-set placeholder' {
         $text = Get-Content -LiteralPath (Join-Path $script:RepoRoot 'design/state-index.md') -Raw
         $text | Should -Not -Match '_\(no contract records yet\)_'
-        $text | Should -Match 'unit/command/pr'
+        $text | Should -Match 'unit/script/pr'
     }
 
     It 'S17.2: every invariant row in the real Invariants section sits inside the single invariants region, none below it' {
@@ -1277,9 +1274,9 @@ Lifts when: tier one is code-complete
         # the confusion the second test below exists to keep apart from the first.
         New-TreeFile -RelativePath 'tools/Update-DesignProjection.ps1' -Content 'param([string]$Path,[switch]$DryRun) exit 0'
 
-        New-StateFile -RelativePath 'units/command/a.md' -Content @'
-# unit/command/a
-Kind: command
+        New-StateFile -RelativePath 'units/script/a.md' -Content @'
+# unit/script/a
+Kind: script
 Status: active
 Binds: I999
 '@

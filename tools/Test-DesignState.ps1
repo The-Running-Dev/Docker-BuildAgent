@@ -313,7 +313,7 @@ function Test-UnresolvedId {
 # exemptions, each of which would otherwise block forever: a retired record (I30); an
 # Invariant's Anchor, which is the invariant number and resolves by well-formedness and
 # uniqueness rather than Test-Path; and a Contract Declaration of the literal `prose`, which is
-# the field's documented second value for a Markdown command surface with nothing to point at.
+# the field's documented second value for a contract with nothing tree-shaped to point at.
 # ---------------------------------------------------------------------------------------------
 function Test-AnchorMissing {
     param([Parameter(Mandatory)][AllowEmptyCollection()][object[]] $Records, [Parameter(Mandatory)][string] $RepoPath)
@@ -413,7 +413,6 @@ function Get-DocumentGlobFiles {
     }
     Get-ChildItem -LiteralPath $RepoPath -Filter '*.md' -File -ErrorAction SilentlyContinue |
         ForEach-Object { & $add $_.FullName }
-    & $add (Join-Path $RepoPath '.claude/COMPANIONS.md')
     $issueTemplates = Join-Path $RepoPath '.github/ISSUE_TEMPLATE'
     if (Test-Path -LiteralPath $issueTemplates) {
         Get-ChildItem -LiteralPath $issueTemplates -Filter '*.md' -File -ErrorAction SilentlyContinue |
@@ -423,19 +422,6 @@ function Get-DocumentGlobFiles {
 
     $excluded = @('design/FROZEN.md', 'CLAUDE.md')
     ,@($set | Where-Object { $_ -notin $excluded })
-}
-
-function Get-CommandGlobFiles {
-    param([Parameter(Mandatory)][string] $RepoPath)
-
-    $dir = Join-Path $RepoPath '.claude/commands'
-    if (-not (Test-Path -LiteralPath $dir)) { return ,@() }
-    ,@(
-        Get-ChildItem -LiteralPath $dir -Filter '*.md' -File |
-            Where-Object { $_.Name -notlike '*-local.md' } |
-            ForEach-Object { ([IO.Path]::GetRelativePath($RepoPath, $_.FullName)) -replace '\\', '/' } |
-            Sort-Object
-    )
 }
 
 function Get-ScriptGlobFiles {
@@ -554,7 +540,6 @@ function Test-GlobDisagreement {
     }
 
     $enumerators = @{
-        command  = { Get-CommandGlobFiles  -RepoPath $RepoPath }
         script   = { Get-ScriptGlobFiles   -RepoPath $RepoPath }
         document = { Get-DocumentGlobFiles -RepoPath $RepoPath }
     }
@@ -622,19 +607,18 @@ function Test-UnrecordedArtifact {
     $findings = [System.Collections.Generic.List[object]]::new()
     $units = @($Records | Where-Object { $_.Kind -eq 'Unit' -and $_.Scalars['Status'] -eq 'active' })
 
-    $byUnitKind = @{ command = @(); script = @(); document = @() }
+    $byUnitKind = @{ script = @(); document = @() }
     foreach ($u in $units) {
         $k = $u.Scalars['Kind']
         if ($byUnitKind.ContainsKey($k)) { $byUnitKind[$k] += $u }
     }
 
     $kindGlobs = @{
-        command  = (Get-CommandGlobFiles -RepoPath $RepoPath)
         script   = (Get-ScriptGlobFiles -RepoPath $RepoPath)
         document = (Get-DocumentGlobFiles -RepoPath $RepoPath)
     }
 
-    foreach ($kind in 'command', 'script', 'document') {
+    foreach ($kind in 'script', 'document') {
         $anchors = @($byUnitKind[$kind] | ForEach-Object { $_.Scalars['Anchor'] })
         $files = @($kindGlobs[$kind])
 
@@ -678,8 +662,8 @@ function Test-UnrecordedArtifact {
 
 # ---------------------------------------------------------------------------------------------
 # Marked regions: RegionMalformed (balance/nesting) and the region half of IdCollision (an id
-# appearing as both the projected and the declared form). Scoped to the document and command
-# globs - the only checkout-local carriers of a real region today; an issue's `agent:start`
+# appearing as both the projected and the declared form). Scoped to the document glob - the only
+# checkout-local carrier of a real region today; an issue's `agent:start`
 # block lives on GitHub and is not evaluable from the checkout alone (I22), so it is out of
 # reach for a blocking class regardless. Matching requires the marker to be the entire
 # (trimmed) line, which is what keeps prose that merely *mentions* the marker syntax - this
@@ -1195,7 +1179,7 @@ function Invoke-DesignStateCheck {
     if ($globResult.CouldNotEvaluate) { $couldNotEvaluate.Add($globResult.CouldNotEvaluate) }
     $blockingFindings.AddRange($globResult.Findings)
 
-    $regionFiles = @((Get-DocumentGlobFiles -RepoPath $RepoPath) + (Get-CommandGlobFiles -RepoPath $RepoPath) | Sort-Object -Unique)
+    $regionFiles = @((Get-DocumentGlobFiles -RepoPath $RepoPath) | Sort-Object -Unique)
     $regionResult = Get-MarkedRegions -RepoPath $RepoPath -Files $regionFiles
     $blockingFindings.AddRange($regionResult.Findings)
     $blockingFindings.AddRange((Test-RegionFormCollision -Inventory $regionResult.Inventory))

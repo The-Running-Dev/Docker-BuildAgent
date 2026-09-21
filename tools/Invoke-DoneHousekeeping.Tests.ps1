@@ -4,8 +4,8 @@
 <#
   Invoke-DoneHousekeeping.ps1 has no exit-calling wrapper - it runs to completion and
   returns its report object on the pipeline - so these tests invoke it end-to-end via `&`
-  against real git repos under $TestDrive, including a real second `git worktree`, the same
-  "not worth mocking" reasoning Sync-Kit.Tests.ps1 gives for its own script.
+  against real git repos under $TestDrive, including a real second `git worktree` - git
+  plumbing is not worth mocking when the real thing is this cheap to spin up.
 #>
 
 BeforeAll {

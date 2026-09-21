@@ -5,7 +5,7 @@
     to a hash of the files whose presence or content determines what the gate list is.
 
 .DESCRIPTION
-    /verify's own procedure (.claude/commands/verify.md, "Discover, do not assume") reads
+    /verify's own procedure ("Discover, do not assume") reads
     CI workflow files, package manifests, and known build-script paths every single run,
     even when none of them have changed since the last run. That discovery is genuine
     judgement the first time - CI is the authoritative list, and matching a workflow's
