@@ -141,58 +141,10 @@ what that costs, and what a resume may therefore assume, is `## Unresolved` U-6.
 
 The mechanical compatibility record, published as a release asset.
 
-```csharp
-namespace Surface;
-
-public enum SurfaceItemKind
-{
-    BuildType,
-    BuildParameter,
-    ConfigKey,
-    ConfigSchemaVersion,
-    ToolCommand,
-    ToolParameter,
-    ModuleCommand,
-    ModuleParameter,
-    TemplateLocation,
-    ImageInvocation,
-    ImageMountPoint,
-    ImageEnvironmentInput,
-}
-
-public sealed record SurfaceItem(
-    SurfaceItemKind Kind,
-    string Name,
-    string Value,
-    string? DeprecatedSince,
-    string? RemoveIn);
-
-public sealed record SurfaceManifest(
-    int ManifestSchemaVersion,
-    string ProductVersion,
-    IReadOnlyList<SurfaceItem> Items);
-
-public enum SurfaceDifferenceKind
-{
-    ItemAdded,
-    ItemRemoved,
-    ValueChanged,
-    DeprecationAdded,
-    DeprecationRemoved,
-    RemovalTargetChanged,
-}
-
-public sealed record SurfaceDifference(
-    SurfaceDifferenceKind Kind,
-    SurfaceItemKind ItemKind,
-    string Name,
-    string? BaselineValue,
-    string? CandidateValue);
-
-public sealed record SurfaceComparison(
-    IReadOnlyList<SurfaceDifference> All,
-    IReadOnlyList<SurfaceDifference> Blocking);
-```
+The binding declaration is [`forge/Surface/SurfaceModel.cs`](../forge/Surface/SurfaceModel.cs)
+(`SurfaceItemKind`, `SurfaceItem`, `SurfaceManifest`, `SurfaceDifferenceKind`,
+`SurfaceDifference`, `SurfaceComparison`), implemented as part of slice S1. Signature
+drift there is a contract change, not an implementation detail.
 
 Semantics a declaration cannot carry:
 
