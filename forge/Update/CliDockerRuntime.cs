@@ -18,10 +18,10 @@ namespace Update;
 /// S2.22: the field mapping below (mount/port/network shape, the anonymous-volume heuristic) is verified
 /// against a live daemon by <c>Update.Tests.RoundTripProbeTests</c>, which round-trips each shape through
 /// <see cref="InspectAsync"/> and <see cref="CreateReplacementAsync"/> the same way <c>Updater</c> does. That
-/// suite runs wherever a `docker` daemon is reachable — CI on Linux, and locally when Docker is present — and
-/// skips itself otherwise. S2.23: this sandbox's own daemon is Windows-hosted (Docker Desktop, Linux containers),
-/// so a Windows host running Docker Desktop remains a stated, unverified gap for live-daemon update behaviour
-/// specifically, distinct from the argument translation and path/mount handling covered on Windows already.
+/// suite runs wherever a `docker` daemon is reachable — CI on Linux, and locally on a Windows host running
+/// Docker Desktop, whose daemon is itself a Linux VM — and skips itself otherwise. S2.23: a daemon running
+/// Windows containers natively remains a stated, unverified gap for live-daemon update behaviour specifically,
+/// distinct from the argument translation and path/mount handling covered on Windows already.
 /// </summary>
 public sealed class CliDockerRuntime : IDockerRuntime
 {
