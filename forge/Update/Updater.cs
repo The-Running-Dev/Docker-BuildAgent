@@ -132,18 +132,22 @@ public sealed class Updater
         }
         catch (DockerRuntimeException)
         {
+            // Only a lock that now exists means another updater won the race; any other create failure is the
+            // daemon's own and propagates as it is, rather than being reported as LockHeld.
             var raced = await _runtime.InspectAsync(lockName);
-            throw raced != null
-                ? BuildLockHeldException(containerName, raced)
-                : new UpdateException(UpdateErrorCode.LockHeld, containerName,
-                    $"An update of '{containerName}' is already in progress.");
+            if (raced != null)
+            {
+                throw BuildLockHeldException(containerName, raced);
+            }
+
+            throw;
         }
 
         // Refusals from here through the log write are before the target's first change (I41): the lock this
         // attempt just created must not survive them.
         try
         {
-            CheckResidue(containerName);
+            await CheckResidueAsync(containerName);
 
             var pinTag = UpdateNaming.PriorImageTag(containerName);
             try
@@ -239,10 +243,10 @@ public sealed class Updater
         }
     }
 
-    private void CheckResidue(string containerName)
+    private async Task CheckResidueAsync(string containerName)
     {
         var priorName = UpdateNaming.PriorContainerName(containerName);
-        var priorInspection = _runtime.InspectAsync(priorName).GetAwaiter().GetResult();
+        var priorInspection = await _runtime.InspectAsync(priorName);
         if (priorInspection != null)
         {
             throw new UpdateException(UpdateErrorCode.ResiduePresent, containerName,

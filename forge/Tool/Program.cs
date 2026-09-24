@@ -44,11 +44,17 @@ static async Task<int> RunClearLockAsync(IDockerRuntime runtime, string containe
     var lockName = UpdateNaming.LockContainerName(containerName);
     try
     {
-        await runtime.RemoveAsync(lockName, force: true);
+        // Nothing to clear is not a failure (contract § Global tool: "--clear-lock ... never touches the target"),
+        // but a daemon that cannot be reached, or a removal it refuses, is.
+        if (await runtime.InspectAsync(lockName) != null)
+        {
+            await runtime.RemoveAsync(lockName, force: true);
+        }
     }
-    catch (DockerRuntimeException)
+    catch (Exception ex) when (ex is DockerRuntimeException or System.ComponentModel.Win32Exception)
     {
-        // Nothing to clear is not a failure (contract § Global tool: "--clear-lock ... never touches the target").
+        Console.Error.WriteLine(ex.Message);
+        return 1;
     }
 
     return 0;
@@ -68,5 +74,12 @@ static async Task<int> RunUpdateAsync(IDockerRuntime runtime, UpdateLogStore log
     {
         Console.Error.WriteLine(ex.Message);
         return UpdateExitCode.ForError(ex.Code);
+    }
+    catch (Exception ex) when (ex is DockerRuntimeException or System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+    {
+        // "Any other failure" (contract § Global tool, Exit statuses): a daemon error outside a mapped step, an
+        // update log that cannot be read or appended to after the swap, or no `docker` on PATH.
+        Console.Error.WriteLine(ex.Message);
+        return 1;
     }
 }

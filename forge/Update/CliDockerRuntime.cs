@@ -25,10 +25,13 @@ public sealed class CliDockerRuntime : IDockerRuntime
 
     public async Task<ContainerInspection?> InspectAsync(string name)
     {
-        var (exitCode, stdout, stderr) = await RunAsync("inspect", name);
+        // --type container: an image, network or volume sharing the name must read as "no container", not as
+        // JSON of a different shape.
+        var (exitCode, stdout, stderr) = await RunAsync("inspect", "--type", "container", name);
         if (exitCode != 0)
         {
-            if (stderr.Contains("No such object", StringComparison.OrdinalIgnoreCase))
+            if (stderr.Contains("No such container", StringComparison.OrdinalIgnoreCase) ||
+                stderr.Contains("No such object", StringComparison.OrdinalIgnoreCase))
             {
                 return null;
             }
@@ -116,9 +119,10 @@ public sealed class CliDockerRuntime : IDockerRuntime
         {
             if (port.HostPort != null)
             {
-                var hostSide = port.HostIp != null ? $"{port.HostIp}:{port.HostPort}" : port.HostPort;
+                // An empty HostPort is a publish to a daemon-chosen host port, as `-p 80` requested it.
+                var hostSide = port.HostIp != null ? $"{port.HostIp}:{port.HostPort}:" : port.HostPort.Length > 0 ? $"{port.HostPort}:" : string.Empty;
                 args.Add("--publish");
-                args.Add($"{hostSide}:{port.ContainerPort}/{port.Protocol}");
+                args.Add($"{hostSide}{port.ContainerPort}/{port.Protocol}");
             }
             else
             {
@@ -204,7 +208,7 @@ public sealed class CliDockerRuntime : IDockerRuntime
         };
 
         var parts = new List<string> { kind };
-        if (mount.Source != null)
+        if (!string.IsNullOrEmpty(mount.Source) && mount.Kind != MountKind.Tmpfs)
         {
             parts.Add($"source={mount.Source}");
         }
@@ -241,13 +245,28 @@ public sealed class CliDockerRuntime : IDockerRuntime
             Command: ReadStringArray(config, "Cmd"),
             Entrypoint: ReadStringArray(config, "Entrypoint"),
             Mounts: ReadMounts(element),
-            Ports: ReadPorts(element),
-            RestartPolicy: hostConfig.TryGetProperty("RestartPolicy", out var restartPolicy) &&
-                           restartPolicy.TryGetProperty("Name", out var restartName)
-                ? restartName.GetString() ?? "no"
-                : "no",
+            Ports: ReadPorts(config, hostConfig),
+            RestartPolicy: ReadRestartPolicy(hostConfig),
             Networks: ReadNetworks(element),
             Links: ReadStringArray(hostConfig, "Links"));
+    }
+
+    private static string ReadRestartPolicy(JsonElement hostConfig)
+    {
+        if (!hostConfig.TryGetProperty("RestartPolicy", out var restartPolicy) ||
+            !restartPolicy.TryGetProperty("Name", out var restartName) ||
+            string.IsNullOrEmpty(restartName.GetString()))
+        {
+            return "no";
+        }
+
+        var name = restartName.GetString()!;
+        return name == "on-failure" &&
+               restartPolicy.TryGetProperty("MaximumRetryCount", out var retries) &&
+               retries.ValueKind == JsonValueKind.Number &&
+               retries.GetInt32() > 0
+            ? $"{name}:{retries.GetInt32()}"
+            : name;
     }
 
     private static IReadOnlyDictionary<string, string> ReadStringMap(JsonElement parent, string propertyName)
@@ -297,43 +316,57 @@ public sealed class CliDockerRuntime : IDockerRuntime
             // a caller-named volume is not verified against a live daemon here.
             var isAnonymous = kind == MountKind.Volume && name != null && AnonymousVolumeName.IsMatch(name);
 
-            result.Add(new MountSpec(kind, source ?? name, destination, readOnly, isAnonymous));
+            // A volume is addressed by its name; its Source is the daemon's host path, which `--mount` rejects.
+            result.Add(new MountSpec(kind, kind == MountKind.Volume ? name : source, destination, readOnly, isAnonymous));
         }
 
         return result;
     }
 
-    private static IReadOnlyList<PortSpec> ReadPorts(JsonElement element)
+    /// <summary>Reads the requested bindings (HostConfig.PortBindings), not the runtime ones
+    /// (NetworkSettings.Ports): the latter are empty for a stopped container and pin a daemon-chosen host port.
+    /// An empty HostPort is kept as "" (publish to any host port); an exposed-only port has a null HostPort.</summary>
+    private static IReadOnlyList<PortSpec> ReadPorts(JsonElement config, JsonElement hostConfig)
     {
-        if (!element.TryGetProperty("NetworkSettings", out var networkSettings) ||
-            !networkSettings.TryGetProperty("Ports", out var ports) ||
-            ports.ValueKind != JsonValueKind.Object)
+        var result = new List<PortSpec>();
+        var published = new HashSet<string>(StringComparer.Ordinal);
+
+        if (hostConfig.TryGetProperty("PortBindings", out var bindings) && bindings.ValueKind == JsonValueKind.Object)
         {
-            return Array.Empty<PortSpec>();
+            foreach (var entry in bindings.EnumerateObject())
+            {
+                if (entry.Value.ValueKind != JsonValueKind.Array || entry.Value.GetArrayLength() == 0)
+                {
+                    continue;
+                }
+
+                var (containerPort, protocol) = ParsePortKey(entry.Name);
+                published.Add(entry.Name);
+                foreach (var binding in entry.Value.EnumerateArray())
+                {
+                    var hostIp = binding.TryGetProperty("HostIp", out var hostIpProp) ? hostIpProp.GetString() : null;
+                    var hostPort = binding.TryGetProperty("HostPort", out var hostPortProp) ? hostPortProp.GetString() : null;
+                    result.Add(new PortSpec(containerPort, protocol, string.IsNullOrEmpty(hostIp) ? null : hostIp, hostPort ?? string.Empty));
+                }
+            }
         }
 
-        var result = new List<PortSpec>();
-        foreach (var entry in ports.EnumerateObject())
+        if (config.TryGetProperty("ExposedPorts", out var exposed) && exposed.ValueKind == JsonValueKind.Object)
         {
-            var parts = entry.Name.Split('/');
-            var containerPort = int.Parse(parts[0]);
-            var protocol = parts.Length > 1 ? parts[1] : "tcp";
-
-            if (entry.Value.ValueKind != JsonValueKind.Array || entry.Value.GetArrayLength() == 0)
+            foreach (var entry in exposed.EnumerateObject().Where(e => !published.Contains(e.Name)))
             {
+                var (containerPort, protocol) = ParsePortKey(entry.Name);
                 result.Add(new PortSpec(containerPort, protocol, null, null));
-                continue;
-            }
-
-            foreach (var binding in entry.Value.EnumerateArray())
-            {
-                var hostIp = binding.TryGetProperty("HostIp", out var hostIpProp) ? hostIpProp.GetString() : null;
-                var hostPort = binding.TryGetProperty("HostPort", out var hostPortProp) ? hostPortProp.GetString() : null;
-                result.Add(new PortSpec(containerPort, protocol, hostIp, hostPort));
             }
         }
 
         return result;
+    }
+
+    private static (int ContainerPort, string Protocol) ParsePortKey(string key)
+    {
+        var parts = key.Split('/');
+        return (int.Parse(parts[0], System.Globalization.CultureInfo.InvariantCulture), parts.Length > 1 ? parts[1] : "tcp");
     }
 
     private static IReadOnlyList<string> ReadNetworks(JsonElement element)
