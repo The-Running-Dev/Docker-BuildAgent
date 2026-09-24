@@ -265,7 +265,9 @@ public sealed class Updater
         {
             throw new UpdateException(UpdateErrorCode.ResiduePresent, containerName,
                 $"An update of '{containerName}' (update {open.UpdateId}) has a start entry in the update log " +
-                $"at '{_log.Path}' with no outcome; resolve it before updating again.");
+                $"at '{_log.Path}' with no outcome; after confirming the target's actual state, clear it by " +
+                $"removing that update's line from the log (or appending a completing outcome line for update " +
+                $"{open.UpdateId}) before updating again.");
         }
     }
 
@@ -316,7 +318,10 @@ public sealed class Updater
                 : $"{age.Seconds}s";
     }
 
-    private static ContainerCreateSpec BuildReplacementSpec(string containerName, ContainerInspection target, string newImageId)
+    /// <summary>Internal rather than private so <c>RoundTripProbeTests</c> (S2.22) can build a replacement spec
+    /// from a live inspection through the exact path the Updater itself uses, rather than a re-implementation
+    /// that could drift from it.</summary>
+    internal static ContainerCreateSpec BuildReplacementSpec(string containerName, ContainerInspection target, string newImageId)
     {
         var labels = target.Labels
             .Where(kv => !kv.Key.StartsWith("com.buildagent.", StringComparison.Ordinal))

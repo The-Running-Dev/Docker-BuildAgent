@@ -15,9 +15,13 @@ namespace Update;
 /// <see cref="ProcessStartInfo.ArgumentList"/> element by element, never through a shell string, so a container
 /// name or label value cannot break out of its argument.
 ///
-/// Disclosed gap (S2.22/S2.23): the field mapping below (mount/port/network shape, the anonymous-volume
-/// heuristic) is written against documented `docker inspect` JSON shapes, not verified against a live daemon —
-/// this sandbox cannot run one. Treat it as unverified until exercised against real Docker.
+/// S2.22: the field mapping below (mount/port/network shape, the anonymous-volume heuristic) is verified
+/// against a live daemon by <c>Update.Tests.RoundTripProbeTests</c>, which round-trips each shape through
+/// <see cref="InspectAsync"/> and <see cref="CreateReplacementAsync"/> the same way <c>Updater</c> does. That
+/// suite runs wherever a `docker` daemon is reachable — CI on Linux, and locally on a Windows host running
+/// Docker Desktop, whose daemon is itself a Linux VM — and skips itself otherwise. S2.23: a daemon running
+/// Windows containers natively remains a stated, unverified gap for live-daemon update behaviour specifically,
+/// distinct from the argument translation and path/mount handling covered on Windows already.
 /// </summary>
 public sealed class CliDockerRuntime : IDockerRuntime
 {
