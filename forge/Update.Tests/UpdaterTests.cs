@@ -375,6 +375,9 @@ public sealed class UpdaterTests : IDisposable
             () => _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true)));
         Assert.Equal(UpdateErrorCode.ResiduePresent, ex.Code);
         Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        // S2.9: names the open record's log path and the action that clears it, not just that one exists.
+        Assert.Contains(_logPath, ex.Message);
+        Assert.Contains("clear it", ex.Message);
     }
 
     // S2.19: a corrupt log refuses every update on the host, checked before anything else is touched.
