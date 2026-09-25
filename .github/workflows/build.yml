@@ -68,6 +68,13 @@ permissions:
   checks: write
   pull-requests: write
 
+# I13/S3.11: one CI concurrency group spans every publishing workflow (Build, Release,
+# Release-from-Tag) so at most one run publishes at a time. Queues rather than cancels — a
+# publish already in flight must finish, not be pre-empted by the next one.
+concurrency:
+  group: buildagent-publish
+  cancel-in-progress: false
+
 jobs:
   Build:
     name: Build & Publish

@@ -72,6 +72,26 @@ public sealed class DockerTests : IDisposable
         Assert.True(build.Parameters.PreRelease);
     }
 
+    // S3.12: A push to `main` moves `latest` and writes no version to any versioned sink — no
+    // tag, no package, no module version (I15). `CreateGitHubRelease false` is exactly the
+    // main-push case (see .github/workflows/build.yml's "Build and Publish" step).
+    [Fact]
+    public void Configure_OmitsVersionedTag_WhenCreateGitHubReleaseIsFalse()
+    {
+        var build = new DockerTestBuild();
+        build.SetParameters(CreateParameters());
+        SetField(build, "RegistryUrl", "ghcr.io/acme");
+        SetField(build, "ImageTag", "my-app");
+        SetField(build, "CreateGitHubRelease", false);
+
+        build.ConfigureForTest();
+
+        Assert.Contains("ghcr.io/acme/my-app:latest", build.Parameters.Tags);
+        Assert.DoesNotContain("ghcr.io/acme/my-app:1.2.3", build.Parameters.Tags);
+        Assert.Single(build.Parameters.Tags);
+        Assert.False(build.Parameters.CreateGitHubRelease);
+    }
+
     private DockerParams CreateParameters()
     {
         return new DockerParams
