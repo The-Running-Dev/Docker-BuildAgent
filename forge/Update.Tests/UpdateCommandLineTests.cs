@@ -53,6 +53,16 @@ public sealed class UpdateCommandLineTests
             () => UpdateCommandLine.Parse(new[] { "web", "--health-timeout", "soon" }));
     }
 
+    // S4.7: a value of zero or less refuses rather than waiting indefinitely.
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-5")]
+    public void Parse_HealthTimeoutNotPositive_Throws(string value)
+    {
+        Assert.Throws<UpdateCommandLineException>(
+            () => UpdateCommandLine.Parse(new[] { "web", "--health-timeout", value }));
+    }
+
     [Fact]
     public void Parse_ClearLock_TakesJustTheContainerName()
     {

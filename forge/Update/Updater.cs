@@ -11,11 +11,18 @@ namespace Update;
 public interface IUpdateClock
 {
     DateTimeOffset UtcNow { get; }
+
+    /// <summary>Waits out <paramref name="delay"/>. A production clock really waits; a fake one can advance its
+    /// own virtual <see cref="UtcNow"/> by <paramref name="delay"/> instead, so a health-wait loop is testable
+    /// without a real wall-clock delay.</summary>
+    Task Delay(TimeSpan delay);
 }
 
 public sealed class SystemUpdateClock : IUpdateClock
 {
     public DateTimeOffset UtcNow => DateTimeOffset.UtcNow;
+
+    public Task Delay(TimeSpan delay) => Task.Delay(delay);
 }
 
 /// <summary>Who is running this update, recorded on the lock so a later refusal can name an owner (S2.5).</summary>
@@ -25,15 +32,9 @@ public sealed record UpdaterIdentity(string OwnerHost, int OwnerProcessId)
 }
 
 /// <summary>
-/// Moves a running container to a new image, or refuses without touching it (design/30-slices.md § S2).
-///
-/// Scope note: health verification, restore and the restore exit statuses are S4's (Out of scope, S2). This
-/// orchestrator therefore ends the swap at "the replacement is running" and records <see
-/// cref="UpdateOutcome.Succeeded"/> immediately — it never waits on health and never restores. That leaves the
-/// prior container and its image pin in place after a success, which is why an immediate second update of the
-/// same container refuses with <see cref="UpdateErrorCode.ResiduePresent"/> (S2's own out-of-scope note:
-/// "until [S4] lands a failure mid-swap leaves residue that the next update refuses on" — true here even for a
-/// success, since S2 never reaches the health-gated cleanup step that would remove the prior container).
+/// Moves a running container to a new image, or refuses without touching it (design/30-slices.md § S2), and
+/// waits for the replacement to report healthy before letting it stand — restoring the prior container when it
+/// does not (design/30-slices.md § S4).
 /// </summary>
 public sealed class Updater
 {
@@ -184,9 +185,8 @@ public sealed class Updater
             }
 
             // The first change to the target happens here. A failure past this point is not covered by I41:
-            // S2 leaves whatever residue results for the next update to refuse on (Out of scope, S2 — S4 owns
-            // restore) and, per I37, does not release the lock without attempting the outcome write, which a
-            // failure here never reaches.
+            // it is S4's job, from here on, to bring the target back rather than leave residue for the next
+            // update to refuse on.
             var priorName = UpdateNaming.PriorContainerName(containerName);
             try
             {
@@ -198,20 +198,252 @@ public sealed class Updater
             }
             catch (DockerRuntimeException ex)
             {
-                throw new UpdateException(UpdateErrorCode.ReplacementCreateFailed, containerName,
-                    $"The replacement for '{containerName}' could not be created: {ex.Message}", ex);
+                // S4.10: no updated container exists to keep, so restore is unconditional here regardless of
+                // --no-restore — there is nothing "unhealthy" to leave in place, only a failed creation attempt.
+                await Console.Error.WriteLineAsync(
+                    $"The replacement for '{containerName}' could not be created: {ex.Message}");
+                return await RestoreAndFinalizeAsync(startRecord, lockName, containerName, priorName, target.Id,
+                    UpdateErrorCode.ReplacementCreateFailed);
             }
 
-            var completedRecord = startRecord with { CompletedAt = _clock.UtcNow, Outcome = UpdateOutcome.Succeeded };
-            _log.Append(completedRecord);
-            await TryRemoveLockAsync(lockName);
-            return UpdateOutcome.Succeeded;
+            var healthOutcome = await WaitForHealthAsync(containerName, options.HealthTimeout);
+            if (healthOutcome == HealthWaitOutcome.Healthy)
+            {
+                // Design step 10: the prior container is removed before the outcome is written and the lock
+                // released. A removal the daemon refuses does not undo a healthy update, but it is reported,
+                // since the next update of this container refuses on the prior container as residue (S2.9).
+                try
+                {
+                    await _runtime.RemoveAsync(priorName, force: true);
+                }
+                catch (DockerRuntimeException ex)
+                {
+                    await Console.Error.WriteLineAsync(
+                        $"'{containerName}' was updated, but its prior container '{priorName}' could not be removed: " +
+                        $"{ex.Message}. The next update of '{containerName}' refuses until it is removed.");
+                }
+
+                return await FinalizeAsync(startRecord, lockName, UpdateOutcome.Succeeded, null);
+            }
+
+            var (failureCode, failureMessage) = healthOutcome switch
+            {
+                HealthWaitOutcome.TimedOut => (UpdateErrorCode.HealthTimedOut,
+                    $"The replacement '{containerName}' did not report healthy within {options.HealthTimeout}."),
+                HealthWaitOutcome.Absent => (UpdateErrorCode.HealthCheckAbsent,
+                    $"The replacement '{containerName}' declares no health check, so it cannot be verified."),
+                HealthWaitOutcome.Exited => (UpdateErrorCode.ReplacementExited,
+                    $"The replacement '{containerName}' stopped running before it reported healthy."),
+                _ => throw new InvalidOperationException("unreachable"),
+            };
+            await Console.Error.WriteLineAsync($"{failureMessage} ({failureCode})");
+
+            if (!options.RestoreOnFailure)
+            {
+                // S4.5: left in place for manual recovery — the replacement, the prior container and its pin
+                // are none of them touched.
+                return await FinalizeAsync(startRecord, lockName, UpdateOutcome.UnhealthyNotRestored, failureCode);
+            }
+
+            return await RestoreAndFinalizeAsync(startRecord, lockName, containerName, priorName, target.Id, failureCode);
         }
         catch (UpdateException ex) when (ex.Code is UpdateErrorCode.ResiduePresent or UpdateErrorCode.PinFailed or UpdateErrorCode.LogUnwritable)
         {
-            await TryRemoveLockAsync(lockName);
+            await TryRemoveContainerAsync(lockName);
             throw;
         }
+    }
+
+    private enum HealthWaitOutcome
+    {
+        Healthy,
+        Absent,
+        TimedOut,
+        Exited,
+    }
+
+    // Not specified by the contract beyond "the timeout" (S4.7); this slice's own disclosed poll cadence.
+    private static readonly TimeSpan HealthPollInterval = TimeSpan.FromSeconds(1);
+
+    private async Task<HealthWaitOutcome> WaitForHealthAsync(string containerName, TimeSpan timeout)
+    {
+        var deadline = _clock.UtcNow + timeout;
+
+        while (true)
+        {
+            var verdict = await PollHealthAsync(containerName);
+            if (verdict.HasValue)
+            {
+                return verdict.Value;
+            }
+
+            if (_clock.UtcNow >= deadline)
+            {
+                return HealthWaitOutcome.TimedOut;
+            }
+
+            await _clock.Delay(HealthPollInterval);
+        }
+    }
+
+    /// <summary>One health poll; null means "not healthy yet, keep waiting".</summary>
+    private async Task<HealthWaitOutcome?> PollHealthAsync(string containerName)
+    {
+        ContainerInspection? inspection;
+        try
+        {
+            inspection = await _runtime.InspectAsync(containerName);
+        }
+        catch (DockerRuntimeException)
+        {
+            // A daemon error while polling is no verdict on the replacement. Letting it escape would skip
+            // restore, the outcome record and the lock release, so it counts as "not healthy yet".
+            return null;
+        }
+
+        if (inspection == null || !inspection.Running)
+        {
+            return HealthWaitOutcome.Exited;
+        }
+
+        if (inspection.HealthStatus == null)
+        {
+            return HealthWaitOutcome.Absent;
+        }
+
+        return inspection.HealthStatus == "healthy" ? HealthWaitOutcome.Healthy : null;
+    }
+
+    /// <summary>Restores, then writes the outcome and releases the lock: <see cref="UpdateOutcome.RestoredAfterUnhealthy"/>
+    /// carrying <paramref name="failureCode"/>, or <see cref="UpdateOutcome.RestoreFailed"/> with the reason on stderr.</summary>
+    private async Task<UpdateOutcome> RestoreAndFinalizeAsync(UpdateRecord startRecord, string lockName, string containerName,
+        string priorName, string originalId, UpdateErrorCode failureCode)
+    {
+        string? restoreFailure;
+        try
+        {
+            restoreFailure = await AttemptRestoreAsync(containerName, priorName, originalId);
+        }
+        catch (DockerRuntimeException ex)
+        {
+            restoreFailure = $"Restoring '{containerName}' from its prior container '{priorName}' could not proceed: {ex.Message}";
+        }
+
+        if (restoreFailure == null)
+        {
+            return await FinalizeAsync(startRecord, lockName, UpdateOutcome.RestoredAfterUnhealthy, failureCode);
+        }
+
+        await Console.Error.WriteLineAsync(restoreFailure);
+        return await FinalizeAsync(startRecord, lockName, UpdateOutcome.RestoreFailed, UpdateErrorCode.RestoreFailed);
+    }
+
+    /// <summary>Returns the prior container to <paramref name="containerName"/> and starts it (S4.2, S4.8), or
+    /// returns why it could not (null on success). Removes whatever replacement occupies that name first — but
+    /// only once the prior container is known to exist, so a restore that cannot succeed never takes down the
+    /// one container still standing. Never reconstructs the prior container from stored inspection data
+    /// (S4.8) — only an actual rename of the retained container counts, so a prior container removed out from
+    /// under this update fails with <see cref="UpdateOutcome.RestoreFailed"/> rather than approximating one.</summary>
+    private async Task<string?> AttemptRestoreAsync(string containerName, string priorName, string originalId)
+    {
+        var current = await _runtime.InspectAsync(containerName);
+        if (current != null && current.Id == originalId)
+        {
+            // The swap failed before the target was renamed (stop or rename rejected): the original still holds
+            // its own name, so restoring it is starting it again — never removing it.
+            try
+            {
+                await _runtime.StartAsync(containerName);
+                return null;
+            }
+            catch (DockerRuntimeException ex)
+            {
+                return $"The original container '{containerName}' could not be started again: {ex.Message}";
+            }
+        }
+
+        var prior = await _runtime.InspectAsync(priorName);
+        if (prior == null)
+        {
+            return current == null
+                ? $"The prior container '{priorName}' is no longer present; restore cannot proceed."
+                : $"The prior container '{priorName}' is no longer present; restore cannot proceed, and the " +
+                  $"replacement '{containerName}' is left in place.";
+        }
+
+        var priorDescription = $"The prior container '{priorName}' (labels: {FormatLabels(prior.Labels)})";
+        if (current != null)
+        {
+            try
+            {
+                await _runtime.RemoveAsync(containerName, force: true);
+            }
+            catch (DockerRuntimeException ex)
+            {
+                return $"{priorDescription} could not be restored: the replacement '{containerName}' could not be removed to make way for it: {ex.Message}";
+            }
+        }
+
+        try
+        {
+            await _runtime.RenameAsync(priorName, containerName);
+        }
+        catch (DockerRuntimeException ex)
+        {
+            return $"{priorDescription} could not be renamed back to '{containerName}': {ex.Message}";
+        }
+
+        try
+        {
+            await _runtime.StartAsync(containerName);
+        }
+        catch (DockerRuntimeException ex)
+        {
+            // S4.9: put it back under its prior name, so the next update refuses on it rather than updating over
+            // a stopped prior container it would take for an ordinary target.
+            try
+            {
+                await _runtime.RenameAsync(containerName, priorName);
+            }
+            catch (DockerRuntimeException)
+            {
+            }
+
+            return $"{priorDescription} could not be started as '{containerName}': {ex.Message}";
+        }
+
+        return null;
+    }
+
+    private static string FormatLabels(IReadOnlyDictionary<string, string> labels) =>
+        labels.Count == 0 ? "(none)" : string.Join(", ", labels.Select(kv => $"{kv.Key}={kv.Value}"));
+
+    /// <summary>Writes the outcome record and releases the lock. A log-append failure here does not change the
+    /// returned outcome (S4.11): it is reported on stderr, and the stranded start record this leaves behind is
+    /// what the next update's residue check (S2.9) detects and refuses on.</summary>
+    private async Task<UpdateOutcome> FinalizeAsync(UpdateRecord startRecord, string lockName, UpdateOutcome outcome, UpdateErrorCode? failureCode)
+    {
+        var completedRecord = startRecord with
+        {
+            CompletedAt = _clock.UtcNow,
+            Outcome = outcome,
+            FailureCode = failureCode?.ToString(),
+        };
+
+        try
+        {
+            _log.Append(completedRecord);
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        {
+            await Console.Error.WriteLineAsync(
+                $"The outcome ({outcome}) for update {startRecord.UpdateId} of '{startRecord.ContainerName}' " +
+                $"could not be written to the update log at '{_log.Path}': {ex.Message}. The stranded start " +
+                "record will be detected as residue by the next update.");
+        }
+
+        await TryRemoveContainerAsync(lockName);
+        return outcome;
     }
 
     private void RefuseUnsupportedShape(string containerName, ContainerInspection target)
@@ -340,11 +572,11 @@ public sealed class Updater
             Networks: target.Networks);
     }
 
-    private async Task TryRemoveLockAsync(string lockName)
+    private async Task TryRemoveContainerAsync(string name)
     {
         try
         {
-            await _runtime.RemoveAsync(lockName, force: true);
+            await _runtime.RemoveAsync(name, force: true);
         }
         catch (DockerRuntimeException)
         {

@@ -29,7 +29,9 @@ public sealed record PortSpec(
     string? HostPort);
 
 /// <summary>The state of a container as inspect reports it, restricted to the fields the Updater needs to
-/// refuse safely (I34) or reproduce exactly. Deliberately excludes health-check state — S4's concern, not S2's.</summary>
+/// refuse safely (I34) or reproduce exactly. <see cref="HealthStatus"/> is Docker's own status string
+/// ("starting", "healthy", "unhealthy") from <c>State.Health.Status</c>, or null when the container declares
+/// no health check at all (S4's concern; not read anywhere before S4).</summary>
 public sealed record ContainerInspection(
     string Id,
     string Name,
@@ -45,7 +47,8 @@ public sealed record ContainerInspection(
     IReadOnlyList<PortSpec> Ports,
     string RestartPolicy,
     IReadOnlyList<string> Networks,
-    IReadOnlyList<string> Links);
+    IReadOnlyList<string> Links,
+    string? HealthStatus = null);
 
 /// <summary>Everything needed to create a container that reproduces another's configuration except its image
 /// (I34). Built from a <see cref="ContainerInspection"/> by the Updater, not by the runtime.</summary>

@@ -63,7 +63,15 @@ public static class UpdateCommandLine
                     imageReference = RequireValue(args, ref i, arg);
                     break;
                 case "--health-timeout":
-                    healthTimeout = ParseDuration(RequireValue(args, ref i, arg), arg);
+                    var healthTimeoutText = RequireValue(args, ref i, arg);
+                    healthTimeout = ParseDuration(healthTimeoutText, arg);
+                    if (healthTimeout <= TimeSpan.Zero)
+                    {
+                        // S4.7: a non-positive timeout refuses rather than waiting indefinitely.
+                        throw new UpdateCommandLineException(
+                            $"Option '{arg}' must be greater than zero; got '{healthTimeoutText}'.");
+                    }
+
                     break;
                 case "--no-restore":
                     restoreOnFailure = false;
@@ -144,9 +152,12 @@ public static class UpdateCommandLine
     }
 }
 
-/// <summary>The exit-status table (contract § Global tool, Exit statuses). 10/11/12 (restore outcomes) are S4's
-/// and unused by anything S2 raises; a <see cref="UpdateErrorCode.ReplacementCreateFailed"/> falls to 1
-/// ("Any other failure") because S2 does not implement the restore that would otherwise select 10, 11 or 12.</summary>
+/// <summary>The exit-status table (contract § Global tool, Exit statuses). 10/11/12 are restore outcomes (S4)
+/// and are reached only via <see cref="ForOutcome"/> — <see cref="Updater.RunAsync"/> returns them as an
+/// <see cref="UpdateOutcome"/> rather than throwing, since <see cref="ForError"/> has no mapping for them
+/// (<see cref="UpdateErrorCode.ReplacementCreateFailed"/> and <see cref="UpdateErrorCode.RestoreFailed"/> both
+/// still fall to 1 here, unreached in practice because the Updater never throws them as an
+/// <see cref="UpdateException"/>).</summary>
 public static class UpdateExitCode
 {
     public static int ForOutcome(UpdateOutcome outcome) => outcome switch
