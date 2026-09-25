@@ -24,6 +24,15 @@ permissions:
   contents: write
   checks: write
 
+# I13/S3.11: one CI concurrency group spans every publishing workflow (Build, Release,
+# Release-from-Tag) so at most one run publishes at a time. cancel-in-progress: false means a
+# publish already in flight always finishes, never pre-empted. GitHub holds at most ONE pending
+# run per group, though: a newer run cancels the older pending one, so a queued release can be
+# superseded and must then be re-dispatched.
+concurrency:
+  group: buildagent-publish
+  cancel-in-progress: false
+
 jobs:
   Release:
     name: Release from Tag

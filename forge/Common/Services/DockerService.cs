@@ -251,16 +251,27 @@ public class DockerService : IDockerService
                 .DisableProcessInvocationLogging()
                 .SetName($"{latestTag}"));
 
-            DockerTasks.DockerPush(s => s
-                .DisableProcessInvocationLogging()
-                .SetName($"{versionTag}"));
+            // No versioned tag means a main push (I15): only `latest` moves.
+            if (!string.IsNullOrEmpty(versionTag))
+            {
+                DockerTasks.DockerPush(s => s
+                    .DisableProcessInvocationLogging()
+                    .SetName($"{versionTag}"));
+            }
         }
         catch
         {
             // Ignore Docker task failures in test environment
         }
 
-        _logger.Push("Docker Images: {Version}, latest", parameters.Version);
+        if (string.IsNullOrEmpty(versionTag))
+        {
+            _logger.Push("Docker Images: latest");
+        }
+        else
+        {
+            _logger.Push("Docker Images: {Version}, latest", parameters.Version);
+        }
     }
 
     /// <summary>
@@ -281,6 +292,12 @@ public class DockerService : IDockerService
 
         var latestTag = parameters.Tags.FirstOrDefault(x => x.Contains("latest"));
         var versionTag = parameters.Tags.FirstOrDefault(x => !x.Contains("latest"));
+
+        // No versioned tag means a main push (I15): there is nothing to tag.
+        if (string.IsNullOrEmpty(versionTag))
+        {
+            return;
+        }
 
         try
         {

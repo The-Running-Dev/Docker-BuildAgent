@@ -102,7 +102,10 @@ public class DockerSimulationService : IDockerService
         var versionTag = parameters.Tags.FirstOrDefault(x => !x.Contains("latest"));
         
         _logger.LogInformation("   📤 Would push: {LatestTag}", latestTag);
-        _logger.LogInformation("   📤 Would push: {VersionTag}", versionTag);
+        if (!string.IsNullOrEmpty(versionTag))
+        {
+            _logger.LogInformation("   📤 Would push: {VersionTag}", versionTag);
+        }
         _logger.LogInformation("   ⏱️  Estimated push time: 30 seconds - 2 minutes (depending on image size and network)");
         _logger.LogInformation("Docker Images: {Version}, latest", parameters.Version);
         _logger.LogInformation("   ✅ Push simulation completed successfully");

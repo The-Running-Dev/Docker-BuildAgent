@@ -9,6 +9,9 @@
 ## 💥 Breaking Changes
 <!-- List any breaking changes -->
 
+## 🗑️ Deprecations
+<!-- List any deprecations -->
+
 ## 🔧 Maintenance
 <!-- List internal improvements, dependency updates, etc. -->
 
