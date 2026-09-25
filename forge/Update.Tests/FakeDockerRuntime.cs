@@ -25,6 +25,7 @@ public sealed class FakeDockerRuntime : IDockerRuntime
     public Func<string, bool>? FailCreateReplacement { get; set; }
     public Func<string, bool>? FailTagImage { get; set; }
     public Func<string, string, bool>? FailRename { get; set; }
+    public Func<string, bool>? FailStart { get; set; }
 
     /// <summary>Overrides <see cref="ContainerInspection.Running"/> and <see cref="ContainerInspection.HealthStatus"/>
     /// for a container name on every <see cref="InspectAsync"/> of it, simulating a health check that starts,
@@ -175,7 +176,10 @@ public sealed class FakeDockerRuntime : IDockerRuntime
         }
     }
 
-    public Task StartAsync(string name) => Mutate(name, c => c with { Running = true });
+    public Task StartAsync(string name) =>
+        FailStart?.Invoke(name) == true
+            ? throw new DockerRuntimeException($"simulated start failure for {name}")
+            : Mutate(name, c => c with { Running = true });
 
     public Task StopAsync(string name) => Mutate(name, c => c with { Running = false });
 

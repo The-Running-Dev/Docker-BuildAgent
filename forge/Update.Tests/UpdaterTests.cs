@@ -659,4 +659,90 @@ public sealed class UpdaterTests : IDisposable
         var open = Assert.Single(state.OpenRecords);
         Assert.Equal("web", open.ContainerName);
     }
+
+    // A swap that fails before the target is renamed leaves the original under its own name: restore starts
+    // it again rather than removing it as though it were a replacement.
+    [Fact]
+    public async Task SwapFailsBeforeRename_RestartsTheOriginal_NeverRemovesIt()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.FailRename = (current, next) => current == "web" && next == UpdateNaming.PriorContainerName("web");
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.RestoredAfterUnhealthy, outcome);
+        var original = _runtime.Get("web");
+        Assert.NotNull(original);
+        Assert.Equal(target.Id, original!.Id);
+        Assert.True(original.Running);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+    }
+
+    // With the prior container gone, a restore that cannot succeed leaves the replacement standing rather than
+    // removing the only container left.
+    [Fact]
+    public async Task RestoreFailed_PriorGone_LeavesTheReplacementInPlace()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var priorName = UpdateNaming.PriorContainerName("web");
+        _runtime.HealthProbe = name => name == "web" ? (true, "starting") : null;
+        var clock = new ClockWithFirstDelayHook(() => _runtime.RemoveAsync(priorName, force: true).GetAwaiter().GetResult());
+        var updater = new Updater(_runtime, _log, clock, _identity);
+
+        var outcome = await updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(2), true));
+
+        Assert.Equal(UpdateOutcome.RestoreFailed, outcome);
+        var replacement = _runtime.Get("web");
+        Assert.NotNull(replacement);
+        Assert.Equal("sha256:new", replacement!.ImageId);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+    }
+
+    // S4.9: a prior container renamed back but refusing to start is returned to its prior name, so the next
+    // update still finds it rather than updating over it.
+    [Fact]
+    public async Task RestoreFailed_WhenThePriorContainerCannotStart_ReturnsItToItsPriorName()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var priorName = UpdateNaming.PriorContainerName("web");
+        _runtime.FailCreateReplacement = name => name == "web";
+        _runtime.FailStart = name => name == "web";
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.RestoreFailed, outcome);
+        var prior = _runtime.Get(priorName);
+        Assert.NotNull(prior);
+        Assert.Equal(target.Id, prior!.Id);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.Empty(_log.ReadState().OpenRecords);
+    }
+
+    // A daemon error while polling health is not a verdict: the wait continues, and a replacement that then
+    // reports healthy succeeds, with the lock released and the outcome written.
+    [Fact]
+    public async Task HealthPollDaemonError_KeepsWaiting_ThenSucceeds()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var polls = 0;
+        _runtime.HealthProbe = name =>
+        {
+            if (name != "web" || _runtime.Get(UpdateNaming.PriorContainerName("web")) == null)
+            {
+                return null;
+            }
+
+            return ++polls == 1 ? throw new DockerRuntimeException("simulated inspect failure") : (true, "healthy");
+        };
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.Succeeded, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.Empty(_log.ReadState().OpenRecords);
+    }
 }

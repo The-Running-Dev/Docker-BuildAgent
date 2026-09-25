@@ -63,12 +63,13 @@ public static class UpdateCommandLine
                     imageReference = RequireValue(args, ref i, arg);
                     break;
                 case "--health-timeout":
-                    healthTimeout = ParseDuration(RequireValue(args, ref i, arg), arg);
+                    var healthTimeoutText = RequireValue(args, ref i, arg);
+                    healthTimeout = ParseDuration(healthTimeoutText, arg);
                     if (healthTimeout <= TimeSpan.Zero)
                     {
                         // S4.7: a non-positive timeout refuses rather than waiting indefinitely.
                         throw new UpdateCommandLineException(
-                            $"Option '{arg}' must be greater than zero; got '{healthTimeout}'.");
+                            $"Option '{arg}' must be greater than zero; got '{healthTimeoutText}'.");
                     }
 
                     break;
