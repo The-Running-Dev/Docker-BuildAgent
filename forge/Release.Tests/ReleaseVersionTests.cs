@@ -36,6 +36,29 @@ public sealed class ReleaseVersionTests
         Assert.Throws<FormatException>(() => ReleaseVersion.Parse("not-a-version"));
     }
 
+    [Theory]
+    [InlineData("v01.2.3")]
+    [InlineData("+1.2.3")]
+    [InlineData("1. 2.3")]
+    [InlineData("2.0.0+sha.5114f85")]
+    [InlineData("2.0.0-beta+sha.5114f85")]
+    [InlineData("2.0.0-")]
+    [InlineData("2.0.0-beta..1")]
+    public void Parse_RejectsNonCanonicalInput(string value)
+    {
+        Assert.Throws<FormatException>(() => ReleaseVersion.Parse(value));
+    }
+
+    [Theory]
+    [InlineData("v0.10.0")]
+    [InlineData("2.0.0-rc-1.2")]
+    public void Parse_RoundTripsCanonicalInput(string value)
+    {
+        var version = ReleaseVersion.Parse(value);
+
+        Assert.Equal(value.TrimStart('v'), version.ToPackageString());
+    }
+
     [Fact]
     public void ToTagString_PrependsV()
     {

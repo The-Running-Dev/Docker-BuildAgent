@@ -50,8 +50,11 @@ public static class ReleaseNotesValidator
         string? line;
         while ((line = reader.ReadLine()) != null)
         {
+            // A Markdown ATX heading: 1-6 '#' followed by a space. "#42 breaking change" is an
+            // issue reference, not a section.
             var trimmed = line.TrimStart();
-            if (!trimmed.StartsWith("#", StringComparison.Ordinal))
+            var level = trimmed.TakeWhile(c => c == '#').Count();
+            if (level is < 1 or > 6 || level == trimmed.Length || !char.IsWhiteSpace(trimmed[level]))
             {
                 continue;
             }

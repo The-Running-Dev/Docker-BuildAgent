@@ -142,6 +142,7 @@ public sealed class ReleasePipelineTests
     [InlineData(nameof(TestNotes.MissingBreakingChanges))]
     [InlineData(nameof(TestNotes.MissingDeprecations))]
     [InlineData(nameof(TestNotes.MissingBoth))]
+    [InlineData(nameof(TestNotes.IssueReferencesAreNotHeadings))]
     public async Task Publish_FailsWithNotesSectionMissing_WhenARequiredHeadingIsAbsent(string notesFieldName)
     {
         var notes = notesFieldName switch
@@ -149,6 +150,7 @@ public sealed class ReleasePipelineTests
             nameof(TestNotes.MissingBreakingChanges) => TestNotes.MissingBreakingChanges,
             nameof(TestNotes.MissingDeprecations) => TestNotes.MissingDeprecations,
             nameof(TestNotes.MissingBoth) => TestNotes.MissingBoth,
+            nameof(TestNotes.IssueReferencesAreNotHeadings) => TestNotes.IssueReferencesAreNotHeadings,
             _ => throw new ArgumentOutOfRangeException(nameof(notesFieldName)),
         };
 

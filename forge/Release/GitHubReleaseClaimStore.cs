@@ -29,6 +29,7 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
     private readonly string _owner;
     private readonly string _repo;
     private readonly IGitHubClient _client;
+    private readonly System.Collections.Generic.Dictionary<string, long> _createdReleaseIds = new(StringComparer.Ordinal);
 
     public GitHubReleaseClaimStore(string owner, string repo, string token, IGitHubClient? client = null)
     {
@@ -62,7 +63,8 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
 
         try
         {
-            await _client.Repository.Release.Create(_owner, _repo, newRelease).ConfigureAwait(false);
+            var created = await _client.Repository.Release.Create(_owner, _repo, newRelease).ConfigureAwait(false);
+            _createdReleaseIds[version.ToTagString()] = created.Id;
         }
         catch (Exception ex)
         {
@@ -78,19 +80,31 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
 
     public async Task PublishAsync(ReleaseClaim claim)
     {
-        var releases = await ListAllAsync().ConfigureAwait(false);
-        var existing = releases.FirstOrDefault(r => string.Equals(r.TagName, claim.Version.ToTagString(), StringComparison.Ordinal));
+        var tagName = claim.Version.ToTagString();
 
-        if (existing == null)
+        // Publish the exact draft this store created: drafts do not reserve a tag, so a stale draft
+        // for the same tag can coexist, and a lookup by tag name could pick the wrong one.
+        if (!_createdReleaseIds.TryGetValue(tagName, out var releaseId))
         {
-            throw new ReleaseException(
-                ReleaseErrorCode.ClaimCreationFailed,
-                null,
-                $"No draft release found for '{claim.Version.ToTagString()}' to publish.");
+            var releases = await ListAllAsync().ConfigureAwait(false);
+            var existing = releases.FirstOrDefault(r =>
+                r.Draft
+                && string.Equals(r.TagName, tagName, StringComparison.Ordinal)
+                && string.Equals(r.TargetCommitish, claim.CommitSha, StringComparison.Ordinal));
+
+            if (existing == null)
+            {
+                throw new ReleaseException(
+                    ReleaseErrorCode.ClaimCreationFailed,
+                    null,
+                    $"No draft release found for '{tagName}' at {claim.CommitSha} to publish.");
+            }
+
+            releaseId = existing.Id;
         }
 
         var update = new ReleaseUpdate { Draft = false };
-        await _client.Repository.Release.Edit(_owner, _repo, existing.Id, update).ConfigureAwait(false);
+        await _client.Repository.Release.Edit(_owner, _repo, releaseId, update).ConfigureAwait(false);
     }
 
     private async Task<System.Collections.Generic.IReadOnlyList<Octokit.Release>> ListAllAsync()

@@ -72,7 +72,7 @@ public sealed class ReleasePipeline
             throw new ReleaseException(
                 ReleaseErrorCode.VersionAlreadyExists,
                 null,
-                $"Version {version.ToPackageString()} already has a draft release claim bound to commit {existingClaim.CommitSha}.");
+                $"Version {version.ToPackageString()} already has a {existingClaim.State.ToString().ToLowerInvariant()} release claim bound to commit {existingClaim.CommitSha}.");
         }
 
         if (await _imageTagChecker.ExistsAsync(version).ConfigureAwait(false))

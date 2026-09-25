@@ -156,6 +156,13 @@ public static class TestNotes
         Nothing structured here.
         """;
 
+    public const string IssueReferencesAreNotHeadings = """
+        # Release notes
+
+        #42 Breaking change in the parser
+        #43 Deprecation of the old flag
+        """;
+
     public const string EmptySectionsPass = """
         ## Breaking Changes
         ## Deprecations

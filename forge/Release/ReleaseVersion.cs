@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using System.Linq;
 
 namespace Release;
 
@@ -33,17 +34,33 @@ public sealed record ReleaseVersion(int Major, int Minor, int Patch, string? Pre
         var core = dashIndex >= 0 ? withoutPrefix[..dashIndex] : withoutPrefix;
         var preRelease = dashIndex >= 0 ? withoutPrefix[(dashIndex + 1)..] : null;
 
+        // Canonical forms only, so Parse(x).ToTagString() names the same tag x did: numeric parts are
+        // plain digits without leading zeros, and the pre-release carries no build metadata ('+').
         var parts = core.Split('.');
         if (parts.Length != 3
-            || !int.TryParse(parts[0], out var major)
-            || !int.TryParse(parts[1], out var minor)
-            || !int.TryParse(parts[2], out var patch))
+            || !TryParseNumericPart(parts[0], out var major)
+            || !TryParseNumericPart(parts[1], out var minor)
+            || !TryParseNumericPart(parts[2], out var patch)
+            || (preRelease != null && !IsValidPreRelease(preRelease)))
         {
-            throw new FormatException($"'{value}' is not a valid release version (expected MAJOR.MINOR.PATCH[-PRERELEASE], optionally 'v'-prefixed).");
+            throw new FormatException($"'{value}' is not a valid release version (expected MAJOR.MINOR.PATCH[-PRERELEASE], optionally 'v'-prefixed, without build metadata).");
         }
 
-        return new ReleaseVersion(major, minor, patch, string.IsNullOrEmpty(preRelease) ? null : preRelease);
+        return new ReleaseVersion(major, minor, patch, preRelease);
     }
+
+    private static bool TryParseNumericPart(string part, out int result)
+    {
+        result = 0;
+        return part.Length > 0
+            && part.All(char.IsAsciiDigit)
+            && (part.Length == 1 || part[0] != '0')
+            && int.TryParse(part, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out result);
+    }
+
+    private static bool IsValidPreRelease(string preRelease) =>
+        preRelease.Split('.').All(identifier =>
+            identifier.Length > 0 && identifier.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'));
 
     /// <summary>Produces the git tag and the GitHub release tag, e.g. "v2.0.0".</summary>
     public string ToTagString() => $"v{ToPackageString()}";

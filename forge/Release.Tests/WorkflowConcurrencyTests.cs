@@ -8,8 +8,10 @@ using YamlDotNet.RepresentationModel;
 namespace Release.Tests;
 
 /// <summary>
-/// S3.11: A single CI concurrency group spans every publishing workflow and queues rather than
-/// cancels, so at most one run publishes at a time (I13). Parses the actual workflow YAML files
+/// S3.11: A single CI concurrency group spans every publishing workflow and never cancels a run in
+/// progress, so at most one run publishes at a time (I13). GitHub still keeps only one pending run
+/// per group — a newer run supersedes an older pending one — so this proves exclusion, not a FIFO
+/// queue. Parses the actual workflow YAML files
 /// rather than re-asserting a hard-coded expectation, so an edit to any one file that breaks the
 /// shared group is caught here.
 /// </summary>
