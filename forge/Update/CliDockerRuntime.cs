@@ -252,8 +252,17 @@ public sealed class CliDockerRuntime : IDockerRuntime
             Ports: ReadPorts(config, hostConfig),
             RestartPolicy: ReadRestartPolicy(hostConfig),
             Networks: ReadNetworks(element),
-            Links: ReadStringArray(hostConfig, "Links"));
+            Links: ReadStringArray(hostConfig, "Links"),
+            HealthStatus: ReadHealthStatus(state));
     }
+
+    /// <summary>Null when the container declares no <c>HEALTHCHECK</c> at all — Docker omits <c>State.Health</c>
+    /// entirely in that case, distinct from a declared check that has not yet reported (which starts "starting").</summary>
+    private static string? ReadHealthStatus(JsonElement state) =>
+        state.TryGetProperty("Health", out var health) && health.ValueKind == JsonValueKind.Object &&
+        health.TryGetProperty("Status", out var status)
+            ? status.GetString()
+            : null;
 
     private static string ReadRestartPolicy(JsonElement hostConfig)
     {

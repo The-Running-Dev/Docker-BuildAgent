@@ -224,20 +224,21 @@ public sealed class UpdaterTests : IDisposable
         Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
     }
 
-    // Out of scope, S2 — S4 owns health/cleanup, so a success still leaves the prior container and pin,
-    // and a second update refuses with ResiduePresent (disclosed boundary interpretation).
+    // S4.1: a healthy replacement's prior container is removed, closing the gap S2 left open — a second
+    // update of the same container no longer refuses with ResiduePresent.
     [Fact]
-    public async Task Success_LeavesResidueThatRefusesTheNextUpdate()
+    public async Task Success_RemovesThePriorContainer_SoASecondUpdateNoLongerRefusesWithResidue()
     {
         var target = Target("web", "sha256:old", "web:1.0");
         SeedTargetAndImages(target, "sha256:new", "web:2.0");
         _runtime.SeedImage("web:3.0", "sha256:newer");
 
-        await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+        Assert.Equal(UpdateOutcome.Succeeded, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.PriorContainerName("web")));
 
-        var ex = await Assert.ThrowsAsync<UpdateException>(
-            () => _updater.RunAsync("web", "web:3.0", new UpdateOptions(TimeSpan.FromSeconds(30), true)));
-        Assert.Equal(UpdateErrorCode.ResiduePresent, ex.Code);
+        var secondOutcome = await _updater.RunAsync("web", "web:3.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+        Assert.Equal(UpdateOutcome.Succeeded, secondOutcome);
     }
 
     // S2.5 / I32: lock message names owner host, pid and age; a passed deadline is diagnostic, not an authorization.
@@ -438,25 +439,224 @@ public sealed class UpdaterTests : IDisposable
         }
     }
 
-    // I37: a failure past the target's first change (stop/rename/create/start) does not release the lock and
-    // writes no outcome — S2's own out-of-scope boundary for restore/recovery of this path (disclosed).
+    // S4.10: a daemon rejection during creation restores unconditionally — no updated container exists to
+    // keep — releasing the lock and writing the outcome record, rather than stranding the target (S2's
+    // former out-of-scope boundary; closed by this slice).
     [Fact]
-    public async Task ReplacementCreateFailed_DoesNotReleaseTheLock_AndWritesNoOutcome()
+    public async Task ReplacementCreateFailed_RestoresUnconditionally_ReleasesLockAndWritesOutcome()
     {
         var target = Target("web", "sha256:old", "web:1.0");
         SeedTargetAndImages(target, "sha256:new", "web:2.0");
         _runtime.FailCreateReplacement = name => name == "web";
 
-        var ex = await Assert.ThrowsAsync<UpdateException>(
-            () => _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true)));
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
 
-        Assert.Equal(UpdateErrorCode.ReplacementCreateFailed, ex.Code);
-        Assert.NotNull(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.Equal(UpdateOutcome.RestoredAfterUnhealthy, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+
+        var restored = _runtime.Get("web");
+        Assert.NotNull(restored);
+        Assert.True(restored!.Running);
+        Assert.Equal("sha256:old", restored.ImageId);
 
         var state = _log.ReadState();
         Assert.False(state.IsCorrupt);
+        Assert.Empty(state.OpenRecords);
+    }
+
+    // S4.2: a replacement that never reports healthy within the timeout restores the prior container and
+    // exits with RestoredAfterUnhealthy; the running container's image id equals the pre-update image id.
+    [Fact]
+    public async Task HealthTimedOut_RestoresThePriorContainer_WithThePreUpdateImage()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.HealthProbe = name => name == "web" ? (true, "starting") : null;
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(2), true));
+
+        Assert.Equal(UpdateOutcome.RestoredAfterUnhealthy, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        var restored = _runtime.Get("web");
+        Assert.NotNull(restored);
+        Assert.True(restored!.Running);
+        Assert.Equal("sha256:old", restored.ImageId);
+    }
+
+    // S4.3: a target declaring no health check at all (a null HealthStatus) is treated as unhealthy and
+    // restores, exactly like a timeout.
+    [Fact]
+    public async Task HealthCheckAbsent_TreatedAsUnhealthy_Restores()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.HealthProbe = name => name == "web" ? (true, null) : null;
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.RestoredAfterUnhealthy, outcome);
+        Assert.Equal("sha256:old", _runtime.Get("web")!.ImageId);
+    }
+
+    // S4.4: a replacement that exits before becoming healthy fails with ReplacementExited and takes the
+    // same restore path as a timeout.
+    [Fact]
+    public async Task ReplacementExited_Restores()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.HealthProbe = name => name == "web" ? (false, null) : null;
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.RestoredAfterUnhealthy, outcome);
+        var restored = _runtime.Get("web");
+        Assert.NotNull(restored);
+        Assert.True(restored!.Running);
+        Assert.Equal("sha256:old", restored.ImageId);
+    }
+
+    // S4.5/S4.6: with restoreOnFailure = false (--no-restore), an unhealthy replacement is left in place;
+    // the prior container and its pin remain untouched, for manual recovery. Restoring is the default
+    // behaviour exercised by every other health-failure test above, which all pass RestoreOnFailure: true.
+    [Fact]
+    public async Task NoRestore_LeavesUnhealthyReplacementInPlace()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.HealthProbe = name => name == "web" ? (true, "starting") : null;
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(2), false));
+
+        Assert.Equal(UpdateOutcome.UnhealthyNotRestored, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+
+        var replacement = _runtime.Get("web");
+        Assert.NotNull(replacement);
+        Assert.Equal("sha256:new", replacement!.ImageId);
+
+        Assert.NotNull(_runtime.Get(UpdateNaming.PriorContainerName("web")));
+        Assert.True(_runtime.HasImageTag(UpdateNaming.PriorImageTag("web")));
+    }
+
+    // S4.8/S4.9: removing the retained prior container before restore is attempted produces RestoreFailed
+    // rather than reconstructing one from inspect output — restore only ever renames an actually-retained
+    // container. The outcome is written and the lock released, per S4.9's general RestoreFailed contract.
+    [Fact]
+    public async Task RestoreFailed_WhenPriorContainerRemovedBeforeRestoreIsAttempted()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var priorName = UpdateNaming.PriorContainerName("web");
+        _runtime.FailCreateReplacement = name =>
+        {
+            if (name != "web")
+            {
+                return false;
+            }
+
+            // Simulates an operator removing the retained prior container out from under this update,
+            // between the rename that retained it and the restore attempt that would otherwise use it.
+            _runtime.RemoveAsync(priorName, force: true).GetAwaiter().GetResult();
+            return true;
+        };
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.RestoreFailed, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.Null(_runtime.Get(priorName));
+        Assert.Null(_runtime.Get("web"));
+
+        var state = _log.ReadState();
+        Assert.Empty(state.OpenRecords);
+    }
+
+    // S4.9: when restore itself fails to put the prior container back, the message names it and its
+    // labels, the outcome is written, the lock is released, and the prior container is left in place so
+    // the next update refuses.
+    [Fact]
+    public async Task RestoreFailed_WhenRenamingThePriorContainerBackFails_NamesItAndItsLabels()
+    {
+        var labels = new Dictionary<string, string> { ["com.example.owner"] = "team-a" };
+        var target = Target("web", "sha256:old", "web:1.0", labels: labels);
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var priorName = UpdateNaming.PriorContainerName("web");
+        _runtime.FailCreateReplacement = name => name == "web";
+        _runtime.FailRename = (current, next) => current == priorName && next == "web";
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.RestoreFailed, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+
+        var prior = _runtime.Get(priorName);
+        Assert.NotNull(prior);
+        Assert.Equal("team-a", prior!.Labels["com.example.owner"]);
+
+        var state = _log.ReadState();
+        Assert.Empty(state.OpenRecords);
+    }
+
+    // Fires `onFirstDelay` the first time the health-wait loop awaits its poll interval, then behaves like
+    // FakeUpdateClock — letting a test tamper with runtime or log state at the exact moment the loop is
+    // about to poll again, a point otherwise unreachable from outside a single async call.
+    private sealed class ClockWithFirstDelayHook : IUpdateClock
+    {
+        private readonly FakeUpdateClock _inner = new();
+        private readonly Action _onFirstDelay;
+        private bool _fired;
+
+        public ClockWithFirstDelayHook(Action onFirstDelay)
+        {
+            _onFirstDelay = onFirstDelay;
+        }
+
+        public DateTimeOffset UtcNow => _inner.UtcNow;
+
+        public Task Delay(TimeSpan delay)
+        {
+            if (!_fired)
+            {
+                _fired = true;
+                _onFirstDelay();
+            }
+
+            return _inner.Delay(delay);
+        }
+    }
+
+    // S4.11: a failure to write the outcome record does not change the exit status — it is reported on
+    // stderr, and the stranded start record is what the next update's residue check (S2.9) detects.
+    [Fact]
+    public async Task FinalizeLogWriteFailure_DoesNotChangeOutcome_ReportsOnStderrAndLeavesResidue()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.HealthProbe = name => name == "web" ? (true, "starting") : null;
+
+        var clock = new ClockWithFirstDelayHook(() => File.SetAttributes(_logPath, FileAttributes.ReadOnly));
+        var updater = new Updater(_runtime, _log, clock, _identity);
+
+        var originalError = Console.Error;
+        var capturedError = new StringWriter();
+        Console.SetError(capturedError);
+        UpdateOutcome outcome;
+        try
+        {
+            outcome = await updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(2), true));
+        }
+        finally
+        {
+            Console.SetError(originalError);
+            File.SetAttributes(_logPath, FileAttributes.Normal);
+        }
+
+        Assert.Equal(UpdateOutcome.RestoredAfterUnhealthy, outcome);
+        Assert.Contains("could not be written", capturedError.ToString());
+
+        var state = _log.ReadState();
         var open = Assert.Single(state.OpenRecords);
         Assert.Equal("web", open.ContainerName);
-        Assert.False(open.HasOutcome);
     }
 }

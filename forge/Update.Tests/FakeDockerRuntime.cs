@@ -24,6 +24,13 @@ public sealed class FakeDockerRuntime : IDockerRuntime
     public bool RegistryReachable { get; set; } = true;
     public Func<string, bool>? FailCreateReplacement { get; set; }
     public Func<string, bool>? FailTagImage { get; set; }
+    public Func<string, string, bool>? FailRename { get; set; }
+
+    /// <summary>Overrides <see cref="ContainerInspection.Running"/> and <see cref="ContainerInspection.HealthStatus"/>
+    /// for a container name on every <see cref="InspectAsync"/> of it, simulating a health check that starts,
+    /// times out, or a replacement that exits — none of which this in-memory daemon otherwise models on its
+    /// own over time. Returning null for a name leaves that container's stored state as-is.</summary>
+    public Func<string, (bool Running, string? HealthStatus)?>? HealthProbe { get; set; }
 
     public void SeedContainer(ContainerInspection inspection)
     {
@@ -66,7 +73,18 @@ public sealed class FakeDockerRuntime : IDockerRuntime
     {
         lock (_gate)
         {
-            return Task.FromResult(_containers.TryGetValue(name, out var container) ? container : null);
+            if (!_containers.TryGetValue(name, out var container))
+            {
+                return Task.FromResult<ContainerInspection?>(null);
+            }
+
+            var probed = HealthProbe?.Invoke(name);
+            if (probed.HasValue)
+            {
+                container = container with { Running = probed.Value.Running, HealthStatus = probed.Value.HealthStatus };
+            }
+
+            return Task.FromResult<ContainerInspection?>(container);
         }
     }
 
@@ -149,7 +167,10 @@ public sealed class FakeDockerRuntime : IDockerRuntime
                 Ports: spec.Ports,
                 RestartPolicy: spec.RestartPolicy,
                 Networks: spec.Networks,
-                Links: Array.Empty<string>());
+                Links: Array.Empty<string>(),
+                // A replacement is healthy from the moment it exists unless a test's HealthProbe says
+                // otherwise (S4) — so every pre-S4 success test keeps passing without simulating health at all.
+                HealthStatus: "healthy");
             return Task.FromResult(id);
         }
     }
@@ -162,6 +183,11 @@ public sealed class FakeDockerRuntime : IDockerRuntime
     {
         lock (_gate)
         {
+            if (FailRename?.Invoke(currentName, newName) == true)
+            {
+                throw new DockerRuntimeException($"simulated rename failure for {currentName} -> {newName}");
+            }
+
             if (!_containers.TryGetValue(currentName, out var container))
             {
                 throw new DockerRuntimeException($"no such container: {currentName}");
@@ -233,4 +259,11 @@ public sealed class FakeDockerRuntime : IDockerRuntime
 public sealed class FakeUpdateClock : IUpdateClock
 {
     public DateTimeOffset UtcNow { get; set; } = DateTimeOffset.Parse("2026-09-21T00:00:00Z");
+
+    // Advances virtual time instead of really waiting, so a health-wait loop runs instantly under test.
+    public Task Delay(TimeSpan delay)
+    {
+        UtcNow += delay;
+        return Task.CompletedTask;
+    }
 }
