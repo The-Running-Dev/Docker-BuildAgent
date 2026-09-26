@@ -41,23 +41,29 @@ switch (command)
 
 static async Task<int> RunClearLockAsync(IDockerRuntime runtime, string containerName)
 {
-    var lockName = UpdateNaming.LockContainerName(containerName);
+    var updater = new Updater(runtime, new UpdateLogStore(), new SystemUpdateClock(), UpdaterIdentity.Current());
+
     try
     {
-        // Nothing to clear is not a failure (contract § Global tool: "--clear-lock ... never touches the target"),
-        // but a daemon that cannot be reached, or a removal it refuses, is.
-        if (await runtime.InspectAsync(lockName) != null)
+        // Nothing to clear is not a failure (contract § Global tool: "--clear-lock ... never touches the target").
+        var cleared = await updater.ClearLockAsync(containerName);
+        if (cleared == null)
         {
-            await runtime.RemoveAsync(lockName, force: true);
+            Console.WriteLine($"No lock was held for '{containerName}'.");
+            return 0;
         }
+
+        var age = Updater.FormatAge(DateTimeOffset.UtcNow - cleared.CreatedAt);
+        Console.WriteLine(
+            $"Cleared the lock on '{containerName}': update {cleared.UpdateId}, held by host '{cleared.OwnerHost}', " +
+            $"process {cleared.OwnerProcessId}, acquired at {cleared.CreatedAt:O}, held for {age}.");
+        return 0;
     }
     catch (Exception ex) when (ex is DockerRuntimeException or System.ComponentModel.Win32Exception)
     {
         Console.Error.WriteLine(ex.Message);
         return 1;
     }
-
-    return 0;
 }
 
 static async Task<int> RunUpdateAsync(IDockerRuntime runtime, UpdateLogStore log, UpdateCommand.Run run)
