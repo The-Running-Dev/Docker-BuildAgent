@@ -12,6 +12,10 @@ public static class UpdateNaming
     public const string LabelRole = "com.buildagent.role";
     public const string LabelContainer = "com.buildagent.container";
     public const string LabelUpdateId = "com.buildagent.update-id";
+    public const string LabelOwnerHost = "com.buildagent.owner-host";
+    public const string LabelOwnerPid = "com.buildagent.owner-pid";
+    public const string LabelCreatedAt = "com.buildagent.created-at";
+    public const string LabelDeadline = "com.buildagent.deadline";
 
     public const string RoleLock = "lock";
     public const string RolePrior = "prior";

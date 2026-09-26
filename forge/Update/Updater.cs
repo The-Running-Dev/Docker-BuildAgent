@@ -120,10 +120,10 @@ public sealed class Updater
             [UpdateNaming.LabelRole] = UpdateNaming.RoleLock,
             [UpdateNaming.LabelContainer] = containerName,
             [UpdateNaming.LabelUpdateId] = updateId.ToString(),
-            ["com.buildagent.owner-host"] = _identity.OwnerHost,
-            ["com.buildagent.owner-pid"] = _identity.OwnerProcessId.ToString(CultureInfo.InvariantCulture),
-            ["com.buildagent.created-at"] = now.ToString("O", CultureInfo.InvariantCulture),
-            ["com.buildagent.deadline"] = deadline.ToString("O", CultureInfo.InvariantCulture),
+            [UpdateNaming.LabelOwnerHost] = _identity.OwnerHost,
+            [UpdateNaming.LabelOwnerPid] = _identity.OwnerProcessId.ToString(CultureInfo.InvariantCulture),
+            [UpdateNaming.LabelCreatedAt] = now.ToString("O", CultureInfo.InvariantCulture),
+            [UpdateNaming.LabelDeadline] = deadline.ToString("O", CultureInfo.InvariantCulture),
         };
 
         try
@@ -252,6 +252,23 @@ public sealed class Updater
             await TryRemoveContainerAsync(lockName);
             throw;
         }
+    }
+
+    /// <summary>Removes exactly the named target's lock, if one exists, and reports what it held (design/30-slices.md
+    /// § S5). Touches nothing else: not the target container, the prior container, the prior image pin, nor the
+    /// update log (S5.2) — this is the only operator action that removes a lock it does not own (S5.3).</summary>
+    public async Task<UpdateLock?> ClearLockAsync(string containerName)
+    {
+        var lockName = UpdateNaming.LockContainerName(containerName);
+        var lockInspection = await _runtime.InspectAsync(lockName);
+        if (lockInspection == null)
+        {
+            return null;
+        }
+
+        var updateLock = ParseLock(containerName, lockInspection);
+        await _runtime.RemoveAsync(lockName, force: true);
+        return updateLock;
     }
 
     private enum HealthWaitOutcome
@@ -510,25 +527,15 @@ public sealed class Updater
 
     private UpdateException BuildLockHeldException(string containerName, ContainerInspection lockInspection)
     {
-        var labels = lockInspection.Labels;
-        var ownerHost = labels.GetValueOrDefault("com.buildagent.owner-host", "an unknown host");
-        var ownerPid = labels.GetValueOrDefault("com.buildagent.owner-pid", "an unknown process");
-
-        DateTimeOffset? createdAt = labels.TryGetValue("com.buildagent.created-at", out var createdAtText) &&
-            DateTimeOffset.TryParse(createdAtText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedCreatedAt)
-                ? parsedCreatedAt
-                : null;
-
-        DateTimeOffset? deadline = labels.TryGetValue("com.buildagent.deadline", out var deadlineText) &&
-            DateTimeOffset.TryParse(deadlineText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedDeadline)
-                ? parsedDeadline
-                : null;
-
+        var updateLock = ParseLock(containerName, lockInspection);
         var now = _clock.UtcNow;
-        var ageText = createdAt.HasValue ? FormatAge(now - createdAt.Value) : "an unknown age";
+        var ageText = updateLock.CreatedAt == DateTimeOffset.MinValue ? "an unknown age" : FormatAge(now - updateLock.CreatedAt);
+        var ownerHost = updateLock.OwnerHost;
+        var ownerPid = updateLock.OwnerProcessId == 0 ? "an unknown process" : updateLock.OwnerProcessId.ToString(CultureInfo.InvariantCulture);
 
-        var message = $"Container '{containerName}' is locked by host '{ownerHost}', process {ownerPid}, held for {ageText}.";
-        if (deadline.HasValue && now > deadline.Value)
+        var message = $"Container '{containerName}' is locked by host '{ownerHost}', process {ownerPid}, held for {ageText}. " +
+            $"Run 'update --clear-lock {containerName}' to clear it.";
+        if (updateLock.Deadline != DateTimeOffset.MinValue && now > updateLock.Deadline)
         {
             message += " The lock's deadline has passed; a passed deadline does not authorise taking it over.";
         }
@@ -536,7 +543,39 @@ public sealed class Updater
         return new UpdateException(UpdateErrorCode.LockHeld, containerName, message);
     }
 
-    private static string FormatAge(TimeSpan age)
+    /// <summary>Reads a lock container's labels back into the typed <see cref="UpdateLock"/> the contract declares
+    /// (design/20-contract.md § Prior image pin and prior container). Shared by the refusal message (S2.5) and by
+    /// <see cref="ClearLockAsync"/>'s report (S5.1), so both read the same fields the same way.</summary>
+    private static UpdateLock ParseLock(string containerName, ContainerInspection lockInspection)
+    {
+        var labels = lockInspection.Labels;
+
+        var updateId = labels.TryGetValue(UpdateNaming.LabelUpdateId, out var updateIdText) &&
+            Guid.TryParse(updateIdText, out var parsedUpdateId)
+                ? parsedUpdateId
+                : Guid.Empty;
+
+        var ownerHost = labels.GetValueOrDefault(UpdateNaming.LabelOwnerHost, "an unknown host");
+
+        var ownerPid = labels.TryGetValue(UpdateNaming.LabelOwnerPid, out var ownerPidText) &&
+            int.TryParse(ownerPidText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedPid)
+                ? parsedPid
+                : 0;
+
+        var createdAt = labels.TryGetValue(UpdateNaming.LabelCreatedAt, out var createdAtText) &&
+            DateTimeOffset.TryParse(createdAtText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedCreatedAt)
+                ? parsedCreatedAt
+                : DateTimeOffset.MinValue;
+
+        var deadline = labels.TryGetValue(UpdateNaming.LabelDeadline, out var deadlineText) &&
+            DateTimeOffset.TryParse(deadlineText, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsedDeadline)
+                ? parsedDeadline
+                : DateTimeOffset.MinValue;
+
+        return new UpdateLock(updateId, containerName, createdAt, deadline, ownerHost, ownerPid);
+    }
+
+    public static string FormatAge(TimeSpan age)
     {
         if (age < TimeSpan.Zero)
         {

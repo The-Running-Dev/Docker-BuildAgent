@@ -267,6 +267,8 @@ public sealed class UpdaterTests : IDisposable
         Assert.Contains("999", ex.Message);
         Assert.Contains("5m", ex.Message);
         Assert.Contains("does not authorise", ex.Message);
+        // S5.4: a refusal naming a lock names the command that clears it.
+        Assert.Contains("--clear-lock web", ex.Message);
     }
 
     // S2.2: the lock is checked by name, before the target is ever inspected — it survives the target
@@ -285,6 +287,94 @@ public sealed class UpdaterTests : IDisposable
         var ex = await Assert.ThrowsAsync<UpdateException>(
             () => _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true)));
         Assert.Equal(UpdateErrorCode.LockHeld, ex.Code);
+    }
+
+    // S5.1: reports the lock's owning host, process, update id and acquisition time.
+    [Fact]
+    public async Task ClearLockAsync_RemovesTheLockAndReportsWhoHeldIt()
+    {
+        var updateId = Guid.NewGuid();
+        var createdAt = _clock.UtcNow.AddMinutes(-5);
+        var lockLabels = new Dictionary<string, string>
+        {
+            [UpdateNaming.LabelRole] = UpdateNaming.RoleLock,
+            [UpdateNaming.LabelContainer] = "web",
+            [UpdateNaming.LabelUpdateId] = updateId.ToString(),
+            [UpdateNaming.LabelOwnerHost] = "other-host",
+            [UpdateNaming.LabelOwnerPid] = "999",
+            [UpdateNaming.LabelCreatedAt] = createdAt.ToString("O"),
+            [UpdateNaming.LabelDeadline] = _clock.UtcNow.AddMinutes(30).ToString("O"),
+        };
+        await _runtime.CreateMarkerAsync(UpdateNaming.LockContainerName("web"), "sha256:whatever", lockLabels);
+
+        var cleared = await _updater.ClearLockAsync("web");
+
+        Assert.NotNull(cleared);
+        Assert.Equal(updateId, cleared!.UpdateId);
+        Assert.Equal("other-host", cleared.OwnerHost);
+        Assert.Equal(999, cleared.OwnerProcessId);
+        Assert.Equal(createdAt, cleared.CreatedAt);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+    }
+
+    // S5.2: leaves the target, the prior container, the prior image pin and the update log untouched.
+    [Fact]
+    public async Task ClearLockAsync_LeavesTargetPriorAndLogUntouched()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var priorName = UpdateNaming.PriorContainerName("web");
+        _runtime.SeedContainer(Target(priorName, "sha256:ancient", "web:0.9"));
+        var pinTag = UpdateNaming.PriorImageTag("web");
+        await _runtime.TagImageAsync("sha256:ancient", pinTag);
+        _log.Append(new UpdateRecord(1, Guid.NewGuid(), "web", DateTimeOffset.UtcNow, "sha256:ancient", "web:0.9",
+            new UpdateOptions(TimeSpan.FromSeconds(30), true), null, null, null));
+
+        var lockLabels = new Dictionary<string, string>
+        {
+            [UpdateNaming.LabelOwnerHost] = "other-host",
+            [UpdateNaming.LabelOwnerPid] = "999",
+        };
+        await _runtime.CreateMarkerAsync(UpdateNaming.LockContainerName("web"), "sha256:whatever", lockLabels);
+
+        await _updater.ClearLockAsync("web");
+
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.NotNull(_runtime.Get("web"));
+        Assert.NotNull(_runtime.Get(priorName));
+        Assert.True(_runtime.HasImageTag(pinTag));
+        Assert.Single(File.ReadAllLines(_logPath));
+    }
+
+    // S5.2: takes no other action when there is nothing to clear.
+    [Fact]
+    public async Task ClearLockAsync_ReturnsNullWhenNoLockIsHeld()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+
+        var cleared = await _updater.ClearLockAsync("web");
+
+        Assert.Null(cleared);
+        Assert.NotNull(_runtime.Get("web"));
+    }
+
+    // S5.3: it is the only operator action that removes a lock it does not own — no ownership check applies.
+    [Fact]
+    public async Task ClearLockAsync_RemovesALockOwnedByAnotherHostWithNoOwnershipCheck()
+    {
+        var lockLabels = new Dictionary<string, string>
+        {
+            [UpdateNaming.LabelOwnerHost] = "some-other-host",
+            [UpdateNaming.LabelOwnerPid] = "12345",
+        };
+        await _runtime.CreateMarkerAsync(UpdateNaming.LockContainerName("web"), "sha256:whatever", lockLabels);
+
+        var cleared = await _updater.ClearLockAsync("web");
+
+        Assert.NotNull(cleared);
+        Assert.Equal("some-other-host", cleared!.OwnerHost);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
     }
 
     // Simulates the daemon's atomic name-uniqueness: another updater's CreateMarkerAsync wins the race
