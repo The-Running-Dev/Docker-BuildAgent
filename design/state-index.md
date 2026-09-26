@@ -111,7 +111,6 @@ the mirror was taken at; check it against `git log` before trusting an entry tha
 |---|---|---|---|---|
 | 1 | #1 | Rollback on Unhealthy Update | — | `0189dd83bf03c2979300bf4b45d1921669af0bcb` |
 | 1 | #14 | Unified Build Orchestration via Global CLI Tool | — | `9e4b4c460d4117f7af5d545ab680c8b3f693944b` |
-| 4 | #27 | S1 — The public surface, derived and compared | S1.1, S1.2, S1.3, S1.4, S1.5, S1.6, S1.7, S1.8, S1.9, S1.10, S1.11, S1.12, S1.13, S1.14 | `9e4b4c460d4117f7af5d545ab680c8b3f693944b` |
 | 5 | #28 | S2 — Update a running container, or refuse without touching it | S2.1, S2.2, S2.3, S2.4, S2.5, S2.6, S2.7, S2.8, S2.9, S2.10, S2.11, S2.12, S2.13, S2.14, S2.15, S2.16, S2.17, S2.18, S2.19, S2.20, S2.21, S2.22, S2.23 | `9e4b4c460d4117f7af5d545ab680c8b3f693944b` |
 | 6 | #29 | S3 — A version publishes exactly once | S3.1, S3.2, S3.3, S3.4, S3.5, S3.6, S3.7, S3.10, S3.11, S3.12, S3.13, S3.14 | `9e4b4c460d4117f7af5d545ab680c8b3f693944b` |
 | 7 | #30 | S4 — When the new image does not come up, the old one comes back | S4.1, S4.2, S4.3, S4.4, S4.5, S4.6, S4.7, S4.8, S4.9, S4.10, S4.11, S4.12 | `9e4b4c460d4117f7af5d545ab680c8b3f693944b` |
