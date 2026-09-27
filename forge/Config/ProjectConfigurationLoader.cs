@@ -24,7 +24,16 @@ public static class ProjectConfigurationLoader
     /// discovery finding nothing is not itself an error (S6.1). Throws <see cref="ConfigException"/>
     /// carrying every error found otherwise.
     /// </summary>
-    public static ResolvedConfiguration? Load(string projectRoot)
+    public static ResolvedConfiguration? Load(string projectRoot) => Load(projectRoot, enforceRequired: true);
+
+    /// <summary>
+    /// Same discovery, parsing and validation as <see cref="Load(string)"/>, except a non-nullable
+    /// parameter with no file value and no declared default is silently omitted rather than reported
+    /// as <see cref="ConfigErrorCode.RequiredValueMissing"/> — used by <see cref="ConfigResolver"/>,
+    /// which only knows a value is truly missing after every tier it can supply has been consulted
+    /// (S7). Every other error in the file remains fatal.
+    /// </summary>
+    internal static ResolvedConfiguration? Load(string projectRoot, bool enforceRequired)
     {
         var candidates = CandidateFileNames
             .Select(name => Path.Combine(projectRoot, name))
@@ -84,7 +93,7 @@ public static class ProjectConfigurationLoader
 
         if (buildTypeKnown)
         {
-            ValidateParameters(document, path, paramsType, errors, resolved);
+            ValidateParameters(document, path, paramsType, errors, resolved, enforceRequired);
         }
 
         if (errors.Count > 0)
@@ -141,7 +150,8 @@ public static class ProjectConfigurationLoader
         string path,
         Type? paramsType,
         List<ConfigError> errors,
-        Dictionary<string, ResolvedValue> resolved)
+        Dictionary<string, ResolvedValue> resolved,
+        bool enforceRequired)
     {
         var propertiesByKey = paramsType is null
             ? new Dictionary<string, PropertyInfo>()
@@ -209,6 +219,11 @@ public static class ProjectConfigurationLoader
 
             if (defaultValue is null && !IsNullable(property))
             {
+                if (!enforceRequired)
+                {
+                    continue;
+                }
+
                 errors.Add(new ConfigError(
                     ConfigErrorCode.RequiredValueMissing,
                     path,
@@ -221,7 +236,7 @@ public static class ProjectConfigurationLoader
         }
     }
 
-    private static bool IsNullable(PropertyInfo property)
+    internal static bool IsNullable(PropertyInfo property)
     {
         if (property.PropertyType.IsValueType)
         {

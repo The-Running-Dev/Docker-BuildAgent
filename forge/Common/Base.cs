@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 
-using DotNetEnv;
 using Nuke.Common;
 using Nuke.Common.Git;
 using Nuke.Common.Execution;
@@ -206,10 +205,19 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
 
         if (File.Exists(config.EnvFilePath))
         {
-            Env.Load(config.EnvFilePath);
+            EnvironmentLoader.LoadWithoutClobbering(config.EnvFilePath);
 
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} [INF] [OK] Loaded Build Env...{config.EnvFile}");
         }
+
+        void DeleteGeneratedEnvFiles()
+        {
+            Files.DeleteIfExists(config.EnvFilePath);
+            Files.DeleteIfExists(config.AppEnvFilePath);
+        }
+
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => DeleteGeneratedEnvFiles();
+        Console.CancelKeyPress += (_, _) => DeleteGeneratedEnvFiles();
 
         // Initialize service locator for static access
         if (!ServiceLocator.IsInitialized)
@@ -243,10 +251,8 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
     /// property. Override this method in a derived class to implement additional cleanup logic.</remarks>
     protected virtual void Cleanup()
     {
-        if (Parameters?.Config?.EnvFilePath != null && File.Exists(Parameters.Config.EnvFilePath))
-        {
-            File.Delete(Parameters.Config.EnvFilePath);
-        }
+        Files.DeleteIfExists(Parameters?.Config?.EnvFilePath);
+        Files.DeleteIfExists(Parameters?.Config?.AppEnvFilePath);
     }
 
     /// <summary>
