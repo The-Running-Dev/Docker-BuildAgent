@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+#nullable enable
+using System.Collections.Generic;
 
 namespace Parameters;
 
@@ -28,7 +29,7 @@ public class DockerParams : ForgeParams
     /// <summary>
     /// Gets or sets the tag associated with the container image.
     /// </summary>
-    public List<string> Tags { get; set; }
+    public List<string>? Tags { get; set; }
 
     /// <summary>
     /// Gets or sets the registry URL where to push the Docker image.
@@ -38,11 +39,13 @@ public class DockerParams : ForgeParams
     /// <summary>
     /// Gets or sets the registry user.
     /// </summary>
+    [SecretParameter]
     public string RegistryUser { get; set; } = string.Empty;
 
     /// <summary>
     /// Gets or sets the registry token.
     /// </summary>
+    [SecretParameter]
     public string RegistryToken { get; set; } = string.Empty;
 
     /// <summary>
