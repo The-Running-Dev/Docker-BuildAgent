@@ -1,4 +1,5 @@
-﻿namespace Parameters;
+﻿#nullable enable
+namespace Parameters;
 
 /// <summary>
 /// Represents the parameters used for configuring a node, including the directory path for storing artifacts.

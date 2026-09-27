@@ -1,4 +1,5 @@
-﻿using Nuke.Common;
+#nullable enable
+using Nuke.Common;
 
 using Entities;
 
@@ -7,7 +8,7 @@ namespace Parameters;
 /// <summary>
 /// Represents the parameters required for configuring a build process in a forge environment.
 /// </summary>
-/// <remarks>This class encapsulates various settings such as build configuration, repository details, 
+/// <remarks>This class encapsulates various settings such as build configuration, repository details,
 /// notification preferences, and verbosity level, which are used to control the behavior of the  build process. It
 /// provides options to enable or disable notifications, force certain actions,  and perform a dry run for testing
 /// purposes.</remarks>
@@ -16,9 +17,9 @@ public class ForgeParams
     /// <summary>
     /// Gets or sets the build configuration settings.
     /// </summary>
-    public BuildConfig Config { get; set; }
+    public BuildConfig? Config { get; set; }
 
-    public string RootDirectory { get; set; }
+    public string? RootDirectory { get; set; }
 
     /// <summary>
     /// Gets or sets the URL of the repository.
@@ -28,7 +29,7 @@ public class ForgeParams
     /// <summary>
     /// Gets or sets the version information for the current application.
     /// </summary>
-    public VersionInfo Version { get; set; }
+    public VersionInfo? Version { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether notifications are enabled.
@@ -43,7 +44,8 @@ public class ForgeParams
     /// <summary>
     /// Gets or sets the URL for the notifications webhook.
     /// </summary>
-    public string NotificationsWebHookUrl { get; set; }
+    [SecretParameter]
+    public string? NotificationsWebHookUrl { get; set; }
 
     /// <summary>
     /// Gets or sets a value indicating whether the push operation should be forced.
@@ -58,7 +60,7 @@ public class ForgeParams
     /// <summary>
     /// Gets or sets the configuration settings for the change log.
     /// </summary>
-    public ChangeLogConfig ChangeLogConfig { get; set; }
+    public ChangeLogConfig? ChangeLogConfig { get; set; }
 
     /// <summary>
     /// Gets or sets the verbosity level for logging output.
