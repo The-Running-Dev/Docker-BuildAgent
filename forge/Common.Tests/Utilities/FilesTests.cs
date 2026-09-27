@@ -77,6 +77,31 @@ public class FilesTests : IDisposable
     }
 
     [Fact]
+    public void DeleteIfExists_DeletesExistingFile()
+    {
+        var path = Path.Combine(_rootDir, "to-delete.txt");
+        File.WriteAllText(path, "content");
+
+        Files.DeleteIfExists(path);
+
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void DeleteIfExists_NoOp_WhenPathMissing()
+    {
+        var path = Path.Combine(_rootDir, "does-not-exist.txt");
+
+        Files.DeleteIfExists(path);
+    }
+
+    [Fact]
+    public void DeleteIfExists_NoOp_WhenPathNull()
+    {
+        Files.DeleteIfExists(null);
+    }
+
+    [Fact]
     public void GenerateEnvironmentFile_WritesOnlyNonEmptyValues()
     {
         var mapPath = Path.Combine(_rootDir, "map.env");

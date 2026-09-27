@@ -164,4 +164,16 @@ public static class Files
 
         return escaped;
     }
+
+    /// <summary>
+    /// Deletes the file at <paramref name="path"/> if it exists. A no-op for a null path or a path
+    /// with no file (I24 — generated environment files must not outlive the build).
+    /// </summary>
+    public static void DeleteIfExists(string path)
+    {
+        if (path != null && File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
 }
