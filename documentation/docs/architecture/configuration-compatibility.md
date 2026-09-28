@@ -4,6 +4,8 @@ title: ⚙️ Configuration & Compatibility
 sidebar_position: 4
 ---
 
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 This guide covers configuration options, compatibility considerations, and environment-specific settings for the Docker Build Agent.
 
 ## PowerShell Compatibility

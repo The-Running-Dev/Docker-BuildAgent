@@ -4,6 +4,8 @@ title: "🧰 PowerShell Helpers"
 sidebar_position: 5
 ---
 
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 The Build Agent provides several PowerShell helper modules that simplify build automation tasks and provide consistent behavior across different environments.
 
 ## nuke-helpers.psm1
@@ -53,5 +55,5 @@ This ensures that template files and generated code don't accidentally get commi
 For user automation, use the unified build command through the root scripts or the container image:
 
 ```powershell
-./build.ps1 -type docker -create-registry true -dry-run true
+./build.ps1 -type docker --dry-run true
 ```

@@ -82,7 +82,7 @@ public static class DocsChecker
     private static readonly Regex CanonicalFor = new(
         @"^[\s>*\-]*(?:\*\*)?Canonical for(?:\*\*)?\s*:\s*(?:\*\*)?\s*(\S.*)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    private static readonly string[] ContractFiles = { "PSModule.requirements.md", "PSModule.specs.md" };
+    private static readonly string[] ContractFiles = { "PSModule.requirements.md", "design/20-contract.md" };
 
     public static DocsCheckReport Check(string root, SurfaceManifest manifest)
     {

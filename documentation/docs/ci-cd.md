@@ -4,6 +4,8 @@ title: "🔄 GitHub Actions"
 sidebar_position: 8
 ---
 
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 ## 🚀 Release Strategy
 
 The Build Agent project uses a **controlled release strategy** to distinguish between development builds and official releases:
@@ -18,9 +20,9 @@ The Build Agent project uses a **controlled release strategy** to distinguish be
 The repository includes multiple GitHub Actions workflows for different purposes:
 
 - **CI Workflow** (`.github/workflows/ci.yml`): Runs on pull requests and feature branches for validation
-- **Deploy Workflow** (`.github/workflows/release.yml`): Builds and publishes Docker images on every main branch push
-- **Create Release Workflow** (`.github/workflows/create-release.yml`): Manual workflow to create official releases
-- **Tag Release Workflow** (`.github/workflows/tag-release.yml`): Creates releases when version tags are pushed
+- **Build Workflow** (`.github/workflows/build.yml`): Builds and publishes Docker images on every main branch push
+- **Create Release Workflow** (`.github/workflows/release.yml`): Manual workflow to create official releases
+- **Tag Release Workflow** (`.github/workflows/release-tag.yml`): Creates releases when version tags are pushed
 
 ### Release Workflow
 

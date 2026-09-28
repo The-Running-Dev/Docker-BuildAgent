@@ -4,6 +4,8 @@ title: 🛠️ Development Guide
 sidebar_position: 3
 ---
 
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 Complete guide for setting up, developing, and contributing to the Docker Build Agent project.
 
 ## Prerequisites
@@ -103,8 +105,8 @@ dotnet test forge/Common.Tests/Common.Tests.csproj
 # Basic Docker build
 .\build.ps1 -type docker
 
-# Node.js build with production flag
-.\build.ps1 -type node -isProd
+# Node.js build
+.\build.ps1 -type node
 
 # Combined Node + Docker build with parameters
 .\build.ps1 -type node-in-docker --dry-run true --verbosity Verbose
@@ -258,8 +260,8 @@ dotnet build forge/NodeInDocker/NodeInDocker.csproj
 Follow the multi-build architecture to add new build types:
 
 ```csharp
-// 1. Create new project directory
-forge/MyNewBuild/
+// 1. Create a new project directory under forge/, named after the build
+// forge/<NewBuild>/
 ├── MyNewBuild.cs
 ├── MyNewBuild.csproj
 └── Parameters/
@@ -281,7 +283,7 @@ public class MyNewBuild : Base<MyNewBuildParams, DiscordNotifications>
 }
 
 // 3. Add to solution
-dotnet sln forge/Forge.sln add forge/MyNewBuild/MyNewBuild.csproj
+dotnet sln forge/Forge.sln add <path-to-the-new-project>.csproj
 
 // 4. Update Dockerfile to include new executable
 ```

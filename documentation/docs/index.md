@@ -38,7 +38,6 @@ For advanced configuration, see [Customization Options](customization.md).
 
 For developers and advanced users, explore our architecture guides:
 
-- **[Multi-Build Architecture](architecture/multi-build-architecture.md)** - Understanding the modular build system
 - **[Dependency Injection](architecture/dependency-injection.md)** - Service architecture and testing
 - **[Development Guide](architecture/development-guide.md)** - Complete setup and contribution guide
 - **[Configuration & Compatibility](architecture/configuration-compatibility.md)** - Environment setup and platform compatibility

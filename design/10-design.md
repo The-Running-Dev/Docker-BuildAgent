@@ -421,7 +421,7 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 - **Detection:** extraction against the manifest and the tree, in PR CI.
 - **System response:** the PR check fails, listing the document, line and unknown name.
 - **Coverage:** behavioural claims are not mechanically checkable and remain review scope. The check does not claim to cover them. Every run prints the claim classes it does not cover.
-- **Canonical markers:** a document names its canonical source with a `Canonical contract: <source>` line, optionally `Canonical contract (<surface>, ...): <source>`; a canonical document declares `Canonical for: <surface>, ...`. Two documents declaring the same surface fail as `CanonicalSourceConflict`.
+- **Canonical markers:** a document names its canonical source with a `Canonical contract: <source>` line, optionally `Canonical contract (<surface>, ...): <source>`; a canonical document declares `Canonical for: <surface>, ...`. Two documents declaring the same surface fail as `CanonicalSourceConflict`. The canonical documents are `design/20-contract.md` (image, build command, global tool, project configuration, Docker-template discovery) and `PSModule.requirements.md` (PowerShell module); `design/docs-classification.txt` classifies every document that covers a surface as canonical, reference, non-overlapping or removed.
 - **Recorded findings:** a finding that is not fixed in the slice that finds it is recorded in `design/docs-check-recorded.txt` (Code, Document, Name, Reason, tab-separated). A recorded finding is listed with its reason and does not fail the check; a line with no reason suppresses nothing, and a line matching no finding is reported as stale.
 
 ## Concurrency and ordering

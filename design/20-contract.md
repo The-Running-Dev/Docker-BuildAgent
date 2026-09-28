@@ -3,6 +3,8 @@
 Derived from `design/10-design.md`. This document constrains every implementing
 session; downstream work is checked against it.
 
+Canonical for: image, build command, global tool, project configuration, Docker-template discovery.
+
 **How to read an entry.** Where the declaration exists in the tree, the entry points
 at it and states only what the declaration cannot carry. Where it does not exist, the
 entry carries a scaffold — declarations in the project's language, types and

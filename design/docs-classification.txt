@@ -1,0 +1,45 @@
+# Every document that covers a public surface, classified once (S12.1).
+# Tab-separated: Document, Class, Detail, Note.
+#   canonical        Detail lists the protected surfaces the document owns; it carries a 'Canonical for:' line.
+#   reference        Detail is the canonical document it explains; the page carries a 'Canonical contract:' line naming it.
+#   non-overlapping  Detail is '-'; the document names no protected-surface name the docs check covers.
+#   removed          Detail is '-'; the file is gone and remains in git history only.
+# Scope: the README, the documentation site sources (documentation/docs, documentation/src/pages), the PowerShell module
+# sources, the product instructions and the contract documents. The design chain (design/00 to design/90), the agent
+# instructions and the repository templates are project process documents, not published surface documentation.
+# The docs check enforces the markers (CanonicalSourceMissing, CanonicalSourceConflict); a test keeps this list matching the tree.
+
+design/20-contract.md	canonical	image, build command, global tool, project configuration, Docker-template discovery	The project-wide contract; declares the surfaces it owns and carries the signatures.
+PSModule.requirements.md	canonical	PowerShell module	The module's contract, named by design/20-contract.md and I46.
+
+README.md	reference	design/20-contract.md	Landing page; explains usage of the image, the build command and template discovery.
+.github/copilot-instructions.md	reference	design/20-contract.md	Product architecture and development workflow; the public surfaces are owned by the contract.
+documentation/docs/architecture/configuration-compatibility.md	reference	design/20-contract.md	Environment setup and platform notes for the build command.
+documentation/docs/architecture/development-guide.md	reference	design/20-contract.md	Contributor guide; shows the build command locally.
+documentation/docs/architecture/powershell-helpers.md	reference	design/20-contract.md	Documents nuke-helpers.psm1, the build wrapper's helper module.
+documentation/docs/build-types.md	reference	design/20-contract.md	Explains each build type and its flags.
+documentation/docs/ci-cd.md	reference	design/20-contract.md	CI examples that invoke the build command.
+documentation/docs/compatibility.md	reference	design/20-contract.md	The compatibility promise page (S11).
+documentation/docs/docker-templates.md	reference	design/20-contract.md	Explains Docker template discovery.
+documentation/docs/fast-track.md	reference	design/20-contract.md	Quick start with the build command.
+documentation/docs/migration.md	reference	design/20-contract.md	Migration guide to 2.0.0 (S11).
+documentation/docs/parameters.md	reference	design/20-contract.md	Lists build parameters, which are also configuration keys.
+documentation/docs/release-notes/2.0.0.md	reference	PSModule.requirements.md	Release notes; the module change is the surface it explains.
+documentation/docs/releases.md	reference	design/20-contract.md	Release process; shows the build command.
+documentation/src/pages/index.md	reference	design/20-contract.md	The site landing page; mirrors the README.
+
+documentation/docs/advanced.md	non-overlapping	-	Names no protected-surface name the docs check covers.
+documentation/docs/architecture/dependency-injection.md	non-overlapping	-	Describes the internal service architecture only.
+documentation/docs/customization.md	non-overlapping	-	Names no protected-surface name the docs check covers.
+documentation/docs/index.md	non-overlapping	-	A table of contents linking the reference pages.
+documentation/docs/status.md	non-overlapping	-	Project status page.
+documentation/docs/targets.md	non-overlapping	-	Names no protected-surface name the docs check covers.
+documentation/docs/troubleshooting.md	non-overlapping	-	Names no protected-surface name the docs check covers.
+documentation/src/pages/CHANGELOG.md	non-overlapping	-	Generated change history.
+scripts/powershell-module/Docker-BuildAgent.psm1	non-overlapping	-	Module source with no help text; the module's contract is PSModule.requirements.md.
+scripts/powershell-module/Update-ModuleParameters.ps1	non-overlapping	-	Maintenance script with no help text.
+
+documentation/docs/architecture/multi-build-architecture.md	removed	-	Stale duplicate of build-types and the development guide; named projects that do not exist.
+PSModule.specs.md	removed	-	Archive of pre-cleanup documentation snapshots; PSModule.requirements.md is the module's contract.
+Docker-BuildAgent-Design-Report.docx	removed	-	Historical design report; the design chain under design/ supersedes it.
+Docker-BuildAgent-System-Design.docx	removed	-	Historical system design snapshot; the design chain under design/ supersedes it.
