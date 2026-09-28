@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "buildType": "docker",
+  "parameters": {
+    "repository-url": "https://github.com/example/my-project.git",
+    "docker-file": "Dockerfile",
+    "image-tag": "my-app",
+    "tags": ["stable", "edge"],
+    "registry-url": "ghcr.io/example",
+    "create-git-hub-release": false,
+    "pre-release": false,
+    "notifications": false
+  }
+}

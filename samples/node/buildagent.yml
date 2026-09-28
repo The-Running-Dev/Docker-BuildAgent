@@ -1,0 +1,8 @@
+# Project configuration for the node build type. Copy to your project root as buildagent.yml.
+schemaVersion: 1
+buildType: node
+parameters:
+  repository-url: https://github.com/example/my-project.git
+  artifacts-dir: artifacts
+  dry-run: false
+  notifications: false

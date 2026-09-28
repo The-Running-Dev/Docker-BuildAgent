@@ -1,0 +1,9 @@
+# Project configuration for the forge build type. Copy to your project root as buildagent.yml.
+schemaVersion: 1
+buildType: forge
+parameters:
+  repository-url: https://github.com/example/my-project.git
+  dry-run: false
+  force-push: false
+  notifications: false
+  verbosity: normal
