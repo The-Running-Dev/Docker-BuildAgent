@@ -34,7 +34,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  ModuleTests:
+    name: Module Tests
+    uses: ./.github/workflows/module-tests.yml
+
   Release:
+    needs: ModuleTests
     name: Release from Tag
     runs-on: ubuntu-latest
     

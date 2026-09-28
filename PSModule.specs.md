@@ -36,7 +36,7 @@ Set-BuildAgentConfig `
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `DockerImage` | The Build Agent image to use | ghcr.io/the-running-dev/build-agent:latest |
+| `DockerImage` | The Build Agent image to use | `ghcr.io/the-running-dev/build-agent:<module version>` (the module's own version, never `latest`) |
 | `DockerHost` | Docker daemon endpoint | tcp://host.docker.internal:2375 |
 | `WorkspacePath` | Local workspace path to mount in container | Current script location |
 | `ArtifactsDir` | Output directory for build artifacts | artifacts |

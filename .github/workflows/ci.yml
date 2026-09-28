@@ -63,7 +63,12 @@ permissions:
   pull-requests: write
 
 jobs:
+  ModuleTests:
+    name: Module Tests
+    uses: ./.github/workflows/module-tests.yml
+
   Build:
+    needs: ModuleTests
     name: Build & Validate
     runs-on: ubuntu-latest
 

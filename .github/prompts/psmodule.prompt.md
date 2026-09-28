@@ -19,7 +19,7 @@ param()
 # Module Configuration Schema
 $script:BuildAgentConfig = @{
     # Required: Docker image containing build tools and dependencies
-    DockerImage = "ghcr.io/the-running-dev/build-agent:latest"
+    DockerImage = "ghcr.io/the-running-dev/build-agent:$moduleVersion"  # the module's own version, never latest
     
     # Required: Docker daemon endpoint for container operations
     DockerHost = "tcp://host.docker.internal:2375"
