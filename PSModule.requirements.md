@@ -40,12 +40,13 @@ Define a reusable requirements specification for the Docker-BuildAgent PowerShel
 ### R-CONFIG-002: Default values
 
 - Defaults must include:
-  - DockerImage = ghcr.io/the-running-dev/build-agent:latest
+  - DockerImage = ghcr.io/the-running-dev/build-agent:<module version>, the module's own `ModuleVersion` from the manifest (for example `2.0.0`), never `latest`
   - DockerHost = tcp://host.docker.internal:2375
   - WorkspacePath = module path
   - ArtifactsDir = artifacts
   - Environment = development
   - Parameters = empty hashtable
+- The default image reference is overridable with Set-BuildAgentConfig -DockerImage, and an override must be used verbatim.
 
 ### R-CONFIG-003: Set-BuildAgentConfig validation
 
@@ -55,7 +56,7 @@ Define a reusable requirements specification for the Docker-BuildAgent PowerShel
     - tcp://host:port
     - unix:///path
     - npipe:////./pipe/name
-  - WorkspacePath is required and must exist as a directory
+  - WorkspacePath is required and must exist as a directory; otherwise it must fail with WorkspaceInvalid (exit status 3)
   - Environment must be one of development or production
 - AdditionalParameters must be optional and default to empty hashtable.
 
@@ -104,8 +105,16 @@ Define a reusable requirements specification for the Docker-BuildAgent PowerShel
 
 ### R-INVOKE-005: Exit behavior
 
-- On non-zero docker exit code, Invoke-Build must throw with exit code details.
+- On non-zero docker exit code, Invoke-Build must throw a terminating error, with FullyQualifiedErrorId `BuildFailed`, carrying the container's exit status unchanged in `Exception.Data['ExitCode']`. It must not map one status onto another (I28).
 - On success, no exception is thrown.
+
+### R-INVOKE-006: Launcher errors
+
+- Every launcher error is a terminating error whose FullyQualifiedErrorId is its code and whose `Exception.Data['ExitCode']` is its process exit status:
+  - `WorkspaceInvalid`, exit 3: the workspace path is absent or not a directory. Checked by Set-BuildAgentConfig and again by Invoke-Build before docker is called.
+  - `DockerUnavailable`, exit 5: the Docker daemon cannot be reached.
+  - `ImageUnavailable`, exit 5: the configured image is not present locally and cannot be pulled. Invoke-Build must not fall back to another version or to `latest` (I27) and must not run the build.
+  - `BuildFailed`: see R-INVOKE-005.
 
 ## Validation Requirements
 

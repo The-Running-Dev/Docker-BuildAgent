@@ -3,8 +3,11 @@
 param()
 
 # --- Module Configuration ---
+# The default image is pinned to this module's own version (never `latest`); an override is used verbatim.
+$script:ModuleVersion = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Docker-BuildAgent.psd1') -Raw), "(?m)^\s*ModuleVersion\s*=\s*'([^']+)'").Groups[1].Value
+
 $script:BuildAgentConfig = @{
-    DockerImage   = "ghcr.io/the-running-dev/build-agent:latest"
+    DockerImage   = "ghcr.io/the-running-dev/build-agent:$script:ModuleVersion"
     DockerHost    = "tcp://host.docker.internal:2375"
     WorkspacePath = $PSScriptRoot
     ArtifactsDir  = "artifacts"
@@ -24,7 +27,6 @@ function Set-BuildAgentConfig {
         [string]$DockerHost,
 
         [Parameter(Mandatory = $true)]
-        [ValidateScript({ Test-Path $_ -PathType Container })]
         [string]$WorkspacePath,
 
         [string]$ArtifactsDir = "./artifacts",
@@ -34,6 +36,10 @@ function Set-BuildAgentConfig {
 
         [hashtable]$AdditionalParameters = @{}
     )
+
+    if (-not (Test-Path -LiteralPath $WorkspacePath -PathType Container)) {
+        $PSCmdlet.ThrowTerminatingError((New-LauncherError -Code WorkspaceInvalid -ExitCode 3 -Message "Workspace path '$WorkspacePath' does not exist or is not a directory."))
+    }
 
     $script:BuildAgentConfig.DockerImage = $DockerImage
     $script:BuildAgentConfig.DockerHost = $DockerHost
@@ -46,6 +52,57 @@ function Set-BuildAgentConfig {
 }
 
 # --- Private Helper Functions ---
+
+# A launcher error carries its stable code as FullyQualifiedErrorId and its process exit status in
+# Exception.Data['ExitCode'], so a caller can map it to a process exit without parsing text.
+function New-LauncherError {
+    param(
+        [string]$Code,
+        [int]$ExitCode,
+        [string]$Message
+    )
+
+    $exception = New-Object System.InvalidOperationException($Message)
+    $exception.Data['Code'] = $Code
+    $exception.Data['ExitCode'] = $ExitCode
+    return New-Object System.Management.Automation.ErrorRecord($exception, $Code, [System.Management.Automation.ErrorCategory]::InvalidOperation, $null)
+}
+
+# The only place `docker` is called. With -Capture the output is collected; without it the output
+# streams to the host (the build's own output) and only the exit status is returned.
+function Invoke-Docker {
+    param(
+        [string[]]$Arguments,
+        [switch]$Capture
+    )
+
+    if ($Capture) {
+        $previous = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try { $output = & docker @Arguments 2>&1 | ForEach-Object { "$_" } }
+        catch { $output = @("$_"); $global:LASTEXITCODE = 1 }
+        finally { $ErrorActionPreference = $previous }
+        return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = @($output) }
+    }
+
+    & docker @Arguments | Out-Host
+    return [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = @() }
+}
+
+# Makes the configured image present locally. Never substitutes another reference (I27).
+function Confirm-BuildAgentImage {
+    param([string]$Image)
+
+    if ((Invoke-Docker -Arguments @('image', 'inspect', $Image) -Capture).ExitCode -eq 0) { return }
+
+    $pull = Invoke-Docker -Arguments @('pull', $Image) -Capture
+    if ($pull.ExitCode -eq 0) { return }
+
+    if ((Invoke-Docker -Arguments @('version', '--format', '{{.Server.Version}}') -Capture).ExitCode -ne 0) {
+        return New-LauncherError -Code DockerUnavailable -ExitCode 5 -Message "Docker is not available: $($pull.Output -join ' ')"
+    }
+    return New-LauncherError -Code ImageUnavailable -ExitCode 5 -Message "Image '$Image' could not be obtained: $($pull.Output -join ' ')"
+}
 
 function Convert-ToKebabCase {
     param([string]$inputString)
@@ -147,6 +204,13 @@ function Invoke-Build {
         }
     }
 
+    if (-not (Test-Path -LiteralPath $script:BuildAgentConfig.WorkspacePath -PathType Container)) {
+        $PSCmdlet.ThrowTerminatingError((New-LauncherError -Code WorkspaceInvalid -ExitCode 3 -Message "Workspace path '$($script:BuildAgentConfig.WorkspacePath)' does not exist or is not a directory."))
+    }
+
+    $imageError = Confirm-BuildAgentImage -Image $script:BuildAgentConfig.DockerImage
+    if ($imageError) { $PSCmdlet.ThrowTerminatingError($imageError) }
+
     $argsList = @(
         "run", "--rm",
         "-v", "$($script:BuildAgentConfig.WorkspacePath):/workspace",
@@ -174,9 +238,11 @@ function Invoke-Build {
     $argsList += Convert-HashtableToArgs -Parameters $mergedArgs
 
     Write-Host "Executing: docker run ... build $type [arguments hidden for security]"
-    & docker @argsList
+    $run = Invoke-Docker -Arguments $argsList
 
-    if ($LASTEXITCODE -ne 0) { throw "Docker invocation failed with exit code $LASTEXITCODE" }
+    if ($run.ExitCode -ne 0) {
+        $PSCmdlet.ThrowTerminatingError((New-LauncherError -Code BuildFailed -ExitCode $run.ExitCode -Message "Docker invocation failed with exit code $($run.ExitCode)"))
+    }
 }
 
 Export-ModuleMember -Function 'Set-BuildAgentConfig', 'Invoke-Build' -Variable 'BuildAgentConfig'
