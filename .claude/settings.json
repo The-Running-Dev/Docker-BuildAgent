@@ -8,9 +8,8 @@
             "command": "pwsh",
             "args": [
               "-NoProfile",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/tools/Measure-Session.ps1",
-              "-Hook"
+              "-Command",
+              "& (Join-Path $HOME '.agent-kit/tools/Measure-Session.ps1') -Hook"
             ],
             "timeout": 30
           }
@@ -25,9 +24,8 @@
             "command": "pwsh",
             "args": [
               "-NoProfile",
-              "-File",
-              "${CLAUDE_PROJECT_DIR}/tools/Measure-Session.ps1",
-              "-Watch"
+              "-Command",
+              "& (Join-Path $HOME '.agent-kit/tools/Measure-Session.ps1') -Watch"
             ],
             "timeout": 10
           }

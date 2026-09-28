@@ -17,7 +17,19 @@ those records are written.
 <!-- units:start -->
 | Id | Kind | Anchor |
 |---|---|---|
-| _(no active unit records yet)_ | | |
+| `unit/document/agent-md` | document | `agent.md` |
+| `unit/document/codex-profiles` | document | `codex/PROFILES.md` |
+| `unit/document/design-00-brief` | document | `design/00-brief.md` |
+| `unit/document/design-10-design` | document | `design/10-design.md` |
+| `unit/document/design-20-contract` | document | `design/20-contract.md` |
+| `unit/document/design-30-slices` | document | `design/30-slices.md` |
+| `unit/document/design-90-decisions` | document | `design/90-decisions.md` |
+| `unit/document/design-state-index` | document | `design/state-index.md` |
+| `unit/document/issue-template-bug` | document | `.github/ISSUE_TEMPLATE/bug.md` |
+| `unit/document/issue-template-story` | document | `.github/ISSUE_TEMPLATE/story.md` |
+| `unit/document/project-agents-md` | document | `AGENTS.md` |
+| `unit/document/psmodule-requirements-md` | document | `PSModule.requirements.md` |
+| `unit/document/readme-md` | document | `README.md` |
 <!-- units:end -->
 
 ## Invariants — bound by
@@ -87,7 +99,38 @@ those records are written.
 <!-- decision-affects:start -->
 | Decision | In force for |
 |---|---|
-| _(no decision records yet)_ | |
+| decision/2026-08-21-install-session-hooks | `unit/document/project-agents-md` |
+| decision/2026-08-21-retain-claude-ignore | `unit/document/project-agents-md` |
+| decision/2026-09-17-configuration-precedence | `unit/document/design-10-design` |
+| decision/2026-09-17-global-tool-launches-versioned-image | `unit/document/design-20-contract` |
+| decision/2026-09-17-one-configuration-validator | `unit/document/design-10-design` |
+| decision/2026-09-17-release-existence-draft-claim | `unit/document/design-10-design` |
+| decision/2026-09-17-restore-by-renaming-back | `unit/document/design-10-design` |
+| decision/2026-09-17-retain-four-feature-issues | `unit/document/design-10-design` |
+| decision/2026-09-17-semver-and-immutable-tags | `unit/document/design-00-brief` |
+| decision/2026-09-17-supported-public-product | `unit/document/design-00-brief` |
+| decision/2026-09-17-surface-baseline-previous-release | `unit/document/design-10-design` |
+| decision/2026-09-17-update-lock-never-started-container | `unit/document/design-10-design` |
+| decision/2026-09-19-agents-md-collapsed-to-pointer | `unit/document/project-agents-md` |
+| decision/2026-09-19-refuse-unfaithful-replacement | `unit/document/design-10-design` |
+| decision/2026-09-19-stale-lock-reported-never-taken-over | `unit/document/design-10-design` |
+| decision/2026-09-19-surface-gate-fails-on-any-difference | `unit/document/design-20-contract` |
+| decision/2026-09-19-update-lock-keyed-on-name | `unit/document/design-10-design` |
+| decision/2026-09-20-compatibility-evidence-stays-readable | `unit/document/design-20-contract` |
+| decision/2026-09-20-direct-invocation-means-packaged-tool | `unit/document/design-10-design` |
+| decision/2026-09-20-docker-objects-named-by-hash | `unit/document/design-20-contract` |
+| decision/2026-09-20-main-push-moves-latest-only | `unit/document/design-10-design` |
+| decision/2026-09-20-module-image-pins-to-module-version | `unit/document/design-20-contract` |
+| decision/2026-09-20-project-configuration-file-name | `unit/document/design-20-contract` |
+| decision/2026-09-20-unreadable-log-line-refuses-updates | `unit/document/design-20-contract` |
+| decision/2026-09-20-update-verification-linux-only | `unit/document/design-10-design` |
+| decision/2026-09-21-delete-stale-kit-command-copies | `unit/document/project-agents-md` |
+| decision/2026-09-21-prior-objects-identified-by-name | `unit/document/design-30-slices` |
+| decision/2026-09-21-sync-adds-deferral-sweep-lesson | `unit/document/agent-md` |
+| decision/2026-09-25-releasepipeline-ships-standalone | `unit/document/design-30-slices` |
+| decision/2026-09-27-config-takes-yamldotnet | `unit/document/design-10-design` |
+| decision/2026-09-28-record-documents-and-decisions | `unit/document/design-90-decisions` |
+| decision/2026-09-28-retire-per-repo-kit-tool-copies | `unit/document/design-20-contract` |
 <!-- decision-affects:end -->
 
 ## Questions — blocks and answered

@@ -615,6 +615,7 @@ the basename; one without is an exact repository-relative path.
 
 | Kind | Glob | Excluded |
 |---|---|---|
+| command | `skills/*/SKILL.md` | — |
 | script | `tools/*.ps1` | `*.Tests.ps1` |
 | document | `design/*.md`, `templates/design/*.md`, `*.md`, `.github/ISSUE_TEMPLATE/*.md`, `codex/PROFILES.md` | `design/FROZEN.md`, `CLAUDE.md` |
 | invariant | not a tree path | — |
@@ -626,8 +627,12 @@ sequential `I<n>` id rather than as prose with a domain-qualified one. An invari
 added outside that row shape is not in the unit set, and its absence is reported by
 nothing at all.
 
-There are no `component` or `command` artifacts in this repository, and the checker
-enumerates no kind by either name.
+The `command` and `script` rows resolve to no files. This repository holds no skills
+and no copy of the AgentKit tools, which run from the machine-wide kit checkout. The
+rows stay because the checker enumerates both kinds, and a kind it enumerates with no
+row here is a `GlobDisagreement` even when both sides are empty. There are no
+`component` artifacts in this repository, and the checker enumerates no kind by that
+name.
 
 ### The divergence classes
 
