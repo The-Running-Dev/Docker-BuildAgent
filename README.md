@@ -43,7 +43,7 @@ For the most up-to-date and detailed information, always refer to the documentat
 ## 📊 Project Status
 
 [![CI](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/ci.yml)
-[![Deploy](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/release.yml)
+[![Deploy](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/the-running-dev/Docker-BuildAgent/actions/workflows/build.yml)
 [![Version](https://img.shields.io/github/v/release/the-running-dev/Docker-BuildAgent?logo=semver&logoColor=white&label=Version)](https://github.com/the-running-dev/Docker-BuildAgent/releases/latest)
 [![License](https://img.shields.io/badge/License-MIT-blue?logo=opensourceinitiative&logoColor=white)](https://github.com/the-running-dev/Docker-BuildAgent/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/Docs-Live-blue?logo=gitbook&logoColor=white)](https://build-agent.subzerodev.com)
@@ -98,6 +98,8 @@ forge/                    # Forge build system with multiple specialized builds:
 
 ## Usage
 
+Canonical contract (image, build command, Docker-template discovery): [design/20-contract.md](design/20-contract.md)
+
 ### Building and Running Locally
 
 1. **Clone the repository:**
@@ -149,9 +151,9 @@ You can use the provided `build.sh`, `build.ps1` script to build and push the im
 The repository includes multiple GitHub Actions workflows for different purposes:
 
 - **CI Workflow** (`.github/workflows/ci.yml`): Runs on pull requests and feature branches for validation
-- **Deploy Workflow** (`.github/workflows/release.yml`): Builds and publishes Docker images on every main branch push
-- **Create Release Workflow** (`.github/workflows/create-release.yml`): Manual workflow to create official releases
-- **Tag Release Workflow** (`.github/workflows/tag-release.yml`): Creates releases when version tags are pushed
+- **Build Workflow** (`.github/workflows/build.yml`): Builds and publishes Docker images on every main branch push
+- **Create Release Workflow** (`.github/workflows/release.yml`): Manual workflow to create official releases
+- **Tag Release Workflow** (`.github/workflows/release-tag.yml`): Creates releases when version tags are pushed
 
 #### Release Strategy
 
@@ -197,7 +199,7 @@ The project uses a **controlled release strategy** to distinguish between develo
 - To install additional global npm packages, add them to the `npm install -g` command in the `Dockerfile`.
 - Add or update PowerShell/.NET tools as needed using `dotnet tool install --global <tool>`.
 - Use the `Forge/` directory for advanced .NET build automation with Nuke.
-- **Docker Templates:** Store custom Dockerfile templates in your repository at `.github/templates/` or `templates/` directory. The build agent will automatically discover and use them when no Dockerfile exists in your project. See [Docker Templates documentation](https://build-agent.subzerodev.com/docs/docker-templates) for details.
+- **Docker Templates:** Store custom Dockerfile templates in your repository in a `templates/` directory (set `TemplatesDir` to use another). The build agent will automatically discover and use them when no Dockerfile exists in your project. See [Docker Templates documentation](https://build-agent.subzerodev.com/docs/docker-templates) for details.
 
 ## Image Details
 

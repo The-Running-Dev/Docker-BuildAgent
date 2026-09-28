@@ -1,44 +1,19 @@
 # Findings of the docs check that are recorded rather than fixed (S10.8).
 # Tab-separated: Code, Document, Name, Reason. A line without a Reason is ignored.
-# Each reason names the slice that resolves it. Remove a line when its finding is fixed; a stale line is reported.
+# Remove a line when its finding is fixed; a stale line is reported.
+#
+# What remains is a gap in the surface manifest, not stale prose: each name is real in the tree (a parameter of
+# scripts/nuke/build.ps1, or the [Parameter] field ChangeLogSource on Forge) but the manifest derives only public
+# properties of the *Params classes (I17), so the check cannot know it. Whether the wrapper and Nuke parameters join
+# the manifest is a contract decision; a test keeps every name below present in the tree.
 
-UnknownName	README.md	.github/workflows/create-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	README.md	.github/workflows/tag-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	README.md	.github/templates/	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	README.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	README.md	change-log-source	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/architecture/configuration-compatibility.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/docs/architecture/development-guide.md	isProd	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/architecture/development-guide.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/docs/architecture/development-guide.md	forge/MyNewBuild/	Placeholder example path in the contributor guide; S11 rewrites the page.
-UnknownName	documentation/docs/architecture/development-guide.md	forge/MyNewBuild/MyNewBuild.csproj	Placeholder example path in the contributor guide; S11 rewrites the page.
-UnknownName	documentation/docs/architecture/multi-build-architecture.md	forge/NodeTemplate/	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/architecture/multi-build-architecture.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/docs/architecture/multi-build-architecture.md	isProd	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/architecture/multi-build-architecture.md	change-log-source	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/architecture/multi-build-architecture.md	forge/NodeTemplate/NodeTemplate.csproj	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/architecture/multi-build-architecture.md	forge/Database/	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/architecture/powershell-helpers.md	create-registry	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/architecture/powershell-helpers.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-CanonicalSourceMissing	documentation/docs/build-types.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/docs/build-types.md	AppDir	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/build-types.md	PackageManager	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/build-types.md	SkipInstall	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/build-types.md	IsProduction	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/build-types.md	NodeTemplateRepositoryUrl	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/build-types.md	change-log-source	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/ci-cd.md	.github/workflows/create-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/ci-cd.md	.github/workflows/tag-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/ci-cd.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/docs/ci-cd.md	change-log-source	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/docker-templates.md	.github/templates/	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/fast-track.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/docs/fast-track.md	change-log-source	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/parameters.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/docs/releases.md	.github/workflows/create-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/docs/releases.md	.github/workflows/tag-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/releases.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/src/pages/index.md	.github/workflows/create-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-UnknownName	documentation/src/pages/index.md	.github/workflows/tag-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/src/pages/index.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-UnknownName	documentation/src/pages/index.md	change-log-source	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
+UnknownName	README.md	change-log-source	Real Nuke [Parameter] field (ChangeLogSource on Forge) that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/docs/build-types.md	AppDir	Real parameter of the build.ps1 wrapper that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/docs/build-types.md	PackageManager	Real parameter of the build.ps1 wrapper that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/docs/build-types.md	SkipInstall	Real parameter of the build.ps1 wrapper that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/docs/build-types.md	IsProduction	Real parameter of the build.ps1 wrapper that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/docs/build-types.md	NodeTemplateRepositoryUrl	Real parameter of the build.ps1 wrapper that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/docs/build-types.md	change-log-source	Real Nuke [Parameter] field (ChangeLogSource on Forge) that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/docs/ci-cd.md	change-log-source	Real Nuke [Parameter] field (ChangeLogSource on Forge) that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/docs/fast-track.md	change-log-source	Real Nuke [Parameter] field (ChangeLogSource on Forge) that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
+UnknownName	documentation/src/pages/index.md	change-log-source	Real Nuke [Parameter] field (ChangeLogSource on Forge) that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.

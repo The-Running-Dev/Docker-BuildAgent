@@ -4,6 +4,8 @@ title: 🔧 Build Types & Commands
 sidebar_position: 2
 ---
 
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 The Build Agent provides a **unified `build` command** with different types. Each type is optimized for specific project types and use cases.
 
 ## Unified Build Command

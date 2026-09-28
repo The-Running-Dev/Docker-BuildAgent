@@ -4,6 +4,8 @@ title: 🚀 Fast Track
 sidebar_position: 1
 ---
 
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 ## Quick Start Examples
 
 The Build Agent uses a unified `build` command with different types. Here are the most common scenarios to get you started quickly:

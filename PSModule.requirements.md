@@ -1,5 +1,7 @@
 # Docker-BuildAgent PowerShell Module Requirements
 
+Canonical for: PowerShell module.
+
 ## Purpose
 
 Define a reusable requirements specification for the Docker-BuildAgent PowerShell module so it can be maintained, re-implemented, or ported without relying on scattered documentation.

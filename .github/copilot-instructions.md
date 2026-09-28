@@ -1,5 +1,11 @@
 # GitHub Copilot Instructions for Docker-BuildAgent
 
+Canonical contract (image, build command, global tool, project configuration, Docker-template discovery): [design/20-contract.md](../design/20-contract.md)
+
+Canonical contract (PowerShell module): [PSModule.requirements.md](../PSModule.requirements.md)
+
+This file explains the architecture and the development workflow; the contract owns the public surfaces.
+
 ## Project Overview
 
 Docker-BuildAgent is a comprehensive CI/CD build system with a multi-build architecture built on .NET/Nuke. It supports containerized builds for Docker, Node.js, Angular, TypeScript, and .NET applications with cross-platform scripts and GitHub Actions integration.

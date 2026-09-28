@@ -4,6 +4,8 @@ title: "🚀 Release Management"
 sidebar_position: 9
 ---
 
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 # Release Management
 
 This guide explains how the Docker Build Agent project handles releases and versioning to maintain clean release history and distinguish between development builds and official releases.
@@ -16,7 +18,7 @@ The project uses a **controlled release strategy** with three main workflows:
 
 - **Purpose**: Continuous integration and deployment for development
 - **Trigger**: Every push to `main` branch
-- **Workflow**: `.github/workflows/release.yml` (Deploy)
+- **Workflow**: `.github/workflows/build.yml` (Build)
 - **Output**: Docker images published to registry (no GitHub releases)
 
 ### Release Workflow
@@ -24,8 +26,8 @@ The project uses a **controlled release strategy** with three main workflows:
 - **Purpose**: Create official releases for users
 - **Trigger**: Manual dispatch or version tags
 - **Workflows**: 
-  - `.github/workflows/create-release.yml` (Manual)
-  - `.github/workflows/tag-release.yml` (Tag-based)
+  - `.github/workflows/release.yml` (Manual)
+  - `.github/workflows/release-tag.yml` (Tag-based)
 - **Output**: GitHub releases with changelog, Docker images, and Git tags
 
 ### Validation Workflow

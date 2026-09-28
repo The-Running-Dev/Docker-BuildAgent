@@ -4,6 +4,8 @@ title: 🐳 Docker Templates
 sidebar_position: 6
 ---
 
+Canonical contract (Docker-template discovery): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 The Build Agent supports flexible Docker template discovery to make it easy to use custom templates in your projects. When you run a build and no `Dockerfile` exists in your project directory, the agent will:
 
 1. Try to determine your application type (e.g., Angular, Node.js).
@@ -14,32 +16,19 @@ The Build Agent supports flexible Docker template discovery to make it easy to u
 
 The Build Agent searches for templates in the following order of priority:
 
-1. **User-specified `TemplatesDir` parameter** - If you provide a custom template directory
-2. **`.github/templates/` in your project root** - GitHub convention for storing templates
-3. **`templates/` in your project root** - Simple project-level templates  
-4. **`/nuke/templates/` (container fallback)** - Built-in templates inside the Build Agent image
+1. **`TemplatesDir` as a directory** - The `TemplatesDir` value, when it names an existing directory
+2. **`TemplatesDir` under your project root** - The same value resolved against the project root (for example `TemplatesDir: templates` finds `templates/` in your repository)
 
-This flexible approach allows you to:
+`TemplatesDir` defaults to `/nuke/templates`, the built-in templates inside the Build Agent image, so the image templates are used when you set nothing. A Dockerfile is taken from `<templates>/Dockerfile.<appType>` only when no Dockerfile exists at the configured path.
+
+This approach allows you to:
 - ✅ Store templates in your own repository (recommended)
-- ✅ Use the GitHub `.github/templates/` convention
 - ✅ Override built-in templates with project-specific ones
 - ✅ Fall back to container templates for quick starts
 
 ## 📁 Storing Templates in Your Repository
 
 **Recommended approach:** Store your custom templates in your project repository:
-
-```
-your-project/
-├── .github/
-│   └── templates/
-│       ├── Dockerfile.angular
-│       └── Dockerfile.node
-└── src/
-    └── ...
-```
-
-or
 
 ```
 your-project/

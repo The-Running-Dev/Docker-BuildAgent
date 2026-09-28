@@ -4,6 +4,8 @@ title: ⚙️ Parameters
 sidebar_position: 3
 ---
 
+Canonical contract (build command, project configuration): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
