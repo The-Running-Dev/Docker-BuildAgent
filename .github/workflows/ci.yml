@@ -67,6 +67,24 @@ jobs:
     name: Module Tests
     uses: ./.github/workflows/module-tests.yml
 
+  DocsCheck:
+    name: Docs Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+
+      # Fails the pull request when a document names a path, command, parameter, build type or
+      # discovery location the tree and surface manifest lack, or breaks the canonical-contract rules.
+      - name: Check Documentation Names
+        run: dotnet run --project forge/DocsCheck -c Release -- .
+
   Build:
     needs: ModuleTests
     name: Build & Validate
