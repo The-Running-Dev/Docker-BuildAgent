@@ -34,9 +34,7 @@ UnknownName	documentation/docs/ci-cd.md	change-log-source	Names something the pr
 UnknownName	documentation/docs/docker-templates.md	.github/templates/	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
 CanonicalSourceMissing	documentation/docs/fast-track.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
 UnknownName	documentation/docs/fast-track.md	change-log-source	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
-CanonicalSourceMissing	documentation/docs/migration.md	PowerShell module	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
 CanonicalSourceMissing	documentation/docs/parameters.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
-CanonicalSourceMissing	documentation/docs/release-notes/2.0.0.md	PowerShell module	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
 UnknownName	documentation/docs/releases.md	.github/workflows/create-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
 UnknownName	documentation/docs/releases.md	.github/workflows/tag-release.yml	Names something the product does not have; the prose is corrected by the S11 documentation rewrite.
 CanonicalSourceMissing	documentation/docs/releases.md	build command	Which document is canonical for this surface is decided by the S12 classification; this page gets its pointer there.
