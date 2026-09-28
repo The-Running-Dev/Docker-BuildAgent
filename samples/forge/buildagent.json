@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "buildType": "forge",
+  "parameters": {
+    "repository-url": "https://github.com/example/my-project.git",
+    "dry-run": false,
+    "force-push": false,
+    "notifications": false,
+    "verbosity": "normal"
+  }
+}

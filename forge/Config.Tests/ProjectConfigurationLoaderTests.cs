@@ -74,6 +74,19 @@ public sealed class ProjectConfigurationLoaderTests : IDisposable
         Assert.NotNull(result);
     }
 
+    // S6.1/S6.4 — a well-formed JSON file loads; its integer schemaVersion is an integer, not a double.
+    [Fact]
+    public void S6_4_JsonIntegerSchemaVersion_IsAccepted()
+    {
+        WriteFile("buildagent.json", """
+            { "schemaVersion": 1, "buildType": "forge", "parameters": { "repository-url": "https://example.com/repo.git" } }
+            """);
+
+        var result = ProjectConfigurationLoader.Load(_root);
+
+        Assert.NotNull(result);
+    }
+
     // S6.2 — two matching files fail with MultipleConfigurationFiles naming every path.
     [Fact]
     public void S6_2_YmlAndYaml_BothPresent_FailsWithMultipleConfigurationFiles()

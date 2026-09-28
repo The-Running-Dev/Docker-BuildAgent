@@ -1,0 +1,4 @@
+# Project configuration for the node-template build type. Copy to your project root as buildagent.yml.
+# This build type has no parameters of its own, so the file carries none.
+schemaVersion: 1
+buildType: node-template

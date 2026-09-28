@@ -191,7 +191,8 @@ internal static class ProjectConfigurationParser
                 return element.GetString();
 
             case JsonValueKind.Number:
-                return element.TryGetInt64(out var longValue) ? longValue : element.GetDouble();
+                // Boxed explicitly: a bare `long : double` conditional promotes both arms to double.
+                return element.TryGetInt64(out var longValue) ? (object)longValue : element.GetDouble();
 
             case JsonValueKind.True:
                 return true;
