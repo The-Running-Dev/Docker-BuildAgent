@@ -156,4 +156,5 @@ the mirror was taken at; check it against `git log` before trusting an entry tha
 | 1 | #14 | Unified Build Orchestration via Global CLI Tool | — | `9e4b4c460d4117f7af5d545ab680c8b3f693944b` |
 | 11 | #11 | Support YAML and JSON for Configuration | — | `0189dd83bf03c2979300bf4b45d1921669af0bcb` |
 | 12 | #12 | Add Generic Configuration for GitHubProject | — | `0189dd83bf03c2979300bf4b45d1921669af0bcb` |
+| 16 | #69 | S13 — The build reads the project's configuration file before it runs | S13.1, S13.2, S13.3, S13.4, S13.5, S13.6, S13.7, S13.8, S13.9, S13.10 | `bd570b4c735c7e5462481d3dbc2fde4b1d665fc4` |
 <!-- outstanding:end -->
