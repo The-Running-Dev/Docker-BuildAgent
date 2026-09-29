@@ -130,7 +130,7 @@ public class Docker : Base<DockerParams, DiscordNotifications>, IDockerComponent
     /// any non-zero value indicates an error or failure during the build.</returns>
     public static int Main()
     {
-        return Build<Docker>(x => x.Build);
+        return Build<Docker>(new Config.ProjectConfigurationGate("docker"), x => x.Build);
     }
 
     /// <summary>

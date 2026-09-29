@@ -90,7 +90,7 @@ public class Node : Base<NodeParams, DiscordNotifications>, ICleanComponent, INo
     /// <returns>An integer representing the exit code of the application. A return value of 0 typically indicates success.</returns>
     public static int Main()
     {
-        return Build<Node>(x => x.Build);
+        return Build<Node>(new Config.ProjectConfigurationGate("node"), x => x.Build);
     }
 
     /// <summary>

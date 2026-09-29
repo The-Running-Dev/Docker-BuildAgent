@@ -17,6 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="..\Config\Config.csproj" />
     <ProjectReference Include="..\Docker\Docker.csproj" />
     <ProjectReference Include="..\Node\Node.csproj" />
   </ItemGroup>
