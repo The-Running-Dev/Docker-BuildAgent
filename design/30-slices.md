@@ -13,7 +13,7 @@ the *target's name* and attributed by label, gives a mutual exclusion that holds
 of the daemon, including through the rename in the middle of the critical section. Neither is
 provable on paper.
 
-**Issue coverage.** #1 → S2, S4, S5. #11 → S6. #12 → S6, S7, S8. #14 → *Blocked*, below.
+**Issue coverage.** #1 → S2, S4, S5. #11 → S6, S13. #12 → S6, S7, S8. #14 → *Blocked*, below.
 
 ## How this document is kept
 
@@ -426,6 +426,40 @@ Acceptance:
   - S12.6 No document still disagrees with the tree on a name the S10 check covers.
 Out of scope: rewriting reference prose beyond adding the canonical pointer; changing
 `docs-template/`.
+
+## S13 — The build reads the project's configuration file before it runs
+Delivers: A project that keeps its settings in a configuration file gets those settings in its
+build, and a mistake in the file stops the build before anything is built, with every mistake
+listed at once and a distinct exit status a pipeline can act on.
+Touches: the entry points of the `docker`, `node`, `node-in-docker` and `forge` build types; their
+dependency on Config; the path an exit status takes from a build type through `build <type>` to its
+caller.
+Depends on: S6, S7.
+Acceptance:
+  - S13.1 For each of `build docker`, `build node`, `build node-in-docker` and `build forge`, a
+    project whose configuration file contains an error exits `2`, and no build target runs.
+  - S13.2 That run generates no environment file: the project holds no generated environment file
+    after the failed run that it did not hold before it.
+  - S13.3 A file containing four distinct errors reports all four in the one failed run, each naming
+    the file, the key and the rule it broke (I18).
+  - S13.4 Exit `2` reaches the caller of `build <type>` unchanged; the wrapper does not replace it
+    with `1` or with any other status.
+  - S13.5 A value set only in the project file is the effective value of that build parameter during
+    the build, and its recorded tier is the project configuration file.
+  - S13.6 The same key supplied by invocation argument or by process environment still wins over the
+    file, in the contract's tier order.
+  - S13.7 A project with no configuration file, whose build today supplies every required value by
+    argument or environment, builds with the same effective values as before this slice.
+  - S13.8 No secret-declared value appears in any output stream of a failed or a successful run
+    (I21, I25).
+  - S13.9 The project file's bytes are identical before and after a build that fails validation and
+    before and after one that succeeds.
+  - S13.10 Automated tests cover, and report the count of, an invalid file on each of the four build
+    types, the no-file case, and a file value reaching a build parameter; removing the call into
+    Config from any one build type fails at least one of them.
+Out of scope: the `node-template` flow's route to Config (*Blocked*, U-5); adding any key,
+parameter, error code or exit status; changing what Config validates or the order of its tiers;
+deprecation warnings; changing the contract or the design.
 
 ## Landed
 
