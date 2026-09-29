@@ -131,6 +131,7 @@ those records are written.
 | decision/2026-09-27-config-takes-yamldotnet | `unit/document/design-10-design` |
 | decision/2026-09-28-record-documents-and-decisions | `unit/document/design-90-decisions` |
 | decision/2026-09-28-retire-per-repo-kit-tool-copies | `unit/document/design-20-contract` |
+| decision/2026-09-29-build-path-owes-config-call | `unit/document/design-30-slices` |
 <!-- decision-affects:end -->
 
 ## Questions — blocks and answered
