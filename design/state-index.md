@@ -152,7 +152,6 @@ the mirror was taken at; check it against `git log` before trusting an entry tha
 <!-- outstanding:start -->
 | Rank | Issue | Title | Criteria | Mirrored at |
 |---|---|---|---|---|
-| 1 | #1 | Rollback on Unhealthy Update | — | `0189dd83bf03c2979300bf4b45d1921669af0bcb` |
 | 1 | #14 | Unified Build Orchestration via Global CLI Tool | — | `9e4b4c460d4117f7af5d545ab680c8b3f693944b` |
 | 11 | #11 | Support YAML and JSON for Configuration | — | `0189dd83bf03c2979300bf4b45d1921669af0bcb` |
 | 12 | #12 | Add Generic Configuration for GitHubProject | — | `0189dd83bf03c2979300bf4b45d1921669af0bcb` |
