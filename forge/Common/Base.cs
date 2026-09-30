@@ -52,6 +52,9 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
     [Parameter("Force Push/Tag for Local Builds")]
     public readonly bool ForcePush;
 
+    /// <summary>The exit status for an invalid project configuration file (I18).</summary>
+    public const int InvalidConfigurationExitStatus = 2;
+
     DateTime BuildStartTime { get; set; } = DateTime.UtcNow;
 
     TimeSpan BuildDuration { get; set; }
@@ -184,12 +187,30 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
     /// and sets up the GitService safe directory. It then executes the specified build targets.</remarks>
     /// <typeparam name="T">The type of the Nuke build, which must be a subclass of <see cref="NukeBuild"/> and have a parameterless
     /// constructor.</typeparam>
+    /// <param name="configurationGate">Resolves the project's configuration file before anything else runs (I18).</param>
     /// <param name="targets">An array of expressions representing the build targets to execute.</param>
-    /// <returns>An integer indicating the result of the build process. Returns -1 if the environment setup is incomplete;
-    /// otherwise, returns the result of executing the targets.</returns>
-    protected static int Build<T>(params Expression<Func<T, Target>>[] targets) where T : NukeBuild, new()
+    /// <returns>An integer indicating the result of the build process. Returns 2 if the project configuration is
+    /// invalid, before any environment file is generated; -1 if the environment setup is incomplete; otherwise,
+    /// returns the result of executing the targets.</returns>
+    protected static int Build<T>(IBuildConfigurationGate configurationGate, params Expression<Func<T, Target>>[] targets) where T : NukeBuild, new()
     {
         var config = new BuildConfig(RootDirectory);
+
+        var mappingEnvironment = Files.ParseEnvironment(config.EnvMapFilePath)
+            .Where(v => !string.IsNullOrEmpty(v.Value))
+            .GroupBy(v => v.Key)
+            .ToDictionary(g => g.Key, g => g.Last().Value);
+        var configuration = configurationGate.Resolve(
+            RootDirectory,
+            Environment.GetCommandLineArgs().Skip(1).ToList(),
+            mappingEnvironment,
+            msg => Console.WriteLine($"{DateTime.Now:HH:mm:ss} [ERR] {msg}"));
+
+        if (!configuration.IsValid)
+        {
+            return InvalidConfigurationExitStatus;
+        }
+
         var isSuccessful = Files.GenerateEnvironmentFile(
             config.EnvMapFilePath,
             config.EnvFilePath,
@@ -208,6 +229,16 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
             EnvironmentLoader.LoadWithoutClobbering(config.EnvFilePath);
 
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} [INF] [OK] Loaded Build Env...{config.EnvFile}");
+        }
+
+        // Project file values are the lowest-precedence supplied tier: never overwrite a value the
+        // invocation, process environment or mapping file already supplied.
+        foreach (var (name, value) in configuration.ProjectFileValues)
+        {
+            if (Environment.GetEnvironmentVariable(name) is null)
+            {
+                Environment.SetEnvironmentVariable(name, value);
+            }
         }
 
         void DeleteGeneratedEnvFiles()

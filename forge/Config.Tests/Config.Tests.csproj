@@ -26,6 +26,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Config\Config.csproj" />
+    <!-- Build-only: BuildEntryPointTests runs each build type DLL as a process. -->
+    <ProjectReference Include="..\Docker\Docker.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Node\Node.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\NodeInDocker\NodeInDocker.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="..\Forge\Forge.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>

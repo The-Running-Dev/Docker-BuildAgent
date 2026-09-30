@@ -137,7 +137,7 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>, ICle
     /// <returns>An integer representing the exit code of the application. A return value of 0 typically indicates success.</returns>
     public static int Main()
     {
-        return Build<NodeInDocker>(x => x.Build);
+        return Build<NodeInDocker>(new Config.ProjectConfigurationGate("node-in-docker"), x => x.Build);
     }
 
     /// <summary>

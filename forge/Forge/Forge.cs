@@ -47,7 +47,7 @@ public class Forge : Base<ForgeParams, DiscordNotifications>
     /// <returns>An integer representing the exit code of the application. Typically, a return value of 0 indicates success.</returns>
     public static int Main()
     {
-        return Build<Forge>(x => x.Build);
+        return Build<Forge>(new Config.ProjectConfigurationGate("forge"), x => x.Build);
     }
     
     /// <summary>
