@@ -110,7 +110,7 @@ public sealed class BuildEntryPointTests : IDisposable
         Assert.Equal(2, exitCode);
         Assert.DoesNotContain("Executing target", output, StringComparison.OrdinalIgnoreCase);
         Assert.False(File.Exists(EnvFilePath), "S13.2: no env file may be generated for a failed run");
-        Assert.Equal(content, File.ReadAllText(filePath));
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(content), File.ReadAllBytes(filePath));
 
         foreach (var key in new[] { "bogus-key", "notifications-web-hook-url", "dry-run", "force-push" })
         {
@@ -183,5 +183,56 @@ public sealed class BuildEntryPointTests : IDisposable
 
         Assert.Contains("[CONFIG] DryRun: False", output, StringComparison.Ordinal);
         Assert.DoesNotContain("Configuration error", output, StringComparison.Ordinal);
+    }
+
+    // S13.9 — a run that passes validation leaves the project file's bytes untouched.
+    [Fact]
+    public void S13_9_ValidFile_BytesUnchangedAfterRun()
+    {
+        WriteForgeFile("  dry-run: true");
+        var filePath = Path.Combine(_root, "buildagent.yml");
+        var before = File.ReadAllBytes(filePath);
+
+        var (_, output) = Run("Forge");
+
+        Assert.DoesNotContain("Configuration error", output, StringComparison.Ordinal);
+        Assert.Equal(before, File.ReadAllBytes(filePath));
+    }
+
+    // S13.4 — exit 2 reaches the caller of `build <type>` unchanged through the wrapper script.
+    [Theory]
+    [MemberData(nameof(BuildTypes))]
+    public void S13_4_WrapperPassesExitTwoThrough(string buildType, string project)
+    {
+        File.WriteAllText(Path.Combine(_root, "buildagent.yml"), InvalidFile(buildType));
+
+        var dll = BuildTypeDll(project);
+        var repoRoot = new DirectoryInfo(Path.GetDirectoryName(dll)!).Parent!.Parent!.Parent!.Parent!.FullName;
+        var script = Path.Combine(repoRoot, "scripts", "nuke", "build.ps1");
+        Assert.True(File.Exists(script), $"Wrapper script not found: {script}");
+
+        var info = new ProcessStartInfo("pwsh")
+        {
+            WorkingDirectory = _root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (var argument in new[]
+                 {
+                     "-NoProfile", "-NonInteractive", "-File", script, buildType,
+                     "-workingDir", _root, "-artifactsDir", Path.GetDirectoryName(dll)!,
+                 })
+        {
+            info.ArgumentList.Add(argument);
+        }
+
+        info.Environment["NUKE_TELEMETRY_OPTOUT"] = "1";
+
+        using var process = Process.Start(info)!;
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        Assert.True(process.WaitForExit(120_000), "wrapper did not exit");
+
+        Assert.True(process.ExitCode == 2, $"expected exit 2, got {process.ExitCode}: {stdout.Result}{stderr.Result}");
     }
 }
