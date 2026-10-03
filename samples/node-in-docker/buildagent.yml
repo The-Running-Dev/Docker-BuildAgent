@@ -6,9 +6,6 @@ parameters:
   artifacts-dir: artifacts
   docker-file: Dockerfile
   image-tag: my-app
-  tags:
-    - stable
-    - edge
   registry-url: ghcr.io/example
   create-git-hub-release: false
   pre-release: false

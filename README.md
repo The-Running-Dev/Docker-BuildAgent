@@ -39,7 +39,7 @@ The working directory is `/workspace`. The image is published as `ghcr.io/the-ru
 
 | You have | Run | You get |
 |---|---|---|
-| A project with a `Dockerfile`, or a type that has a [template](https://build-agent.subzerodev.com/docs/docker-templates) | `build docker` | An image, pushed and released in CI |
+| A project with a `Dockerfile`, or a type that has a [template](https://build-agent.subzerodev.com/docs/docker-templates) | `build docker` | An image, pushed in CI (and released with `--create-github-release true`) |
 | A Node.js application that is not containerized | `build node` | The built application in the artifacts directory |
 | A Node.js application that ships as an image | `build node-in-docker` | The Node build, then the image |
 | A documentation site | `build node-template` | The site built from a template repository |
@@ -53,7 +53,7 @@ The working directory is `/workspace`. The image is published as `ghcr.io/the-ru
 | `build node` | No | A `build:prod` npm script, or `.build/.build.scripts` | Not applicable |
 | `build node-in-docker` | Yes | The same as `build node` | `RegistryToken` and `GITHUB_TOKEN` |
 | `build node-template` | No | A documentation directory; the template comes from a repository | Not applicable |
-| `build forge` | No | The full Git history (`fetch-depth: 0` in GitHub Actions) | Not applicable |
+| `build forge` | No | The full Git history (`fetch-depth: 0` in GitHub Actions) and a `.build/` directory (the build stops if it is missing) | Not applicable |
 
 Every build mounts the project at `/workspace`.
 
@@ -61,7 +61,7 @@ Every build mounts the project at `/workspace`.
 
 Mount your project at `/workspace` and run a build type. This builds a Docker image from your project (mount the Docker socket so the container can reach the Docker host):
 
-```pwsh
+```bash
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     -v /var/run/docker.sock:/var/run/docker.sock \
@@ -71,7 +71,7 @@ docker run --rm -it \
 
 The other build types work the same way:
 
-```pwsh
+```bash
 # Build a Node.js application
 docker run --rm -it \
     -v "${PWD}:/workspace" \
@@ -132,10 +132,10 @@ jobs:
 
 ## Build the image from this repository
 
-You need Docker and a .NET SDK that can build .NET 8 projects. The `Dockerfile` copies the compiled Forge build system from `artifacts/`, which is not in the repository, so build the image through one of the scripts, which compile Forge into `artifacts/` first and then run the `docker` build type:
+You need Docker and a .NET SDK that can build .NET 8 projects. The `Dockerfile` copies the compiled Forge build system from `artifacts/`, which is not in the repository, and the `docs-template/` submodule, so clone with submodules and build the image through one of the scripts, which compile Forge into `artifacts/` first and then run the `docker` build type:
 
 ```pwsh
-git clone https://github.com/the-running-dev/Docker-BuildAgent
+git clone --recurse-submodules https://github.com/the-running-dev/Docker-BuildAgent
 cd Docker-BuildAgent
 
 # Windows, or anywhere PowerShell runs

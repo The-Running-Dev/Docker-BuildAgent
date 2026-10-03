@@ -31,7 +31,7 @@ yet.
 | `<container>` | The name of the container to update. Required. |
 | `--image <reference>` | The image to move to. Default: the container's own image reference, looked up again so a moved tag is picked up. |
 | `--health-timeout <duration>` | How long to wait for the replacement to report healthy. A bare number is seconds; `120s`, `2m` and `1h` also work. Default 120 seconds. Must be greater than zero. |
-| `--no-restore` | Leave the replacement in place if it is unhealthy instead of restoring the original. |
+| `--no-restore` | Leave the replacement in place if it is unhealthy instead of restoring the original. It does not apply when the replacement cannot be created: the original is always restored then. |
 | `--notify <url>` | Accepted, but has no effect yet: the tool does not send a notification today. |
 | `--clear-lock` | Remove the update lock for `<container>` and do nothing else. It accepts no other option. |
 
@@ -48,7 +48,8 @@ If the image already matches the running container, the tool reports success and
    same settings on the new image, and starts it.
 5. Waits for the replacement's own health check to report healthy.
 6. If healthy, removes the prior container and records success. If not, restores the original
-   (unless `--no-restore`) and records the outcome.
+   (unless `--no-restore`) and records the outcome. If the replacement cannot be created in step 4,
+   the original is restored whatever `--no-restore` says.
 
 A refusal before step 4 leaves the target untouched, and any lock it took is released.
 
@@ -78,8 +79,8 @@ the prior container, not the log.
 The update log is a file, `updates.jsonl`, under `%LOCALAPPDATA%\Docker-BuildAgent` on Windows and
 under `$XDG_STATE_HOME/docker-buildagent` (default `~/.local/state/docker-buildagent`) elsewhere.
 A start entry with no outcome, or a prior container left over from an earlier update, makes the
-next update refuse (exit 22) until you remove it. A log line that cannot be parsed refuses every
-update on the host until it is corrected.
+next update refuse (exit 22) until you remove it. A log line that cannot be parsed also refuses
+every update on the host, with exit 22, until it is corrected.
 
 ## Exit statuses
 
@@ -91,7 +92,7 @@ update on the host until it is corrected.
 | 12 | The replacement was unhealthy and the original could not be restored. |
 | 20 | Refused: the container does not exist, or its shape is not supported. |
 | 21 | Refused: a lock is held. |
-| 22 | Refused: leftovers from an earlier update are present. |
+| 22 | Refused: leftovers from an earlier update are present, or the update log has a line that cannot be parsed. |
 | 23 | Refused: the current image could not be kept. |
 | 24 | Refused: the update log could not be written. |
 | 30 | The target image could not be obtained. |

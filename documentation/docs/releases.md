@@ -58,12 +58,12 @@ replaces an older queued one; if your queued release disappears, run it again.
 
 1. In the repository's **Actions** tab, select the **Release** workflow.
 2. Choose **Run workflow**.
-3. Set **Pre-release** if the release is a beta or release candidate.
+3. Set **Mark as Pre-Release** if the release is a beta or release candidate.
 4. Run it.
 
-The workflow also shows a **Version** and a **Release notes** input. Neither takes effect today:
-the version always comes from GitVersion, and the release notes are always generated from the
-commit history. Leave both empty.
+The workflow also shows a **version** input. It is not supported yet: any value fails the run,
+because the version always comes from GitVersion. Leave it empty. The release notes are always
+generated from the commit history; there is no input for them.
 
 ### Method 2: pushing a tag
 
@@ -128,7 +128,10 @@ Required to publish:
 
 - `GITHUB_TOKEN`: GitHub authentication token
 - `RegistryToken`: container registry authentication
-- `NotificationsWebHookUrl`: Discord notifications (optional)
+
+Optional:
+
+- `NotificationsWebHookUrl`: Discord notifications
 
 ## Troubleshooting
 

@@ -150,7 +150,7 @@ Run these from the repository root.
 | Run a build type locally | `.\build.ps1 -type docker --dry-run true` (compiles `forge/Forge.sln` into `artifacts/`, then runs the type) |
 | Build the image | `dotnet build forge/Forge.sln -o artifacts -c Release`, then `docker build -t build-agent:dev .` |
 | Before opening a pull request | The .NET tests, the DocsCheck command and the Pester tests above |
-| CI on a pull request (`ci.yml`) | Module tests on Windows PowerShell 5.1 and PowerShell 7, the DocsCheck command, then `dotnet test forge/Forge.sln` with coverage, `nuke --type docker --dry-run true` and a docs-template build |
+| CI on a pull request (`ci.yml`) | Three jobs: module tests on Windows PowerShell 5.1 and PowerShell 7; Docs Check (the DocsCheck command, then `pwsh scripts/sync-site-home.ps1 -Check`), which runs in parallel with the module tests; and, after the module tests, Build & Validate (`dotnet test forge/Forge.sln` with coverage, `nuke --type docker --dry-run true` and a docs-template build) |
 | Release | The `release.yml` workflow (manual) or a pushed `v*` tag (`release-tag.yml`). See `documentation/docs/releases.md` |
 
 The `Dockerfile` copies the compiled build from `artifacts/` and needs the `docs-template/` submodule checked out.
@@ -223,7 +223,7 @@ The workflows are in `.github/workflows/`; shared steps are in `.github/actions/
 | Workflow | Trigger |
 |---|---|
 | `ci.yml` | Pull requests, manual |
-| `build.yml` | Push to `main`, manual |
+| `build.yml` | Push to `main` that changes more than `documentation/**` and `.github/**`, manual |
 | `release.yml` | Manual |
 | `release-tag.yml` | A pushed `v*` tag |
 | `docs.yml` | Documentation changes on `main`, manual, repository dispatch |
@@ -234,7 +234,12 @@ Builds read `GITHUB_TOKEN` and the parameters `RegistryToken` and `Notifications
 
 ## Documentation System
 
-Pages live in `documentation/docs/`. The site itself is built from the pinned `docs-template/` submodule (Docusaurus), by `docs.yml` and as a check in `ci.yml`. `design/docs-classification.txt` says which document owns which public surface, and the DocsCheck command fails when a page names something that does not exist. Run it after any documentation change.
+Pages live in `documentation/docs/`. The site itself is built from the pinned `docs-template/` submodule (Docusaurus), by `docs.yml` and as a check in `ci.yml`. `design/docs-classification.txt` says which document owns which public surface, and the DocsCheck command fails when a page names something that does not exist. It reads only `README.md`, `documentation/docs/**`, `documentation/src/pages/*` and the module sources in `scripts/powershell-module/`; other files are not checked. Run it after any documentation change.
+
+Two files are generated; edit their sources, not them:
+
+- `documentation/src/pages/index.md` comes from `README.md`. Run `pwsh scripts/sync-site-home.ps1` after editing the README; CI runs it with `-Check`.
+- The tables in `documentation/docs/parameters.md` come from the `*Params` classes. Run `pwsh scripts/Update-ParameterDocs.ps1` after changing a parameter; `-Check` reports drift.
 
 ## Testing Strategy
 

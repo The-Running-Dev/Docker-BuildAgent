@@ -40,9 +40,6 @@ parameters:
   repository-url: https://github.com/example/my-project.git
   docker-file: Dockerfile
   image-tag: my-app
-  tags:
-    - stable
-    - edge
   registry-url: ghcr.io/example
   create-git-hub-release: false
   notifications: false
@@ -61,7 +58,8 @@ Rules for the document:
   the same ones the command line takes. See [Parameters](./parameters.md) for each build type's
   list and defaults.
 - `node-template` has no parameters of its own, so any key under `parameters` for that type is
-  rejected.
+  rejected. The `node-template` build runs through its own PowerShell flow and does not read or
+  validate the file today, so a file for it has no effect on that build.
 - YAML anchors, aliases, several documents in one file, and keys that are not strings are
   rejected.
 - A value must fit its parameter: a boolean parameter takes `true` or `false`, a list parameter
@@ -83,7 +81,7 @@ These parameters carry credentials, and the file may not set them:
 
 A file that names one is rejected with `SecretKeyRejected`. Supply secrets by argument, by
 environment variable (the variable name is the parameter's PascalCase name, for example
-`RegistryToken`), or through the `.build.env.map` mapping file.
+`RegistryToken`), or through the `.build/.build.env.map` mapping file.
 
 ## Precedence
 
@@ -92,7 +90,7 @@ When the same parameter is set in more than one place, the highest of these wins
 1. An argument on the command line
 2. PowerShell module configuration (`Set-BuildAgentConfig`)
 3. The process environment
-4. The environment generated from `.build.env.map`
+4. The environment generated from `.build/.build.env.map`
 5. The project configuration file
 6. The parameter's declared default
 
@@ -105,7 +103,7 @@ Every problem found in the file is collected and reported together, then the bui
 status **2** and runs no step. Each line has this form:
 
 ```text
-Configuration error: file=buildagent.yml key=image-tag rule=ValueTypeMismatch: ...
+Configuration error: file=/workspace/buildagent.yml key=image-tag rule=ValueTypeMismatch: ...
 ```
 
 | Rule | Cause |

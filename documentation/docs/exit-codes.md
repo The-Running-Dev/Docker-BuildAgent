@@ -1,7 +1,7 @@
 ---
 id: exit-codes
 title: Exit Codes
-sidebar_position: 16
+sidebar_position: 17
 ---
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

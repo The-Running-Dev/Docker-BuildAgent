@@ -6,7 +6,7 @@ sidebar_position: 5
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
-The Build Agent provides several PowerShell helper modules that simplify build automation tasks and provide consistent behavior across different environments.
+The Build Agent provides a PowerShell helper module, `nuke-helpers.psm1`, that simplifies build automation tasks and provides consistent behavior across different environments.
 
 ## nuke-helpers.psm1
 
@@ -22,6 +22,10 @@ The core PowerShell module that powers Build Agent automation scripts and provid
 | `Initialize-Build` | Set up build paths and validate project structure |
 | `Get-PackageManager` | Auto-detect Node.js package manager based on lock files |
 | `Invoke-SafeCommand` | Execute commands with comprehensive error handling |
+| `Add-RootArgument` | Add the project root directory to a list of build arguments |
+| `Invoke-DotNetCommand` | Run a `dotnet` command and fail on a non-zero exit code |
+| `Initialize-DotNetEnvironment` | Verify the .NET SDK before a build |
+| `Invoke-Forge` | Run the Forge build system for a build type, after running `set-environment.ps1` if the project has one |
 
 ### Copy-Directory
 
@@ -37,11 +41,11 @@ Copy-Directory -SourceDir './template' -DestinationDir './docs-ui' -Overwrite
 - **Preservation Mode**: Can skip existing files to preserve customizations
 - **Automatic Directory Creation**: Creates destination directory structure as needed
 - **Detailed Logging**: Shows which files are copied, skipped, or ignored
-- **Gitignore Management**: Automatically updates `.gitignore` with copied files
+- **Gitignore Management**: Updates `.gitignore` with copied files when `-UpdateGitIgnore` is passed
 
 #### Gitignore Management
 
-When copying files, the function now automatically:
+When `-UpdateGitIgnore` is passed (it is off by default, and `build.ps1` does not pass it), the function:
 
 1. Creates `.gitignore` if it doesn't exist in the destination directory
 2. Tracks all copied files

@@ -61,7 +61,7 @@ be pulled as a failure to fix, not a fallback to expect.
 
 ## Map-derived environment no longer overwrites a set variable (2.0.0)
 
-**Before:** values generated from `.build.env.map` were loaded over the process environment, so
+**Before:** values generated from `.build/.build.env.map` were loaded over the process environment, so
 a generated value replaced a variable you had already set.
 
 **Now:** a variable already set in the process environment keeps its value. The generated value
