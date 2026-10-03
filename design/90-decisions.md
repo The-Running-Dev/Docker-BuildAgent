@@ -43,8 +43,6 @@ Every entry below, newest first, by date and title. The entries are not edited; 
 ## Open
 <A staging area, not a home. Things noticed mid-slice that were deliberately not acted on. `/track` turns each into a GitHub issue and removes it from here. An item that is a *decision* rather than a *todo* belongs below as an entry, not in an issue.>
 
-- The `TemplateLocation` surface derives three items (`ExplicitTemplatesDirectory`, `RootRelativeTemplatesDirectory`, `TemplateDockerfileByAppType`) while `DockerService.FindTemplateDockerFile` searches four directories (`TemplatesDir`, `.github/templates`, `templates`, `/nuke/templates`). Whether the three fallback directories become `TemplateLocation` items, appended after the existing ones, is a protected-surface decision for `/align`.
-
 ---
 
 ### 2026-09-29 — The build path owes the call into Config; the contract stands and issue #11 stays open until it lands
