@@ -1,27 +1,20 @@
-# Manual Release Creation Workflow
+# Manual Release Workflow
 #
-# This workflow creates official releases for the Docker Build Agent project.
-# It is triggered manually when you want to create a new release version.
-#
-# Features:
-#   - Manual trigger with optional version override
-#   - Comprehensive testing before release
-#   - Docker image building and publishing
-#   - GitHub release creation with changelog
-#   - Semantic versioning with GitVersion
+# Creates an official release from the commit it is dispatched on. The version always comes
+# from GitVersion; a manually supplied version is not honoured yet (design/00-brief.md,
+# I5), so the `version` input fails the run rather than being silently ignored.
 #
 # Usage:
-#   1. Go to Actions tab in GitHub
-#   2. Select "Create Release" workflow
-#   3. Click "Run workflow"
-#   4. Optionally specify a custom version (e.g., v1.2.3)
-#   5. Click "Run workflow" button
+#   1. Go to the Actions tab in GitHub
+#   2. Select the "Release" workflow
+#   3. Click "Run workflow", optionally ticking "Mark as Pre-Release"
 #
 # The workflow will:
-#   - Run all tests to ensure quality
-#   - Build and publish Docker images
-#   - Create a GitHub release with auto-generated changelog
+#   - Run the module tests and every forge test project
+#   - Build and publish the Docker image (latest and the GitVersion version tag)
+#   - Create a GitHub release with an auto-generated changelog
 #   - Tag the repository with the version number
+#   - Dispatch the Update-Documentation event
 
 name: Release
 
@@ -29,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release Version (optional, leave empty for auto-version)'
+        description: 'Not supported yet: any value fails the run. Leave empty; the version comes from GitVersion'
         required: false
         type: string
       prerelease:
@@ -37,10 +30,6 @@ on:
         required: false
         type: boolean
         default: false
-      release_notes:
-        description: 'Custom Release Notes (optional)'
-        required: false
-        type: string
 
 permissions:
   packages: write
@@ -82,16 +71,17 @@ jobs:
       - name: Tests & Coverage
         uses: ./.github/actions/tests
 
+      # A manual version is not honoured by the build (Version always comes from GitVersion),
+      # so refuse it instead of publishing a different version than the operator asked for.
+      - name: Reject Unsupported Version Input
+        if: ${{ github.event.inputs.version != '' }}
+        run: |
+          echo "::error::The version input is not supported yet; the release version comes from GitVersion. Re-run with it empty, or push a version tag to use Release-from-Tag."
+          exit 1
+
       # Build and create release
       - name: Build and Create Release
-        run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            echo "Using custom version: ${{ github.event.inputs.version }}"
-            nuke --type docker --create-github-release true --version "${{ github.event.inputs.version }}" --pre-release "${{ github.event.inputs.prerelease }}"
-          else
-            echo "Using GitVersion for automatic versioning"
-            nuke --type docker --create-github-release true --pre-release "${{ github.event.inputs.prerelease }}"
-          fi
+        run: nuke --type docker --create-github-release true --pre-release "${{ github.event.inputs.prerelease }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
