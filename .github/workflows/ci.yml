@@ -11,8 +11,9 @@
 #
 # Jobs:
 #   - ModuleTests: calls module-tests.yml (Pester on Windows PowerShell 5.1 and PowerShell 7).
-#   - DocsCheck: runs forge/DocsCheck and the site home page check; fails the pull request when a
-#     document names something the repository does not have, or the home page has drifted from README.md.
+#   - DocsCheck: runs forge/DocsCheck, the site home page check and the parameter tables check; fails
+#     the pull request when a document names something the repository does not have, the home page
+#     has drifted from README.md, or parameters.md has drifted from the *Params classes.
 #   - Build ("Build & Validate"): runs after ModuleTests.
 #       1. Skips duplicate runs for the same content (skip-duplicate-actions)
 #       2. Checks out the repository with full history and submodules
@@ -70,6 +71,10 @@ jobs:
       - name: Check Site Home Page Matches README
         run: pwsh scripts/sync-site-home.ps1 -Check
 
+      # parameters.md tables are generated from the *Params classes; fails when they have drifted.
+      - name: Check Parameter Tables Match Sources
+        run: pwsh scripts/Update-ParameterDocs.ps1 -Check
+
   Build:
     needs: ModuleTests
     name: Build & Validate
@@ -113,10 +118,12 @@ jobs:
         with:
           node-version: '22'
 
+      # Keep this version equal to ARG PNPM_VERSION in the Dockerfile, so CI builds the site the
+      # way the image does.
       - name: Setup pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@9.0.0 --activate
+          corepack prepare pnpm@10.16.0 --activate
 
       - name: Validate Docs Build
         run: |

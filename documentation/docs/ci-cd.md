@@ -33,7 +33,9 @@ CI has three jobs:
   request when a document names a path, command, parameter, build type or template-discovery
   location that the repository does not have, or breaks the canonical-contract rules.
   It then runs `pwsh scripts/sync-site-home.ps1 -Check`, which fails the pull request when the
-  site home page (`documentation/src/pages/index.md`) no longer matches `README.md`.
+  site home page (`documentation/src/pages/index.md`) no longer matches `README.md`, and
+  `pwsh scripts/Update-ParameterDocs.ps1 -Check`, which fails it when the tables in
+  [Parameters](parameters.md) no longer match the `*Params` classes.
 - **Build & Validate** runs after Module Tests. It runs every test project in `forge/Forge.sln` with
   coverage (test results appear as a check run, and a coverage summary is posted on the pull
   request), makes a dry run of the Docker build with `nuke --type docker --dry-run true`, and
@@ -69,8 +71,16 @@ it. `docker` is mocked, so a Windows runner is enough.
 
 ### Docs
 
-Docs checks out the repository with submodules, builds the site from `docs-template`
+Docs first runs the same three documentation checks as the CI Docs Check job (DocsCheck, the site
+home page check and the parameter tables check); if one fails, nothing is deployed. It then checks
+out the repository with submodules, builds the site from `docs-template`
 (`pnpm --dir docs-template build`) and deploys `docs-template/artifacts` to GitHub Pages.
+
+### Pinned tools
+
+The workflows and the Dockerfile use the same tool versions: pnpm 10.16.0 (`ci.yml`, `docs.yml`,
+`ARG PNPM_VERSION`), GitVersion 6.5.1 and Nuke 10.1.0 (`.github/actions/common`,
+`ARG GITVERSION_VERSION`, `ARG NUKE_VERSION`). Change them together.
 
 ---
 

@@ -6,7 +6,8 @@
 # Steps included:
 #   - Set up Docker Buildx for advanced Docker builds
 #   - Install .NET SDK 8.x for building .NET projects
-#   - Install global .NET tools: GitVersion.Tool and Nuke.GlobalTool
+#   - Install global .NET tools: GitVersion.Tool and Nuke.GlobalTool, at the versions the Dockerfile
+#     pins (ARG GITVERSION_VERSION and ARG NUKE_VERSION); keep them equal
 #
 # Usage:
 #   - Reference this action in your workflow with:
@@ -29,6 +30,6 @@ runs:
 
     - name: Install .NET Tools
       run: |
-        dotnet tool install --global GitVersion.Tool
-        dotnet tool install --global Nuke.GlobalTool
+        dotnet tool install --global GitVersion.Tool --version 6.5.1
+        dotnet tool install --global Nuke.GlobalTool --version 10.1.0
       shell: bash
