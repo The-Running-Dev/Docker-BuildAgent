@@ -10,7 +10,7 @@ Canonical contract (build command): [design/20-contract.md](https://github.com/T
 
 | You have | Run | You get |
 |---|---|---|
-| A project with a `Dockerfile`, or a type that has a [template](docker-templates) | `build docker` | An image, pushed and released in CI |
+| A project with a `Dockerfile`, or a type that has a [template](docker-templates) | `build docker` | An image, pushed in CI (and released with `--create-github-release true`) |
 | A Node.js application that is not containerized | `build node` | The built application in the artifacts directory |
 | A Node.js application that ships as an image | `build node-in-docker` | The Node build, then the image |
 | A documentation site | `build node-template` | The site built from a template repository |
@@ -24,7 +24,7 @@ Canonical contract (build command): [design/20-contract.md](https://github.com/T
 | `build node` | No | A `build:prod` npm script, or `.build/.build.scripts` | Not applicable |
 | `build node-in-docker` | Yes | The same as `build node` | `RegistryToken` and `GITHUB_TOKEN` |
 | `build node-template` | No | A documentation directory; the template comes from a repository | Not applicable |
-| `build forge` | No | The full Git history (`fetch-depth: 0` in GitHub Actions) | Not applicable |
+| `build forge` | No | The full Git history (`fetch-depth: 0` in GitHub Actions) and a `.build/` directory (the build stops if it is missing) | Not applicable |
 
 Every build mounts the project at `/workspace`.
 
@@ -36,7 +36,7 @@ The Build Agent uses a unified `build` command with different types. Here are th
 
 ### 🐳 Docker Image Build
 
-Creates a Docker image for your project artifacts (from the default `ArtifactsDir`).
+Creates a Docker image from your project; the project directory is the Docker build context.
 
 1. Map your project directory (`./`) to `/workspace`
 2. Expose the Docker host to the container, either through docker.sock volume bind (on Linux) or DOCKER_HOST environment variable.
@@ -61,7 +61,7 @@ docker run \
      build docker
 ```
 
-This will run the `Docker` forge with all it's [targets](targets#docker) and default [parameters](parameters#docker), and build your Docker image.
+This will run the `Docker` forge with all its [targets](targets#docker) and default [parameters](parameters#docker), and build your Docker image.
 
 ### 🟢 Node.js Application Build
 
@@ -76,12 +76,13 @@ This will run the `Docker` forge with all it's [targets](targets#docker) and def
     build node
 ```
 
-This will run the `Node` forge with all it's [targets](targets#node) and default [parameters](parameters#node), and build your Node application.
+This will run the `Node` forge with all its [targets](targets#node) and default [parameters](parameters#node), and build your Node application.
 
-By default, the `Node` build target runs 2 scripts:
+By default, the `Node` build target runs 3 scripts, using the package manager it detects (`npm` below):
 
-1. npm install
-2. npm run build:prod
+1. `rm -rf node_modules`
+2. `npm install`
+3. `npm run build:prod`
 
 You can customize this by specifying your own `.build.scripts`, see [customization](customization).
 
@@ -100,7 +101,7 @@ You can customize this by specifying your own `.build.scripts`, see [customizati
     build node-in-docker
 ```
 
-This will run the `Node` forge with all it's [targets](targets#node) and default [parameters](parameters#node), and build your Node application. And after that, it will run the `Docker` forge with all it's [targets](targets#docker) and default [parameters](parameters#docker), and build your Docker image.
+This will run the `Node` forge with all its [targets](targets#node) and default [parameters](parameters#node), and build your Node application. And after that, it will run the `Docker` forge with all its [targets](targets#docker) and default [parameters](parameters#docker), and build your Docker image.
 
 ### 📝 Changelog Generation
 

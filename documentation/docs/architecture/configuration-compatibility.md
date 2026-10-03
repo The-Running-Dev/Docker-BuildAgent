@@ -164,39 +164,7 @@ Node version, not the `engines` field of its `package.json`.
 The build asks GitVersion for the version by running `dotnet-gitversion /output json` in the
 project root, and reads `GitVersion.yml` from there. The image ships GitVersion 6.5.1, so the file
 uses the version 6 syntax. If the project has no `.git` directory the version is `0.0.0`.
-This repository's `GitVersion.yml` is an example:
-
-```yaml
-mode: ContinuousDelivery
-next-version: v2.0.0
-tag-prefix: v
-
-branches:
-  main:
-    regex: ^main$
-    increment: Minor
-    is-release-branch: false
-  feature:
-    regex: ^features?[/-](?<BranchName>.+)
-    increment: Inherit
-    source-branches: [main]
-  release:
-    regex: ^releases?[/-](?<BranchName>.+)
-    increment: Patch
-    source-branches: [main]
-  hotfix:
-    regex: ^hotfix(es)?[/-](?<BranchName>.+)
-    increment: Patch
-    source-branches: [main]
-  pull-request:
-    regex: ^(pull|pr)[/-](?<BranchName>.+)
-    increment: Inherit
-    source-branches: [main, feature, release, hotfix]
-    label: pr-{BranchName}
-
-commit-message-incrementing: Enabled
-```
-
+This repository's [`GitVersion.yml`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/GitVersion.yml) is an example; this page does not copy it, because a copy goes stale.
 A file written for GitVersion 5 needs migrating, because version 6 renamed some keys and values
 (for example the branch `tag` is now `label`, and the `Mainline` mode is now `TrunkBased`). See
 the GitVersion documentation for the full list.

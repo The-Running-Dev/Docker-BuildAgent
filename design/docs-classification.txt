@@ -39,8 +39,8 @@ documentation/docs/index.md	non-overlapping	-	A table of contents linking the re
 documentation/docs/status.md	non-overlapping	-	Project status page.
 documentation/docs/targets.md	non-overlapping	-	Names no protected-surface name the docs check covers.
 documentation/docs/troubleshooting.md	non-overlapping	-	Names no protected-surface name the docs check covers.
-documentation/src/pages/CHANGELOG.md	non-overlapping	-	Generated change history.
-scripts/powershell-module/Docker-BuildAgent.psm1	non-overlapping	-	Module source with no help text; the module's contract is PSModule.requirements.md.
+documentation/src/pages/CHANGELOG.md	non-overlapping	-	Hand-maintained change history.
+scripts/powershell-module/Docker-BuildAgent.psm1	non-overlapping	-	Module source with comment-based help on its public functions; the module's contract is PSModule.requirements.md.
 scripts/powershell-module/Update-ModuleParameters.ps1	non-overlapping	-	Maintenance script with no help text.
 
 documentation/docs/architecture/multi-build-architecture.md	removed	-	Stale duplicate of build-types and the development guide; named projects that do not exist.

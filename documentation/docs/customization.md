@@ -13,7 +13,7 @@ You can customize the build process by creating a `.build` directory in your pro
 | [`.build.env.map`](#buildenvmap)         | Maps environment variables/constants for the build process (`.build/.build.env`).       |
 | [`.build.copy`](#buildcopy)            | Lists files/folders to copy to `ArtifactsDir` after the build completes.                |
 | [`.build.scripts`](#buildscripts)         | Lists shell scripts or commands to run as part of the build.                            |
-| [`set-environment.ps1`](#environment-variables-helper)    | (Local only) PowerShell script to set environment variables before the build starts.     |
+| [`set-environment.ps1`](#environment-variables-helper)    | PowerShell script to set environment variables before the build starts.                  |
 
 ## `.app.env.map`
 
@@ -73,7 +73,7 @@ npm run build:prod
 
 ## Environment Variables Helper
 
-For local builds, you can create a `set-environment.ps1` script in your project directory. If present, this script is automatically called by `build docker`, `build node`, and `build node-in-docker` before the build starts.
+You can create a `set-environment.ps1` script in your project directory. If present, `Invoke-Forge` runs it before the build starts, for every build type that goes through Forge.
 
 This allows you to set up environment variables or secrets without hardcoding them in your pipeline or Dockerfile.
 

@@ -26,8 +26,8 @@ Available types: `docker`, `node`, `node-in-docker`, `node-template`, `forge`
 | A documentation site | `build node-template` | The site built from a template repository |
 | A change log | `build forge` | `CHANGELOG.md` from the Git history |
 
-The flags, environment variables and configuration keys of the first four types are in
-[Parameters](./parameters.md), one table per type. The order each type runs its steps in is in
+The flags, environment variables and configuration keys of `docker`, `node`, `node-in-docker` and
+`forge` are in [Parameters](./parameters.md), one table per type; `node-template` has no table. The order each type runs its steps in is in
 [Targets](./targets.md). What a failed build returns is in [Exit Codes](./exit-codes.md).
 
 Files that a build reads live in the `.build` directory of the project:

@@ -20,13 +20,14 @@ sidebar_position: 0
 - 📜 Orchestration by convention or via `.build.scripts` and `.build.copy`
 - 🧪 Dry-run mode for safe testing
 - 🟢 Node.js runtime
-- 🅰️ Latest Angular and Angular CLI
+- 🅰️ Angular CLI (pinned in the `Dockerfile`)
 - 💻 PowerShell for cross-platform scripting
-- 🟣 .NET 8 SDK for .NET builds and tools
+- 🟣 .NET SDKs 8, 9 and 10 for .NET builds and tools
 - 🗃️ Git for source control
 - 🔢 GitVersion for semantic versioning in CI/CD
 - 📝 **CHANGELOG generation** with Git integration and customizable formatting
 - ⚡ **Forge build system** with specialized commands for different project types
+- 🧩 Five build types (`docker`, `node`, `node-in-docker`, `node-template`, `forge`), an optional [project configuration file](project-configuration.md), a [PowerShell module](powershell-module.md) and an [update and rollback tool](update-tool.md)
 
 ## ⚡ Fast Track
 
@@ -41,5 +42,3 @@ For developers and advanced users, explore our architecture guides:
 - **[Dependency Injection](architecture/dependency-injection.md)** - Service architecture and testing
 - **[Development Guide](architecture/development-guide.md)** - Complete setup and contribution guide
 - **[Configuration & Compatibility](architecture/configuration-compatibility.md)** - Environment setup and platform compatibility
-
-<!-- 📦 ⚡ 🛠️ -->

@@ -32,6 +32,8 @@ CI has three jobs:
 - **Docs Check** runs `dotnet run --project forge/DocsCheck -c Release -- .`. It fails the pull
   request when a document names a path, command, parameter, build type or template-discovery
   location that the repository does not have, or breaks the canonical-contract rules.
+  It then runs `pwsh scripts/sync-site-home.ps1 -Check`, which fails the pull request when the
+  site home page (`documentation/src/pages/index.md`) no longer matches `README.md`.
 - **Build & Validate** runs after Module Tests. It runs every test project in `forge/Forge.sln` with
   coverage (test results appear as a check run, and a coverage summary is posted on the pull
   request), makes a dry run of the Docker build with `nuke --type docker --dry-run true`, and
