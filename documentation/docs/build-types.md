@@ -1,12 +1,12 @@
 ---
 id: build-types
-title: 🔧 Build Types & Commands
+title: Build Types and Commands
 sidebar_position: 2
 ---
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
-The Build Agent provides a **unified `build` command** with different types. Each type is optimized for specific project types and use cases.
+The Build Agent has one `build` command with five types. Each type suits a kind of project.
 
 ## Unified Build Command
 
@@ -18,22 +18,44 @@ build <type> [parameters]
 
 Available types: `docker`, `node`, `node-in-docker`, `node-template`, `forge`
 
+| Project | Command | Result |
+|---|---|---|
+| A project with a Dockerfile, or a type that has a [template](./docker-templates.md) | `build docker` | An image, pushed and released in CI |
+| A Node.js application that is not containerized | `build node` | The built application in the artifacts directory |
+| A Node.js application that ships as an image | `build node-in-docker` | The Node build, then the image |
+| A documentation site | `build node-template` | The site built from a template repository |
+| A change log | `build forge` | `CHANGELOG.md` from the Git history |
+
+The flags, environment variables and configuration keys of the first four types are in
+[Parameters](./parameters.md), one table per type. The order each type runs its steps in is in
+[Targets](./targets.md). What a failed build returns is in [Exit Codes](./exit-codes.md).
+
+Files that a build reads live in the `.build` directory of the project:
+
+| File | Used by | Purpose |
+|---|---|---|
+| `.build/.build.scripts` | `node`, `node-in-docker` | The commands that build the application, one per line |
+| `.build/.build.copy` | `node`, `node-in-docker` | The files to copy to the artifacts directory |
+| `.build/.build.env.map` | every type but `node-template` | The variables the build needs and where each value comes from |
+| `.build/.app.env.map` | `node`, `node-in-docker` | The variables written to the application's `.env` file |
+
+A map line is `Name=const:value` for a fixed value or `Name=env:VARIABLE` for a value read from the environment.
+The build stops with `Build Env Incomplete` when a variable in `.build/.build.env.map` has no value.
+
 ---
 
-## 🐳 build docker
+## build docker
 
-**Purpose**: Creates Docker images for your project artifacts with automatic tagging and registry push capabilities.
+Builds a Docker image from the project and, in CI, pushes it to a registry and publishes a GitHub release.
 
-**What it does**:
+What it does:
 
-- Builds Docker images from project artifacts (located in `ArtifactsDir`)
-- Automatically detects or uses provided Dockerfile
-- Supports [Docker templates](docker-templates) for common application types
-- Tags images with version information from GitVersion
-- Pushes to container registries when configured
-- Creates git tags when building releases
+- Builds the image from the project's Dockerfile, or from a [template](./docker-templates.md) when the project has none
+- Tags the image `latest`, and also with the version when a GitHub release is requested. The version comes from GitVersion.
+- Pushes the tags to the registry in CI, or when `--force-push true` is given
+- Creates the GitHub release and the Git tag `v` followed by the version, when `--create-github-release true` is given
 
-**Usage**:
+Usage:
 
 ```bash
 docker run \
@@ -43,27 +65,24 @@ docker run \
   build docker
 ```
 
-**Common Parameters**:
-
-- `--dry-run true` - Simulate build without pushing
-- `--create-github-release true` - Create GitHub release
-- `--force-push true` - Force push even in dry-run scenarios
+Common flags: `--dry-run true` simulates the build without pushing, `--create-github-release true` creates the
+release and `--force-push true` pushes outside CI.
 
 ---
 
-## 📦 build node
+## build node
 
-**Purpose**: Builds Node.js applications with automatic package manager detection and script execution.
+Builds a Node.js application into the artifacts directory.
 
-**What it does**:
+What it does:
 
-- Auto-detects package manager (npm, pnpm, yarn) based on lock files
-- Reads build scripts from `.build.scripts` file or uses conventions
-- Executes custom build workflows
-- Copies specified artifacts to output directory
-- Supports TypeScript, Angular, React, Next.js, Express, and more
+- Runs the commands in `.build/.build.scripts`. Without that file it removes `node_modules`, then runs
+  `<package manager> install` and `<package manager> run build:prod`.
+- Detects the package manager from the lock file: `pnpm-lock.yaml` means pnpm, `yarn.lock` means yarn, anything else npm
+- Writes the application's `.env` file from `.build/.app.env.map`
+- Copies the files listed in `.build/.build.copy` to the artifacts directory
 
-**Usage**:
+Usage:
 
 ```bash
 docker run \
@@ -72,48 +91,22 @@ docker run \
   build node
 ```
 
-**Build Scripts Convention**:
-
-If no `.build.scripts` file exists, defaults to:
-
-```text
-{detected-package-manager} install
-{detected-package-manager} run build:prod
-```
-
 ---
 
-## 🔄 build node-in-docker
+## build node-in-docker
 
-**Purpose**: Combines Node.js build with Docker image creation in a comprehensive two-phase build pipeline.
+Runs the Node.js build, then builds and publishes the image.
 
-**What it does**:
+What it does:
 
-- **Phase 1**: Node.js Application Build
-  - Auto-detects package manager (npm, pnpm, yarn)
-  - Executes build scripts from `.build.scripts` or conventions
-  - Generates production-ready artifacts
-  - Copies built files to artifacts directory
+- Phase 1 is the `build node` steps: clean the artifacts directory, write the environment file, build the
+  application and copy the artifacts.
+- Phase 2 is the `build docker` steps: build the image, push it, then create the GitHub release and Git tag.
 
-- **Phase 2**: Docker Image Creation
-  - Builds Docker image using specified Dockerfile
-  - Tags image with version information
-  - Optionally pushes to container registry
-  - Creates Git tags and GitHub releases
+The image always gets both a `latest` tag and a version tag. The full order of steps is in
+[Targets](./targets.md#node-in-docker).
 
-**Build Target Execution Order**:
-
-1. `Setup` - Initialize parameters and environment
-2. `Clean` - Remove previous artifacts
-3. `GenerateEnvironment` - Set up build environment
-4. `BuildApplication` - Execute Node.js build process
-5. `CopyToArtifacts` - Move built files to artifacts directory
-6. `BuildDockerImage` - Create Docker container image
-7. `PushToRegistry` - Push image to container registry
-8. `PublishToGitHub` - Create GitHub release (includes Git tag creation)
-9. `Build` - Final completion target
-
-**Usage**:
+Usage:
 
 ```bash
 # Basic usage
@@ -130,55 +123,28 @@ docker run \
   -it ghcr.io/the-running-dev/build-agent:latest \
   build node-in-docker \
   --artifacts-dir ./dist \
-  --image-tag my-app:latest \
+  --image-tag my-app \
   --registry-url ghcr.io/myorg \
   --create-github-release true
 ```
 
-**Key Parameters**:
+The version tag comes from GitVersion, and there is no flag to set it. The release tag is `v` followed by the version.
 
-### Node.js Build Parameters
-
-- `--artifacts-dir` - Directory for build artifacts (default: 'artifacts')
-
-### Docker Build Parameters
-
-- `--templates-dir` - Directory containing Dockerfile templates (default: '/nuke/templates')
-- `--docker-file` - Dockerfile to use for building (default: 'Dockerfile')
-- `--image-tag` - Tag for the Docker image (default: 'container-app')
-- `--registry-url` - Container registry URL for pushing images
-- `--registry-user` - Registry username for authentication
-- `--registry-token` - Registry token/password for authentication
-
-### Release & Git Parameters
-
-- `--create-github-release` - Create GitHub release (default: false)
-- `--release-tag` - Tag for the release (default: 'v0.0.0')
-- `--force-push` - Force push operations
-- `--dry-run` - Simulate build without pushing
-
-### Common Parameters
-
-- `--notifications` - Enable Discord notifications
-- `--notifications-web-hook-url` - Discord webhook URL
-- `--verbosity` - Logging verbosity level (Quiet, Minimal, Normal, Verbose)
-
-**Configuration Examples**:
+Examples:
 
 ```bash
 # Production build with registry push
 build node-in-docker \
   --artifacts-dir ./build \
-  --image-tag myapp:v1.2.3 \
+  --image-tag myapp \
   --registry-url ghcr.io/myorg \
   --registry-user $GITHUB_ACTOR \
   --registry-token $GITHUB_TOKEN \
-  --create-github-release true \
-  --release-tag v1.2.3
+  --create-github-release true
 
-# Development build (dry run)
+# Dry run
 build node-in-docker \
-  --image-tag myapp:dev \
+  --image-tag myapp \
   --dry-run true \
   --verbosity Verbose
 
@@ -187,53 +153,60 @@ build node-in-docker \
   --docker-file Dockerfile.prod \
   --artifacts-dir ./dist/app \
   --templates-dir ./docker-templates \
-  --image-tag myapp:custom
+  --image-tag myapp
 ```
 
-**Project Structure Requirements**:
+Project structure:
 
 ```text
 your-project/
 ├── package.json              # Node.js project configuration
-├── .build.scripts            # Optional: Custom build commands
-├── Dockerfile                # Docker image definition
-├── set-environment.ps1       # Optional: Environment setup
+├── .build/
+│   ├── .build.scripts        # Optional: custom build commands
+│   ├── .build.copy           # Files to copy to the artifacts directory
+│   └── .build.env.map        # Variables the build needs
+├── Dockerfile                # Optional: a template is used when it is missing
+├── set-environment.ps1       # Optional: runs before the build to set variables
 └── artifacts/                # Default output directory
     └── (built files)
 ```
 
-**Environment Variables**:
+Secrets are given by flag or as variables, not in the project configuration file. The registry credentials and the
+notification webhook are the variables `RegistryUser`, `RegistryToken` and `NotificationsWebHookUrl`.
+The registry token also authenticates the GitHub release, so the release needs `RegistryToken` even when no image is
+pushed. For example, in `.build/.build.env.map`:
 
-The build process respects these environment variables:
-
-- `GITHUB_TOKEN` - For GitHub release creation
-- `REGISTRY_USER` - Container registry username
-- `REGISTRY_TOKEN` - Container registry authentication
-- `DISCORD_WEBHOOK_URL` - For build notifications
-
-**Use Cases**:
-
-- **Frontend Applications**: Angular, React, Vue.js with Nginx serving
-- **Node.js APIs**: Express, Fastify, NestJS applications
-- **Full-Stack Apps**: Next.js, Nuxt.js applications
-- **Static Sites**: Gatsby, Hugo with Node.js build pipeline
-- **Microservices**: Node.js services requiring containerization
+```env
+RegistryUser=env:GITHUB_ACTOR
+RegistryToken=env:GITHUB_TOKEN
+```
 
 ---
 
-## 📚 build node-template
+## build node-template
 
-**Purpose**: Builds documentation sites using templates (primarily Docusaurus) with smart file merging.
+Builds a documentation site from a template repository, usually Docusaurus.
 
-**What it does**:
+What it does:
 
-- Clones a documentation template repository
-- Copies template files to your project, preserving existing files
-- Auto-detects package manager (npm, pnpm, yarn)
-- Installs dependencies and builds the documentation
-- Supports production and development builds
+- Clones the template repository, by default Docusaurus-Template. A `#branch` suffix on the URL selects a branch.
+- Copies the template files into the application directory without overwriting existing files
+- Runs `template-setup.ps1` in the working directory if it exists there, then deletes it
+- Detects the package manager as `build node` does, installs dependencies and runs `<package manager> run build:prod`
 
-**Usage**:
+This type is a PowerShell script. Its options take a single dash, and they are not in [Parameters](./parameters.md).
+
+| Option | Default | Meaning |
+|---|---|---|
+| `-AppDir` | `documentation` | The application directory, relative to the working directory |
+| `-WorkingDir` | the current directory | The project root |
+| `-NodeTemplateRepositoryUrl` | `https://github.com/The-Running-Dev/Docusaurus-Template.git` | The template repository |
+| `-NodeTemplateDirPath` | `/node-template` | Where the template is cloned. An existing directory there is removed first. |
+| `-PackageManager` | detected | `npm`, `pnpm` or `yarn` |
+| `-SkipInstall` | off | Skips the dependency install |
+| `-IsProduction` | on | Runs `build:prod`. Pass `-IsProduction:$false` to skip it. |
+
+Usage:
 
 ```bash
 docker run \
@@ -242,15 +215,7 @@ docker run \
   build node-template -AppDir documentation
 ```
 
-**Key Parameters**:
-
-- `-AppDir` - Target directory for documentation (default: 'documentation')
-- `-PackageManager` - Force specific package manager (npm/pnpm/yarn)
-- `-SkipInstall` - Skip npm install step
-- `-IsProduction` - Build for production using build:prod script
-- `-NodeTemplateRepositoryUrl` - Custom template repository URL
-
-**Examples**:
+Examples:
 
 ```bash
 # Basic usage with auto-detection
@@ -268,26 +233,24 @@ build node-template -NodeTemplateRepositoryUrl https://github.com/my-org/custom-
 
 ---
 
-## 📝 build forge
+## build forge
 
-**Purpose**: Provides build orchestration and changelog generation from Git history with advanced formatting options.
+Generates the change log from the Git history.
 
-**What it does**:
+What it does:
 
-- Generates formatted changelogs from Git commit history
-- Supports multiple changelog sources (all commits, since last tag, or specific tag)
-- Customizable date formatting (default: yyyy.MM.dd)
-- Automatically prepends new changelog content to existing files
-- Provides build orchestration for complex multi-stage processes
+- Writes `CHANGELOG.md` in the project root and puts the new entries before any existing content
+- Takes the commits since the last tag, the complete history, or the commits since a tag you name
+- Groups the commits by date, latest first, with dates written as `yyyy.MM.dd`
 
-**Usage**:
+Usage:
 
 ```bash
 # Generate changelog since last tag
 docker run \
   -v ./:/workspace \
   -it ghcr.io/the-running-dev/build-agent:latest \
-  build forge --target GenerateChangeLog
+  build forge
 
 # Generate complete history
 docker run \
@@ -302,23 +265,10 @@ docker run \
   build forge --change-log-source v1.0.0
 ```
 
-**Key Parameters**:
+The values of `--change-log-source` are in [Parameters](./parameters.md#change-log-source). The targets are `Setup`,
+`GenerateChangeLog` and `Build`, as listed in [Targets](./targets.md#forge).
 
-- `--change-log-source` - Source for changelog generation:
-  - `null/empty` - Since last Git tag (default)
-  - `all` - Complete commit history
-  - `specific-tag` - Since specified tag (e.g., "v1.0.0")
-- `--target` - Build target to execute (GenerateChangeLog, Build)
-
-**Build Targets**:
-
-1. `Setup` - Initialize parameters and environment
-2. `GenerateChangeLog` - Create and save changelog to CHANGELOG.md
-3. `Build` - Complete build process (depends on GenerateChangeLog)
-
-**Output Format**:
-
-The generated changelog uses this format with customizable date formatting:
+Output format, with the date of the run in the heading:
 
 ```markdown
 ## Since v1.4.0 (2025.08.04)
@@ -334,62 +284,27 @@ The generated changelog uses this format with customizable date formatting:
 - Work in Progress
 ```
 
-**Configuration**:
-
-The changelog formatter supports these options:
-
-- **Date Format**: `yyyy.MM.dd` (default), customizable via ChangeLogFormatOptions
-- **Include Hash**: Option to include commit hashes in output
-- **Include Author**: Option to include commit author names
-- **Grouping**: Commits grouped by date in descending order (latest first)
-
-## 🔧 Common Features
-
-All build commands share these common capabilities:
-
-### Environment Setup
-
-- Automatically loads `set-environment.ps1` if present in project root
-- Supports GitVersion for semantic versioning
-- Reads configuration from project files
-
-### Parameter Support
-
-- `--root` - Specify project root directory (auto-added)
-- `--dry-run` - Simulate operations without side effects
-- `--force-push` - Override safety checks for pushing
-
-### Logging & Output
-
-- Colored console output with status prefixes
-- Detailed progress information
-- Error handling with meaningful messages
-
-### Integration
-
-- GitHub release creation
-- Discord notifications
-- Container registry push
-- Git tag creation
+With `--change-log-source all` the heading reads `History` in place of `Since <tag>`. Each entry is the commit
+message alone. The format has no option for hashes, authors or other date styles.
 
 ---
 
-## 🎯 Choosing the Right Build Type
+## Behavior Shared by All Types
 
-| Project Type | Command | Use Case |
-| ------------ | ------- | -------- |
-| Pure Docker projects | `build docker` | Existing Dockerfile, containerizing artifacts |
-| Node.js apps (no container) | `build node` | Build and test Node.js applications |
-| Node.js apps (with container) | `build node-in-docker` | Complete CI/CD pipeline with registry push |
-| Documentation sites | `build node-template` | Docusaurus, GitBook, static sites |
-| Changelog generation | `build forge` | Git history-based changelog creation |
-| Build orchestration | `build forge` | Complex multi-stage build processes |
+- Every type but `node-template` first runs `set-environment.ps1` from the project root, when it exists, and adds
+  `--root` with the working directory unless you pass it.
+- `.build/.build.env.map` is read before any step. The order that decides which value wins when a setting is given
+  in several places is in [Project Configuration File](./project-configuration.md#precedence).
+- A [project configuration file](./project-configuration.md) can supply parameters. It is checked before any
+  step runs, and an invalid file ends the build with status 2.
+- `--dry-run true` simulates the Docker steps, and `--force-push true` pushes and releases outside CI.
+- Notifications go to the webhook in `NotificationsWebHookUrl`, in CI only unless `--force-notifications true` is given.
 
----
+## Related Documentation
 
-## 🔗 Related Documentation
-
-- [Parameters Reference](parameters) - Detailed parameter documentation
-- [Docker Templates](docker-templates) - Available Dockerfile templates
-- [Customization](customization) - Custom build scripts and configuration
-- [CI/CD Examples](ci-cd) - GitHub Actions integration examples
+- [Parameters](./parameters.md) lists every flag, variable and configuration key.
+- [Targets](./targets.md) lists the steps of each type.
+- [Exit Codes](./exit-codes.md) lists what a build returns.
+- [Docker Templates](./docker-templates.md) explains the Dockerfile templates.
+- [Customization](./customization.md) covers custom build scripts and configuration.
+- [CI/CD](./ci-cd.md) has GitHub Actions examples.
