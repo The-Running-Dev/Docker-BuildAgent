@@ -6,6 +6,13 @@ sidebar_position: 1
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
+## Prerequisites
+
+- **Docker**, running. Every build runs in the image. `build docker` and `build node-in-docker` also need the
+  Docker host: mount `docker.sock` or set `DOCKER_HOST`.
+- **Git history** for `build forge` (`fetch-depth: 0` in GitHub Actions).
+- A project with the files the build needs; see [What each build needs](#what-each-build-needs).
+
 ## Choose a build
 
 | You have | Run | You get |

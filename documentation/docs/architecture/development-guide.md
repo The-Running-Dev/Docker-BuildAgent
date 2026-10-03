@@ -21,6 +21,15 @@ This page does not repeat them, so read that file for what is where and for whic
   `git clone --recurse-submodules`, or run `git submodule update --init` in an existing clone.
 - **Node.js 22**, only to build the documentation site. CI uses 22.
 
+Only .NET and Git are needed for the first check, and it needs no Docker host. From the repository
+root, after cloning with submodules:
+
+```bash
+dotnet run --project forge/DocsCheck -c Release -- .
+```
+
+It exits 0 when the documentation matches the code.
+
 ## Build and test
 
 From the repository root:
@@ -55,6 +64,13 @@ from there:
 ```powershell
 .\build.ps1 -type docker --dry-run true
 ```
+
+`build.sh` is the Linux, macOS and CI equivalent. It always runs the `docker` build type and passes its
+arguments through. Run locally, neither script pushes an image.
+
+`changelog.ps1` regenerates `CHANGELOG.md` from the Git history and copies it to
+`documentation/src/pages/`. It runs the `forge` build type in the published image when Docker is
+available, and otherwise through `dotnet run --project forge/Forge/Forge.csproj`.
 
 The build types and their parameters are in [Build Types](../build-types.md) and
 [Parameters](../parameters.md).
@@ -111,11 +127,26 @@ naming the document that owns it, and a new page needs an entry in the classific
 DocsCheck command above fails when a page names a path, command, parameter or build type that does
 not exist, so run it after any documentation change.
 
+Two files are generated, so edit their sources and regenerate them. CI checks both with `-Check`:
+
+```powershell
+# documentation/src/pages/index.md is generated from README.md
+pwsh scripts/sync-site-home.ps1
+
+# the tables in documentation/docs/parameters.md are generated from the parameter classes
+pwsh scripts/Update-ParameterDocs.ps1
+```
+
+To preview the site with hot reload, run `./scripts/build-docs-local.ps1`. It needs `pnpm` and the
+`docs-template/` submodule, and serves http://localhost:3000. `docs.ps1` and `docs-image.ps1` in the
+repository root are older helpers and are not the supported flow.
+
 ## Contributing
 
 1. Branch from `main`.
 2. Make the change with its tests.
-3. Run `dotnet test forge/Forge.sln` and the DocsCheck command.
+3. Run `dotnet test forge/Forge.sln`, the DocsCheck command and the two `-Check` commands above. The
+   full list is in [CONTRIBUTING.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/CONTRIBUTING.md).
 4. Open a pull request and wait for the CI checks.
 
 Commit messages use a lowercase conventional prefix, for example `fix: ...`, `docs: ...`,
