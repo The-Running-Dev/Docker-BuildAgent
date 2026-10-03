@@ -44,7 +44,7 @@ Set-BuildAgentConfig `
     -DockerImage "ghcr.io/the-running-dev/build-agent:latest" `
     -DockerHost "tcp://host.docker.internal:2375" `
     -WorkspacePath $PWD `
-    -ArtifactsDir "./artifacts" `
+    -ArtifactsDir "artifacts" `
     -AdditionalParameters @{ imageTag = "my-app" }
 ```
 
@@ -53,7 +53,7 @@ Set-BuildAgentConfig `
 | `-DockerImage` | yes | The image to run. Used exactly as given. |
 | `-DockerHost` | yes | The Docker daemon the build talks to. Must look like `tcp://host:port`, `unix:///path` or `npipe:////./pipe/name`. |
 | `-WorkspacePath` | yes | The directory to build. It is mounted at `/workspace`. It must exist. |
-| `-ArtifactsDir` | no | Output directory for the `node`, `node-in-docker` and `node-template` build types. Default `./artifacts`. |
+| `-ArtifactsDir` | no | Output directory for the `node`, `node-in-docker` and `node-template` build types. Default `artifacts`. |
 | `-Environment` | no | `development` (default) or `production`. Stored in the configuration; it is not passed to the build. |
 | `-AdditionalParameters` | no | A hashtable of build parameters applied to every `Invoke-Build`. |
 

@@ -54,7 +54,7 @@ function Set-BuildAgentConfig {
     .PARAMETER ArtifactsDir
     The output directory for the node, node-in-docker and node-template build types. Invoke-Build
     passes it as the artifactsDir build parameter unless the build parameters already set one.
-    Defaults to ./artifacts.
+    Defaults to artifacts.
 
     .PARAMETER Environment
     The environment label, development or production. It is stored in the configuration and is not
@@ -115,7 +115,7 @@ function Set-BuildAgentConfig {
         [Parameter(Mandatory = $true)]
         [string]$WorkspacePath,
 
-        [string]$ArtifactsDir = "./artifacts",
+        [string]$ArtifactsDir = "artifacts",
 
         [ValidateSet('development', 'production')]
         [string]$Environment = 'development',

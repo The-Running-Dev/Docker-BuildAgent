@@ -96,15 +96,8 @@ RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 RUN test -f package.json && test -f pnpm-lock.yaml || (echo "docs-template missing package.json or pnpm-lock.yaml" >&2; exit 1); \
     pnpm install --frozen-lockfile && pnpm build
 
-# Expose port 3000 for documentation server
-EXPOSE 3000
-
 SHELL ["pwsh", "-Command"]
 
 WORKDIR /workspace
-
-# Health check for docs server
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:3000 || exit 1
 
 CMD ["pwsh"]

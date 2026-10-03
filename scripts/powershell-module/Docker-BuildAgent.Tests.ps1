@@ -35,6 +35,19 @@ Describe 'Default image (S9.1)' {
     }
 }
 
+Describe 'Set-BuildAgentConfig defaults (R-CONFIG-002)' {
+    BeforeEach {
+        Import-FreshModule
+        Mock Write-Host -ModuleName $script:ModuleName {}
+    }
+
+    It 'leaves ArtifactsDir at artifacts when -ArtifactsDir is not passed' {
+        Set-BuildAgentConfig -DockerImage 'a/b:1' -DockerHost 'tcp://localhost:2375' -WorkspacePath $script:Workspace
+
+        $BuildAgentConfig.ArtifactsDir | Should -BeExactly 'artifacts'
+    }
+}
+
 Describe 'Invoke-Build' {
     BeforeEach {
         Import-FreshModule
