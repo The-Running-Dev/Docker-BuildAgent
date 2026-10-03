@@ -14,12 +14,14 @@ The Build Agent supports flexible Docker template discovery to make it easy to u
 
 ## 🔍 Template Discovery Order
 
-The Build Agent searches for templates in the following order of priority:
+The Build Agent looks for `Dockerfile.<appType>` in these directories and uses the first one that contains it:
 
-1. **`TemplatesDir` as a directory** - The `TemplatesDir` value, when it names an existing directory
-2. **`TemplatesDir` under your project root** - The same value resolved against the project root (for example `TemplatesDir: templates` finds `templates/` in your repository)
+1. **The configured `TemplatesDir`** - the value as given when it names an existing directory, otherwise the same value resolved against your project root
+2. **`.github/templates/`** in your project root
+3. **`templates/`** in your project root
+4. **`/nuke/templates/`** - the built-in templates inside the Build Agent image
 
-`TemplatesDir` defaults to `/nuke/templates`, the built-in templates inside the Build Agent image, so the image templates are used when you set nothing. A Dockerfile is taken from `<templates>/Dockerfile.<appType>` only when no Dockerfile exists at the configured path.
+`TemplatesDir` defaults to `/nuke/templates`, so with nothing set the first and last locations are the same directory. A template is only used when no Dockerfile exists at the configured path. When none of the four contains a matching template, the build fails and the error lists every location it searched.
 
 This approach allows you to:
 - ✅ Store templates in your own repository (recommended)

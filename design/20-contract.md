@@ -477,9 +477,13 @@ Declared at
 Semantics this document adds: the ordered discovery locations are a protected surface.
 Each location is a `TemplateLocation` manifest item whose `Value` is its position, so
 adding a location at the end is compatible and inserting one anywhere else is not.
-Today's order is the explicit templates directory when it exists as a directory, then
-that same value resolved under the root directory; a Dockerfile is taken from
-`<templates>/Dockerfile.<appType>` when no Dockerfile exists at the configured path.
+Today's `TemplatesDir` resolution is the explicit value when it exists as a directory,
+otherwise that same value resolved under the root directory. The search for
+`<templates>/Dockerfile.<appType>`, taken when no Dockerfile exists at the configured path,
+then tries four directories in order: the resolved `TemplatesDir`, `<root>/.github/templates`,
+`<root>/templates` and `/nuke/templates`. The `TemplateLocation` manifest derives the
+resolution steps and the by-app-type lookup, not the three fallback directories; that gap is
+recorded in `design/90-decisions.md` under `## Open`.
 
 ### Build parameters
 
