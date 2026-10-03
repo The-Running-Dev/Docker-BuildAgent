@@ -295,16 +295,16 @@ public class NodeServiceTests : IDisposable
     }
 
     [Fact]
-    public void DetectPackageManager_WithBothLocks_ReturnsYarn()
+    public void DetectPackageManager_WithBothLocks_ReturnsPnpm()
     {
-        // When both exist, yarn takes precedence due to the order of checks
+        // When both exist, pnpm takes precedence, as in the PowerShell helper
         CreateFile("pnpm-lock.yaml", "lockfileVersion: 5.4");
         CreateFile("yarn.lock", "# yarn lockfile v1");
 
         var result = _nodeService.DetectPackageManager(_testParams);
 
-        Assert.Equal("yarn", result);
-        VerifyLoggerInfo("Detected Package Manager: yarn");
+        Assert.Equal("pnpm", result);
+        VerifyLoggerInfo("Detected Package Manager: pnpm");
     }
 
     [Fact]
@@ -319,9 +319,9 @@ public class NodeServiceTests : IDisposable
     }
 
     [Fact]
-    public void DetectPackageManager_WithAllLockFiles_ReturnsYarn()
+    public void DetectPackageManager_WithAllLockFiles_ReturnsPnpm()
     {
-        // Arrange - Test precedence order (assuming yarn takes precedence over pnpm based on existing test)
+        // Arrange - pnpm takes precedence over yarn, and both over npm
         CreateFile("pnpm-lock.yaml", "# pnpm lock file");
         CreateFile("yarn.lock", "# yarn lock file");
         CreateFile("package-lock.json", "{}");
@@ -330,8 +330,8 @@ public class NodeServiceTests : IDisposable
         var result = _nodeService.DetectPackageManager(_testParams);
 
         // Assert
-        Assert.Equal("yarn", result); // yarn has precedence based on existing tests
-        VerifyLoggerInfo("Detected Package Manager: yarn");
+        Assert.Equal("pnpm", result);
+        VerifyLoggerInfo("Detected Package Manager: pnpm");
     }
 
     [Fact]
