@@ -12,6 +12,8 @@ public enum DocsCheckErrorCode
     UnknownName,
     CanonicalSourceMissing,
     CanonicalSourceConflict,
+    UnclosedCodeFence,
+    CorruptedText,
 }
 
 /// <summary>One violation, in the shape design/20-contract.md § Docs check fixes.</summary>

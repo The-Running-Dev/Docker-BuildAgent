@@ -102,6 +102,11 @@ public static class DocsChecker
             var document = DocumentLoader.Load(root, path);
             var covered = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
+            foreach (var issue in document.Issues)
+            {
+                findings.Add(new DocsCheckFinding(new DocsCheckError(issue.Code, path, issue.Name, issue.Message), issue.Line));
+            }
+
             CheckClaims(root, document, index, topLevel, findings, covered);
             var pointed = ReadCanonicalMarkers(document, findings, declarations);
 
