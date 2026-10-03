@@ -5,12 +5,12 @@ four reverse edges a unit record does not carry directly (`Invariant.BoundBy`,
 `Contract.Consumers`, `Decision.Affects`, `Question.Affects`). Every table below is a
 **projected** marked region (`AGENTS.shared.md` § *Marked regions*) — rendered by
 `tools/Update-DesignProjection.ps1` from `design/state/`, and overwritten on every
-regeneration. Nothing here is written by hand.
+regeneration. No table here is written by hand.
 
-This repository has not yet written unit, invariant, contract, decision, or question records
-under `design/state/` — only the work mirror (`design/state/work/`, refreshed by `/track`) exists
-so far. The tables below are empty for that reason, not because nothing is true; they fill in as
-those records are written.
+This repository has written document unit records, invariant records and decision records under
+`design/state/`, alongside the work mirror (`design/state/work/`, refreshed by `/track`). It has
+written no question records, so the questions table is empty for that reason alone; the open
+questions live in `design/20-contract.md` under `## Unresolved`.
 
 ## Units
 

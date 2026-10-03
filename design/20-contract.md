@@ -47,7 +47,7 @@ overwritten on every regeneration — it is not written by hand.
 | **I10** | **The manifest holds only comparable values.** An item whose value cannot be recorded as a stable ordinal string is absent from the manifest, and its compatibility is carried by release notes instead. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
 | **I11** | **Once recorded, an item leaves only by the removal rule.** An item present in a published manifest and absent from the candidate is a removal, whatever the reason for its absence. Making a surface unrecordable is not an exit from the gate after its first release. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
 | **I12** | **Every published manifest stays readable.** The manifest reader accepts every `manifestSchemaVersion` ever published, because baselines are immutable release assets and the gate must keep comparing against them for the product's lifespan. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
-| **I13** | **One publisher at a time.** At most one release-pipeline run publishes at any moment, held by a single CI concurrency group spanning every publishing workflow, queued rather than cancelled. Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — no `concurrency:` key exists in `.github/workflows/release.yml` or `.github/workflows/release-tag.yml` today | — | instruction | — |
+| **I13** | **One publisher at a time.** At most one release-pipeline run publishes at any moment, held by a single CI concurrency group spanning every publishing workflow, queued rather than cancelled. Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — the three publishing workflows each declare `concurrency: group: buildagent-publish` with `cancel-in-progress: false` (`.github/workflows/build.yml:76-78`, `.github/workflows/release.yml:45-47`, `.github/workflows/release-tag.yml:32-34`); nothing checks that a future publishing workflow joins the group | — | instruction | — |
 | **I14** | **Only CI publishes.** No sink accepts a write from a developer machine. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I15** | **A push to `main` writes no version.** It moves `latest` and nothing else. No versioned image tag, tool package or module version is written outside a release (2026-09-20 decision). Owner: Release pipeline. Enforcement: `[instruction]` — the main-push workflow has no path to a versioned sink | — | instruction | — |
 | **I16** | **One project configuration file.** A project carries at most one configuration file. Two files differing only in format are an error, reported before anything is built. Owner: Config. Enforcement: `[instruction]` | — | instruction | — |
@@ -56,14 +56,14 @@ overwritten on every regeneration — it is not written by hand.
 | **I19** | **Precedence is total and attributed.** Every resolved value carries the tier it came from. No two tiers tie, and no value has an unknown source. Owner: Config. Enforcement: `[instruction]` | — | instruction | — |
 | **I20** | **Secrets are not project-file values.** A parameter declared secret is rejected when it appears in the project configuration file. It is supplied by argument, environment variable or mapping file only. Owner: Config. Enforcement: `[instruction]` | — | instruction | — |
 | **I21** | **Resolved configuration is never persisted.** The resolved set exists for the duration of one invocation. Any display of it redacts secret-declared values. Owner: Config. Enforcement: `[instruction]` | — | instruction | — |
-| **I22** | **Map-derived environment does not overwrite the process environment.** A value already present in the process environment wins over a value the mapping file produces. Owner: Config, Build types. Enforcement: `[instruction]` — `forge/Common/Base.cs:209` loads the generated file into the process with the library's default overwrite behaviour, which the slice must pin explicitly | — | instruction | — |
+| **I22** | **Map-derived environment does not overwrite the process environment.** A value already present in the process environment wins over a value the mapping file produces. Owner: Config, Build types. Enforcement: `[instruction]` — `forge/Common/Base.cs:229` loads the generated file through `EnvironmentLoader.LoadWithoutClobbering`, which passes `clobberExistingVars: false` (`forge/Common/Utilities/EnvironmentLoader.cs:14`) and is exercised by `forge/Common.Tests/Utilities/EnvironmentLoaderTests.cs:33` | — | instruction | — |
 | **I23** | **One validator.** The `node-template` flow resolves configuration by calling Config. No second validation implementation exists. Owner: Config. Enforcement: `[instruction]` — `scripts/nuke/build.ps1` calls no configuration module today | — | instruction | — |
-| **I24** | **Generated environment files do not outlive the build.** Every environment file the build generates is removed on every exit path, success or failure. Owner: Build types. Enforcement: **partial `[code]`** — `forge/Common/Base.cs:244-250` removes `.build/.build.env` from `OnBuildFinished`, which NUKE runs on both outcomes. The application environment file generated at `forge/Common/Components/INodeComponent.cs:48` into the repository root is **not** removed by any path; closing that is a slice obligation, not an existing property | — | instruction | — |
+| **I24** | **Generated environment files do not outlive the build.** Every environment file the build generates is removed on every exit path, success or failure. Owner: Build types. Enforcement: **partial `[code]`** — `forge/Common/Base.cs:244-251` (`DeleteGeneratedEnvFiles`) removes both `.build/.build.env` and the application environment file `.env` in the repository root (generated at `forge/Common/Components/INodeComponent.cs:48`) on process exit and on cancel, and `Cleanup` (`forge/Common/Base.cs:283-287`, called from `OnBuildFinished`) removes the same two on both build outcomes. A forcible kill that runs neither handler is not covered, and no test asserts the removal of either file after a build | — | instruction | — |
 | **I25** | **No secret value reaches output or an image.** No secret-declared value appears on stdout, on stderr, in a log line, or in a layer of an image the product builds. Owner: Build types, PowerShell module. Enforcement: partial `[code]` for the module (`PSModule.requirements.md` R-SEC-001, R-SEC-002); `[instruction]` elsewhere | — | instruction | — |
 | **I26** | **Deprecation warns, never fails.** Use of a deprecated item emits a warning naming the item, the release that deprecated it and its replacement, and the invocation continues. Owner: Config, Build types. Enforcement: `[instruction]` | — | instruction | — |
 | **I27** | **A launcher never substitutes an image version.** When the configured image cannot be obtained the launcher fails. It never falls back to another version or to `latest`. Owner: Launchers. Enforcement: `[instruction]` | — | instruction | — |
-| **I28** | **A launcher does not reinterpret the build's outcome.** The global tool returns the container's exit status unchanged. The PowerShell module surfaces a non-zero status as a terminating error carrying that status (`PSModule.requirements.md` R-INVOKE-005). Neither maps one status onto another. Owner: Launchers. Enforcement: partial `[code]` for the module (`scripts/powershell-module/Docker-BuildAgent.psm1:111`); `[instruction]` for the tool | — | instruction | — |
-| **I29** | **The accepted build-type set is closed.** Exactly five build types are accepted: `docker`, `node`, `node-in-docker`, `node-template`, `forge`. Every entry point accepts the same five and no entry point defaults the type. Owner: Build types. Enforcement: `[code]` — `scripts/nuke/build.ps1:4` (`ValidateSet`, `Position = 0, Mandatory`) and `PSModule.requirements.md` R-INVOKE-001 realised at `scripts/powershell-module/Docker-BuildAgent.psm1:111` | — | code | scripts/nuke/build.ps1, scripts/powershell-module/Docker-BuildAgent.psm1, PSModule.requirements.md |
+| **I28** | **A launcher does not reinterpret the build's outcome.** The global tool returns the container's exit status unchanged. The PowerShell module surfaces a non-zero status as a terminating error carrying that status (`PSModule.requirements.md` R-INVOKE-005). Neither maps one status onto another. Owner: Launchers. Enforcement: partial `[code]` for the module (`Invoke-Build` in `scripts/powershell-module/Docker-BuildAgent.psm1` throws the `BuildFailed` launcher error carrying the container's exit status); `[instruction]` for the tool | — | instruction | — |
+| **I29** | **The accepted build-type set is closed.** Exactly five build types are accepted: `docker`, `node`, `node-in-docker`, `node-template`, `forge`. Every entry point accepts the same five and no entry point defaults the type. Owner: Build types. Enforcement: `[code]` — `scripts/nuke/build.ps1:37-38` (`Position = 0, Mandatory`, `ValidateSet`) and `PSModule.requirements.md` R-INVOKE-001 realised by the `ValidateSet` on the `$type` parameter of `Invoke-Build` in `scripts/powershell-module/Docker-BuildAgent.psm1` | — | code | scripts/nuke/build.ps1, scripts/powershell-module/Docker-BuildAgent.psm1, PSModule.requirements.md |
 | **I30** | **One update per container at a time.** At most one update of a given target container name is in progress, enforced by a created-but-never-started container whose name derives deterministically from the target's name. Owner: Updater. Enforcement: `[instruction]` | — | instruction | — |
 | **I31** | **A lock is never taken over automatically.** Only the owning process, or an operator running the explicit lock-clearing command, removes a lock. Age alone never removes one. Owner: Updater. Enforcement: `[instruction]` | — | instruction | — |
 | **I32** | **The deadline is diagnostic, not an authorization.** A lock past its recorded deadline changes the message and nothing else. It does not permit the update to proceed and does not permit an automatic takeover. Owner: Updater. Enforcement: `[instruction]` | — | instruction | — |
@@ -93,16 +93,9 @@ overwritten on every regeneration — it is not written by hand.
 The product version. One value per release (I1), semantic, without build
 metadata.
 
-```csharp
-namespace Release;
-
-public sealed record ReleaseVersion(int Major, int Minor, int Patch, string? PreRelease)
-{
-    public static ReleaseVersion Parse(string value);
-    public string ToTagString();      // "v2.0.0"
-    public string ToPackageString();  // "2.0.0"
-}
-```
+The binding declaration is [`forge/Release/ReleaseVersion.cs`](../forge/Release/ReleaseVersion.cs)
+(`ReleaseVersion`, `Parse`, `ToTagString`, `ToPackageString`). Signature drift there is a
+contract change, not an implementation detail.
 
 Semantics a declaration cannot carry: `ToTagString` produces the git tag and the
 GitHub release tag; `ToPackageString` produces the image tag, the tool package version
@@ -114,26 +107,9 @@ else, so a change to either is a change to both.
 The record that settles whether a version exists (I5). A GitHub draft release
 bound to a commit SHA.
 
-```csharp
-namespace Release;
-
-public enum ClaimState { Draft, Published }
-
-public enum ReleaseSink
-{
-    ImageVersionedTag = 1,
-    GlobalTool = 2,
-    PowerShellModule = 3,
-    ImageLatestTag = 4,
-}
-
-public sealed record ReleaseClaim(
-    ReleaseVersion Version,
-    string CommitSha,
-    ClaimState State,
-    string Notes,
-    SurfaceManifest CandidateManifest);
-```
+The binding declaration is [`forge/Release/ReleaseClaim.cs`](../forge/Release/ReleaseClaim.cs)
+(`ClaimState`, `ReleaseSink`, `ReleaseClaim`). Signature drift there is a contract change,
+not an implementation detail.
 
 Semantics: the enum's numeric values are the publication order and are load-bearing —
 `ImageLatestTag` is last (I4). The claim carries no per-sink completion state;
@@ -166,31 +142,10 @@ Semantics a declaration cannot carry:
 
 ### Project configuration and precedence
 
-```csharp
-namespace Config;
-
-public enum ConfigurationTier
-{
-    InvocationArgument = 1,
-    ModuleConfiguration = 2,
-    ProcessEnvironment = 3,
-    MappingFileEnvironment = 4,
-    ProjectConfigurationFile = 5,
-    DeclaredDefault = 6,
-}
-
-public sealed record ResolvedValue(
-    string Key,
-    string? Value,
-    ConfigurationTier Tier,
-    bool IsSecret);
-
-public sealed record ResolvedConfiguration(
-    IReadOnlyDictionary<string, ResolvedValue> Values)
-{
-    public override string ToString();  // secret values redacted (I21)
-}
-```
+The binding declarations are [`forge/Config/ConfigurationTier.cs`](../forge/Config/ConfigurationTier.cs)
+(`ConfigurationTier`) and [`forge/Config/ResolvedConfiguration.cs`](../forge/Config/ResolvedConfiguration.cs)
+(`ResolvedValue`, `ResolvedConfiguration`, whose `ToString` redacts secret values, I21).
+Signature drift there is a contract change, not an implementation detail.
 
 Semantics: the numeric values are the precedence order, lowest wins. Tier 3 above
 tier 4 is what makes I22 true. `Value` is null only when a parameter is declared
@@ -199,43 +154,9 @@ nullable; a non-nullable parameter with no value at any tier is a
 
 ### Container update
 
-```csharp
-namespace Update;
-
-public enum UpdateOutcome
-{
-    Succeeded,
-    AlreadyCurrent,
-    RestoredAfterUnhealthy,
-    UnhealthyNotRestored,
-    RestoreFailed,
-    Refused,
-}
-
-public sealed record UpdateOptions(
-    TimeSpan HealthTimeout,
-    bool RestoreOnFailure);
-
-public sealed record UpdateRecord(
-    int RecordSchemaVersion,
-    Guid UpdateId,
-    string ContainerName,
-    DateTimeOffset StartedAt,
-    string PriorImageId,
-    string TargetImageReference,
-    UpdateOptions Options,
-    DateTimeOffset? CompletedAt,
-    UpdateOutcome? Outcome,
-    string? FailureCode);
-
-public sealed record UpdateLock(
-    Guid UpdateId,
-    string ContainerName,
-    DateTimeOffset CreatedAt,
-    DateTimeOffset Deadline,
-    string OwnerHost,
-    int OwnerProcessId);
-```
+The binding declaration is [`forge/Update/UpdateModel.cs`](../forge/Update/UpdateModel.cs)
+(`UpdateOutcome`, `UpdateOptions`, `UpdateRecord`, `UpdateLock`). Signature drift there is
+a contract change, not an implementation detail.
 
 Semantics a declaration cannot carry:
 
