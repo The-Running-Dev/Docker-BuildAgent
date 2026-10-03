@@ -1,7 +1,7 @@
 ---
 id: compatibility
 title: "Compatibility and Support"
-sidebar_position: 9
+sidebar_position: 11
 ---
 
 # Compatibility and Support
@@ -42,7 +42,8 @@ release.
   `main` and can change under you at any time. Pin a version when you need a build to
   reproduce.
 
-To select a versioned image, put the version in the tag:
+To select a versioned image, put the version in the tag. 2.0.0 is the first version this
+promise covers and it is not published yet, so until it is, use a version that exists:
 
 ```bash
 docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:2.0.0 build docker

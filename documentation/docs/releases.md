@@ -1,147 +1,105 @@
 ---
 id: releases
-title: "🚀 Release Management"
-sidebar_position: 9
+title: "Release Management"
+sidebar_position: 10
 ---
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
 # Release Management
 
-This guide explains how the Docker Build Agent project handles releases and versioning to maintain clean release history and distinguish between development builds and official releases.
+This guide explains how Docker-BuildAgent publishes images and releases, and how versions are
+chosen. For what a version promises its users, see [Compatibility and Support](./compatibility.md).
 
-## Release Strategy Overview
+## Publishing at a glance
 
-The project uses a **controlled release strategy** with three main workflows:
+| Event | Workflow | Moves `latest` | Writes a version |
+|---|---|---|---|
+| Pull request, or manual run | `ci.yml` (**CI**) | No | No |
+| Push to `main` | `build.yml` (**Build**) | Yes | No |
+| Manual run | `release.yml` (**Release**) | Yes | Yes |
+| Push of a `v*` tag | `release-tag.yml` (**Release-from-Tag**) | Yes | Yes |
 
-### Development Workflow
+A push to `main` writes no version: it moves `latest` and nothing else. A versioned image tag,
+a GitHub release and a version tag are written only by a release.
 
-- **Purpose**: Continuous integration and deployment for development
-- **Trigger**: Every push to `main` branch
-- **Workflow**: `.github/workflows/build.yml` (Build)
-- **Output**: Docker images published to registry (no GitHub releases)
+`latest` is movable. A versioned tag, from v2.0.0, is immutable: its content never changes and it
+is never deleted. Pin a version when a build must reproduce.
 
-### Release Workflow
+### CI
 
-- **Purpose**: Create official releases for users
-- **Trigger**: Manual dispatch or version tags
-- **Workflows**: 
-  - `.github/workflows/release.yml` (Manual)
-  - `.github/workflows/release-tag.yml` (Tag-based)
-- **Output**: GitHub releases with changelog, Docker images, and Git tags
+- **Trigger**: pull requests and manual runs. It does not run on pushes to feature branches.
+- **Does**: module tests, the documentation check, the test projects with coverage, a dry run
+  of the Docker build, and a build of the documentation site.
+- **Publishes**: nothing.
 
-### Validation Workflow
+### Build
 
-- **Purpose**: Validate pull requests and feature branches
-- **Trigger**: Pull requests, feature branch pushes
-- **Workflow**: `.github/workflows/ci.yml` (CI)
-- **Output**: Test results and validation (no deployments)
+- **Trigger**: every push to `main` that changes more than `documentation/**` or `.github/**`,
+  and manual runs.
+- **Does**: runs the tests, then builds and pushes the image as `latest`.
+- **Publishes**: `latest` only. No GitHub release, no versioned tag.
 
-## Creating Releases
+### Release and Release-from-Tag
 
-### Method 1: Manual Release (Recommended)
+- **Trigger**: a manual run of **Release**, or pushing a `v*` tag, which runs **Release-from-Tag**.
+- **Does**: runs the module tests and the test projects, then builds the image, pushes the
+  versioned tag and `latest`, and creates the GitHub release with its changelog.
+- **Publishes**: the versioned image, `latest` and the GitHub release.
 
-This is the **preferred method** for creating releases as it gives you full control:
+The three publishing workflows (Build, Release and Release-from-Tag) share one `buildagent-publish`
+concurrency group. At most one of them publishes at a time and a run already in flight finishes
+rather than being cancelled. GitHub keeps only one pending run per group, so a newer queued run
+replaces an older queued one; if your queued release disappears, run it again.
 
-1. **Navigate to Actions**
-   - Go to your repository's **Actions** tab
-   - Select **"Create Release"** workflow
+## Creating a release
 
-2. **Configure Release**
-   - Click **"Run workflow"**
-   - Optionally specify:
-     - **Version**: Custom version (e.g., `v1.2.3`) or leave empty for auto-version
-     - **Pre-release**: Check if this is a beta/RC release
-     - **Release notes**: Custom release notes
+### Method 1: manual run
 
-3. **Execute**
-   - Click **"Run workflow"** button
-   - The workflow will run tests, build Docker images, and create the GitHub release
+1. In the repository's **Actions** tab, select the **Release** workflow.
+2. Choose **Run workflow**.
+3. Set **Pre-release** if the release is a beta or release candidate.
+4. Run it.
 
-### Method 2: Tag-Based Release
+The workflow also shows a **Version** and a **Release notes** input. Neither takes effect today:
+the version always comes from GitVersion, and the release notes are always generated from the
+commit history. Leave both empty.
 
-For automated releases based on Git tags:
+### Method 2: pushing a tag
 
 ```bash
-# Create a normal release
 git tag v1.2.3
 git push origin v1.2.3
-
-# Create a pre-release
-git tag v1.0.0-beta.1
-git push origin v1.0.0-beta.1
-
-# Create a release candidate
-git tag v2.0.0-rc.1
-git push origin v2.0.0-rc.1
 ```
 
-**Pre-release Detection**: Tags containing `-alpha`, `-beta`, `-rc`, or other suffixes are automatically marked as pre-releases.
+A tag with a suffix such as `-alpha`, `-beta` or `-rc` (for example `v2.0.0-rc.1`) is marked as a
+pre-release.
 
-## Versioning Strategy
+### A version is published once
 
-### GitVersion Configuration
+A version that already exists is never republished. A versioned image tag or a git tag for the
+version makes it taken. Do not delete a tag, a release or an image to try again.
 
-The project uses **GitVersion** in `ContinuousDelivery` mode with the following configuration:
+## Versioning
 
-```yaml
-mode: ContinuousDelivery
-branches:
-  main:
-    increment: Minor
-    is-release-branch: false
-```
+The version comes from **GitVersion** in `ContinuousDelivery` mode, configured in
+`GitVersion.yml` at the repository root. Read that file for the increment rules in force; this
+page does not copy them, because a copy goes stale.
 
-### Version Increment Rules
+Pre-release versions follow GitVersion's branch labels, for example `1.1.0-rc.1`.
 
-- **Main branch commits**: Minor version increment (e.g., 1.0.0 → 1.1.0)
-- **Feature branches**: Inherit increment from source branch
-- **Release branches**: Patch increment (e.g., 1.1.0 → 1.1.1)  
-- **Hotfix branches**: Patch increment
+## What a release contains
 
-### Pre-release Versions
+1. **A GitHub release** with the version tag and a changelog generated from the commit history
+   since the previous release.
+2. **Docker images** published to the GitHub Container Registry under the version tag and under
+   `latest`. Images are built on an amd64 runner; there is no multi-architecture build.
+3. **A git tag** for the version.
 
-Pre-release versions are automatically generated for:
+The release workflows run the test projects with coverage and the module tests before they
+publish. They do not scan images for vulnerabilities.
 
-- Feature branches: `1.1.0-feature-branch.1`
-- Pull requests: `1.1.0-pr-123.1`
-- Release candidates: `1.1.0-rc.1`
-
-## Release Content
-
-### What Gets Included
-
-Each official release includes:
-
-1. **GitHub Release**
-   - Semantic version tag (e.g., `v1.2.3`)
-   - Auto-generated changelog from commit history
-   - Docker image information
-   - Release artifacts
-
-2. **Docker Images**
-   - Published to GitHub Container Registry (GHCR)
-   - Tagged with version number and `latest`
-   - Multi-architecture support (if configured)
-
-3. **Git Tag**
-   - Created automatically after successful release
-   - Follows semantic versioning format
-
-### Changelog Generation
-
-Changelogs are automatically generated from Git commit history using:
-
-- **Commit messages** since the last release
-- **Pull request titles** and descriptions
-- **Custom formatting** with date stamps
-- **Docker image references** for each release
-
-## Build Parameters
-
-### Release-Specific Parameters
-
-When creating releases, you can use these parameters:
+## Build parameters
 
 ```bash
 # Create a release
@@ -150,107 +108,40 @@ nuke --type docker --create-github-release true
 # Create a pre-release
 nuke --type docker --create-github-release true --pre-release true
 
-# Custom version override
-nuke --type docker --create-github-release true --version v1.2.3
-
-# Dry run mode (testing)
+# Dry run (no push, no tag)
 nuke --type docker --create-github-release true --dry-run true
 ```
 
-### Environment Variables
+There is no `--version` parameter: the version is taken from GitVersion.
 
-Required for release creation:
+### Environment variables
+
+Required to publish:
 
 - `GITHUB_TOKEN`: GitHub authentication token
-- `RegistryToken`: Container registry authentication
-- `NotificationsWebHookUrl`: Discord/Slack notifications (optional)
-
-## Best Practices
-
-### When to Create Releases
-
-✅ **Do create releases for:**
-
-- New features ready for users
-- Bug fixes that affect users
-- Breaking changes
-- Security updates
-- Documentation updates that affect usage
-
-❌ **Don't create releases for:**
-
-- Internal refactoring
-- CI/CD changes
-- Development dependencies updates
-- Code formatting changes
-
-### Release Naming
-
-- **Major**: Breaking changes (v1.0.0 → v2.0.0)
-- **Minor**: New features, backward compatible (v1.0.0 → v1.1.0)  
-- **Patch**: Bug fixes, backward compatible (v1.0.0 → v1.0.1)
-- **Pre-release**: Beta/RC versions (v1.0.0-beta.1)
-
-### Testing Before Release
-
-The release workflows automatically:
-
-1. Run comprehensive test suites
-2. Generate code coverage reports
-3. Validate Docker image builds
-4. Check for security vulnerabilities
-5. Verify documentation builds
+- `RegistryToken`: container registry authentication
+- `NotificationsWebHookUrl`: Discord notifications (optional)
 
 ## Troubleshooting
 
-### Common Issues
-
 **Release creation fails**
 
-- Check that `GITHUB_TOKEN` has correct permissions
-- Verify `RegistryToken` is valid for container registry
-- Ensure all tests pass before release
+- Check that `GITHUB_TOKEN` has the permissions the workflow requests.
+- Check that `RegistryToken` is valid for the container registry.
+- Check that the tests pass.
 
-**Version conflicts**
+**The version already exists**
 
-- Avoid creating multiple releases with same version
-- Use pre-release versions for testing
-- Check GitVersion configuration for correct incrementing
+Do not republish it. Pick a new version: push a new commit, or a new tag.
 
-**Missing changelog**
+**The changelog is empty**
 
-- Ensure commits follow conventional commit format
-- Check that there are commits since last release
-- Verify Git history is available (fetch-depth: 0)
+- Check that there are commits since the last release.
+- Check that the full git history is available (`fetch-depth: 0`).
 
-### Manual Recovery
+**A release fails partway**
 
-If a release fails partially:
-
-```bash
-# Clean up failed release
-gh release delete v1.2.3 --yes
-
-# Recreate release manually
-git tag -d v1.2.3
-git push origin :v1.2.3
-git tag v1.2.3
-git push origin v1.2.3
-```
-
-## Migration from Previous Strategy
-
-If you previously created releases on every commit, here's how to clean up:
-
-1. **Review existing releases** - Delete development/test releases
-2. **Update workflows** - Use the new release strategy workflows  
-3. **Update documentation** - Inform users about the new release cadence
-4. **Clean tags** - Remove unnecessary version tags if needed
-
-The new strategy provides:
-
-- ✅ Cleaner release history
-- ✅ Meaningful release notes  
-- ✅ Better user experience
-- ✅ Controlled deployment process
-- ✅ Separation of development and production builds
+Do not delete the tag, the release or the images, and do not re-create them. A published version
+is immutable, and no failure path deletes anything. How a partly published version is resumed is
+not yet defined (contract item U-6). Until it is, open an issue describing which of the image,
+the tag and the release were written, and release a new version.
