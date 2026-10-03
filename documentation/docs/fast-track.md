@@ -6,6 +6,28 @@ sidebar_position: 1
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
+## Choose a build
+
+| You have | Run | You get |
+|---|---|---|
+| A project with a `Dockerfile`, or a type that has a [template](docker-templates) | `build docker` | An image, pushed and released in CI |
+| A Node.js application that is not containerized | `build node` | The built application in the artifacts directory |
+| A Node.js application that ships as an image | `build node-in-docker` | The Node build, then the image |
+| A documentation site | `build node-template` | The site built from a template repository |
+| A Git history | `build forge` | `CHANGELOG.md` |
+
+## What each build needs
+
+| Build | Docker host | Your project provides | To push or release in CI |
+|---|---|---|---|
+| `build docker` | Yes: mount `docker.sock` or set `DOCKER_HOST` | A `Dockerfile`, or none when a template matches | `RegistryToken` and `GITHUB_TOKEN` |
+| `build node` | No | A `build:prod` npm script, or `.build/.build.scripts` | Not applicable |
+| `build node-in-docker` | Yes | The same as `build node` | `RegistryToken` and `GITHUB_TOKEN` |
+| `build node-template` | No | A documentation directory; the template comes from a repository | Not applicable |
+| `build forge` | No | The full Git history (`fetch-depth: 0` in GitHub Actions) | Not applicable |
+
+Every build mounts the project at `/workspace`.
+
 ## Quick Start Examples
 
 The Build Agent uses a unified `build` command with different types. Here are the most common scenarios to get you started quickly:
