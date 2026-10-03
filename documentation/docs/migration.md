@@ -1,13 +1,14 @@
 ---
 id: migration
 title: "Migration Guide"
-sidebar_position: 10
+sidebar_position: 12
 ---
 
 # Migration Guide
 
 This guide covers every breaking change in 2.0.0 and the move from a floating tag to a pinned
-version. What is protected from now on is stated in [Compatibility and Support](./compatibility.md).
+version. 2.0.0 is not published yet, so the version-pinned image and module described below
+do not exist until it is released. What is protected from now on is stated in [Compatibility and Support](./compatibility.md).
 
 Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
@@ -24,7 +25,7 @@ Canonical contract (PowerShell module): [PSModule.requirements.md](https://githu
 **Before:** with the module's defaults, `Invoke-Build` ran
 `ghcr.io/the-running-dev/build-agent:latest`.
 
-**Now:** the default is the module's own version, for example
+**Now:** the default is the module's own version; version 2.0.0 of the module runs
 `ghcr.io/the-running-dev/build-agent:2.0.0`. The module and the image it runs stay in step.
 
 **What to do:**
@@ -76,11 +77,12 @@ unset that variable before the build, or set the value you want explicitly.
 `latest` is movable: it follows the newest push to `main`. A pinned version is immutable, so a
 build that names one reproduces. To move:
 
-1. Pick the release you want from the release notes, for example `2.0.0`.
-2. Replace the tag in every reference to the image:
+1. Pick a published release from the release notes.
+2. Replace the tag in every reference to the image, with your chosen version in place of
+   `<version>`:
 
    ```bash
-   docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:2.0.0 build docker
+   docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:<version> build docker
    ```
 
 3. For the PowerShell module, install the module version that matches the image. It runs that
