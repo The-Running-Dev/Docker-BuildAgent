@@ -43,34 +43,12 @@ The working directory is `/workspace`. The image is published as `ghcr.io/the-ru
 
 ## Choose a build
 
-| You have | Run | You get |
-|---|---|---|
-| A project with a `Dockerfile`, or a type that has a [template](https://build-agent.subzerodev.com/docs/docker-templates) | `build docker` | An image, pushed in CI (and released with `--create-github-release true`) |
-| A Node.js application that is not containerized | `build node` | The built application in the artifacts directory |
-| A Node.js application that ships as an image | `build node-in-docker` | The Node build, then the image |
-| A documentation site | `build node-template` | The site built from a template repository |
-| A Git history | `build forge` | `CHANGELOG.md` |
-
-## What each build needs
-
-| Build | Docker host | Your project provides | To push or release in CI |
-|---|---|---|---|
-| `build docker` | Yes: mount `docker.sock` or set `DOCKER_HOST` | A `Dockerfile`, or none when a template matches | `RegistryToken` and `GITHUB_TOKEN` |
-| `build node` | No | A `build:prod` npm script, or `.build/.build.scripts` | Not applicable |
-| `build node-in-docker` | Yes | The same as `build node` | `RegistryToken` and `GITHUB_TOKEN` |
-| `build node-template` | No | A documentation directory; the template comes from a repository | Not applicable |
-| `build forge` | No | The full Git history (`fetch-depth: 0` in GitHub Actions) and a `.build/` directory (the build stops if it is missing) | Not applicable |
-
-Every build mounts the project at `/workspace`.
+The `build` command has five types: `docker`, `node`, `node-in-docker`, `node-template` and `forge`. Which one suits your project, and what each needs (the Docker host, project files, CI tokens), is in [Build Types](https://build-agent.subzerodev.com/docs/build-types#choose-a-build).
 
 ## Prerequisites
 
-- **Docker**, running. Every build runs in the image, and `build docker` and `build node-in-docker` also need
-  the Docker host: mount `docker.sock` or set `DOCKER_HOST`.
-- **Git history** for `build forge` (`fetch-depth: 0` in GitHub Actions).
-- To work on this repository you also need the .NET 8 SDK, PowerShell and the `docs-template/` submodule
-  (`git clone --recurse-submodules`). The first check there needs no Docker host:
-  `dotnet run --project forge/DocsCheck -c Release -- .`
+- **Docker**, running. Every build runs in the image. [What each build needs](https://build-agent.subzerodev.com/docs/build-types#what-each-build-needs) says which builds also need the Docker host.
+- To work on this repository you also need the .NET 8 SDK, PowerShell and the `docs-template/` submodule (`git clone --recurse-submodules`). The first check there needs no Docker host: `dotnet run --project forge/DocsCheck -c Release -- .`
 
 ## Quick start
 

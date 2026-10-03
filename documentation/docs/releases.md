@@ -4,8 +4,6 @@ title: "Release Management"
 sidebar_position: 10
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 # Release Management
 
 This guide explains how Docker-BuildAgent publishes images and releases, and how versions are
@@ -156,3 +154,5 @@ Do not delete the tag, the release or the images, and do not re-create them. A p
 is immutable, and no failure path deletes anything. How a partly published version is resumed is
 not yet defined (contract item U-6). Until it is, open an issue describing which of the image,
 the tag and the release were written, and release a new version.
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

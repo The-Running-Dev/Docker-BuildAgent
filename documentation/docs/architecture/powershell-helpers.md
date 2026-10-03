@@ -1,16 +1,14 @@
 ---
 id: powershell-helpers
-title: "🧰 PowerShell Helpers"
+title: PowerShell Helpers
 sidebar_position: 5
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
-The Build Agent provides a PowerShell helper module, `nuke-helpers.psm1`, that simplifies build automation tasks and provides consistent behavior across different environments.
+Docker-BuildAgent provides a PowerShell helper module, `nuke-helpers.psm1`, that simplifies build automation tasks and provides consistent behavior across different environments.
 
 ## nuke-helpers.psm1
 
-The core PowerShell module that powers Build Agent automation scripts and provides standardized functions for common operations.
+The core PowerShell module that powers Docker-BuildAgent automation scripts and provides standardized functions for common operations.
 
 ### Key Functions
 
@@ -61,3 +59,5 @@ For user automation, use the unified build command through the root scripts or t
 ```powershell
 ./build.ps1 -type docker --dry-run true
 ```
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

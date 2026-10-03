@@ -4,8 +4,6 @@ title: "Project Configuration File"
 sidebar_position: 4
 ---
 
-Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 # Project Configuration File
 
 A project can keep its build settings in a file at its root instead of repeating them as
@@ -120,3 +118,5 @@ Configuration error: file=/workspace/buildagent.yml key=image-tag rule=ValueType
 
 Exit status 2 passes through the PowerShell module unchanged. The full table of exit statuses is
 in the contract.
+
+Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

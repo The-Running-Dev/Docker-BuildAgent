@@ -9,8 +9,6 @@ sidebar_position: 11
 This page states what Docker-BuildAgent promises to keep stable, how versions work, and where
 support ends. The promise binds from v2.0.0.
 
-Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 The contract is the authority. Where this page and the contract disagree, the contract is right
 and this page is the defect.
 
@@ -91,3 +89,5 @@ verified, and this page does not claim it is.
 Some builds need the host Docker socket. Mounting it into the build container assumes a trusted
 host and trusted code. A host compromised through the mounted socket is not a defect in the
 product. Do not mount the socket for code you do not trust.
+
+Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

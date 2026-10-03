@@ -4,8 +4,6 @@ title: Parameters
 sidebar_position: 3
 ---
 
-Canonical contract (build command, project configuration): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 Each build type has one table below. A row is one setting, and the columns show every way to set it:
 
 | Column | Meaning |
@@ -178,3 +176,5 @@ buildType: docker
 parameters:
   create-git-hub-release: true
 ```
+
+Canonical contract (build command, project configuration): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

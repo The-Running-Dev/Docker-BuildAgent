@@ -4,8 +4,6 @@ title: Exit Codes
 sidebar_position: 17
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 A script or CI step decides what to do from the exit status of `build`. This page lists every status the
 build command returns, what causes it, and what to do about it. The
 [update tool](./update-tool.md) and the [PowerShell module](./powershell-module.md) have statuses of
@@ -45,3 +43,5 @@ so no target starts, and no artifact or image changes.
 - A launcher does not change the status: the PowerShell module raises a terminating error carrying the
   container's status, so `2` passes through. The module adds statuses 3 and 5 for faults it finds before
   the container starts. See [Errors](./powershell-module.md#errors).
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

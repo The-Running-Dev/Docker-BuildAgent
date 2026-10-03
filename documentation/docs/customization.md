@@ -1,6 +1,6 @@
 ---
 id: customization
-title: ⚙️ Customization
+title: Customization
 sidebar_position: 7
 ---
 

@@ -4,9 +4,7 @@ title: Build Types and Commands
 sidebar_position: 2
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
-The Build Agent has one `build` command with five types. Each type suits a kind of project.
+Docker-BuildAgent has one `build` command with five types. Each type suits a kind of project.
 
 ## Unified Build Command
 
@@ -18,13 +16,27 @@ build <type> [parameters]
 
 Available types: `docker`, `node`, `node-in-docker`, `node-template`, `forge`
 
-| Project | Command | Result |
+## Choose a build
+
+| You have | Run | You get |
 |---|---|---|
-| A project with a Dockerfile, or a type that has a [template](./docker-templates.md) | `build docker` | An image, pushed and released in CI |
+| A project with a `Dockerfile`, or a type that has a [template](./docker-templates.md) | `build docker` | An image, pushed in CI (and released with `--create-github-release true`) |
 | A Node.js application that is not containerized | `build node` | The built application in the artifacts directory |
 | A Node.js application that ships as an image | `build node-in-docker` | The Node build, then the image |
 | A documentation site | `build node-template` | The site built from a template repository |
-| A change log | `build forge` | `CHANGELOG.md` from the Git history |
+| A Git history | `build forge` | `CHANGELOG.md` |
+
+## What each build needs
+
+| Build | Docker host | Your project provides | To push or release in CI |
+|---|---|---|---|
+| `build docker` | Yes: mount `docker.sock` or set `DOCKER_HOST` | A `Dockerfile`, or none when a template matches | `RegistryToken` and `GITHUB_TOKEN` |
+| `build node` | No | A `build:prod` npm script, or `.build/.build.scripts` | Not applicable |
+| `build node-in-docker` | Yes | The same as `build node` | `RegistryToken` and `GITHUB_TOKEN` |
+| `build node-template` | No | A documentation directory; the template comes from a repository | Not applicable |
+| `build forge` | No | The full Git history (`fetch-depth: 0` in GitHub Actions) and a `.build/` directory (the build stops if it is missing) | Not applicable |
+
+Every build runs in the image, and every build mounts the project at `/workspace`.
 
 The flags, environment variables and configuration keys of `docker`, `node`, `node-in-docker` and
 `forge` are in [Parameters](./parameters.md), one table per type; `node-template` has no table. The order each type runs its steps in is in
@@ -78,7 +90,7 @@ What it does:
 
 - Runs the commands in `.build/.build.scripts`. Without that file it removes `node_modules`, then runs
   `<package manager> install` and `<package manager> run build:prod`.
-- Detects the package manager from the lock file: `pnpm-lock.yaml` means pnpm, `yarn.lock` means yarn, anything else npm
+- Detects the package manager from the lock file: `pnpm-lock.yaml` means pnpm, `yarn.lock` means yarn, anything else npm; pnpm wins if both lock files exist
 - Writes the application's `.env` file from `.build/.app.env.map`
 - Copies the files listed in `.build/.build.copy` to the artifacts directory
 
@@ -308,3 +320,5 @@ message alone. The format has no option for hashes, authors or other date styles
 - [Docker Templates](./docker-templates.md) explains the Dockerfile templates.
 - [Customization](./customization.md) covers custom build scripts and configuration.
 - [CI/CD](./ci-cd.md) has GitHub Actions examples.
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

@@ -4,10 +4,6 @@ title: Configuration and Compatibility
 sidebar_position: 4
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
-Canonical contract (PowerShell module): [PSModule.requirements.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/PSModule.requirements.md)
-
 Where a build gets its settings, which environment variables it reads, and what to know when
 running it on different machines. Supported hosts and the compatibility promise are on the
 [Compatibility and Support](../compatibility.md) page, and the list of parameters is on the
@@ -95,7 +91,7 @@ mapping file.
 ## Console output
 
 Build output uses plain ASCII prefixes so it renders the same in Windows PowerShell 5.1, in
-PowerShell 7 and in CI logs. The forge logger prefixes each line with the time and a level, as in
+PowerShell 7 and in CI logs. The Forge logger prefixes each line with the time and a level, as in
 `10:42:07 [INF] message`.
 
 | Prefix | Meaning |
@@ -140,8 +136,8 @@ container.
 ## Node.js
 
 The build detects the package manager from the project root: `pnpm-lock.yaml` selects pnpm,
-`yarn.lock` selects yarn, and anything else selects npm. A project should keep only one lock file,
-because the code does not give both the same answer.
+`yarn.lock` selects yarn, and anything else selects npm. If both lock files exist, pnpm wins. A project should
+still keep only one lock file.
 
 A node build runs the commands in `.build/.build.scripts`, one per line. Lines that start with
 `npm`, `pnpm` or `yarn` run that package manager, and `bash` or `sh` lines run a shell:
@@ -208,3 +204,7 @@ To see what a build would do without pushing anything, run it with `--dry-run tr
 ```powershell
 .\build.ps1 -type docker --dry-run true --verbosity Verbose
 ```
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
+Canonical contract (PowerShell module): [PSModule.requirements.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/PSModule.requirements.md)

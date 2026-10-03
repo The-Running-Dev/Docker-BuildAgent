@@ -4,8 +4,6 @@ title: "Update and Rollback Tool"
 sidebar_position: 15
 ---
 
-Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 # Update and Rollback Tool
 
 The update tool replaces a running container with one built from a newer image, waits for the
@@ -99,3 +97,5 @@ every update on the host, with exit 22, until it is corrected.
 | 1 | Any other failure, including a bad command line or no `docker` on `PATH`. |
 
 Every refusal message names the container, the reason, and what clears it.
+
+Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

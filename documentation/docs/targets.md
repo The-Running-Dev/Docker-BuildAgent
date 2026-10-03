@@ -4,8 +4,6 @@ title: Targets
 sidebar_position: 5
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 Each build type runs a fixed chain of targets. This page lists the targets of every type, the order they run in and
 the conditions under which a target is skipped. `build node-template` is a PowerShell script, not a chain of targets,
 so it is not listed here.
@@ -97,3 +95,5 @@ This type always tags the image with both `latest` and the version. `build docke
 - [Build Types](./build-types.md) for the commands and the files each type reads.
 - [Parameters](./parameters.md) for the flags that decide which targets are skipped.
 - [Exit Codes](./exit-codes.md) for what a failed target returns.
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

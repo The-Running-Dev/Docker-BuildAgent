@@ -1,10 +1,8 @@
 ---
 id: ci-cd
-title: "🔄 GitHub Actions"
+title: GitHub Actions
 sidebar_position: 8
 ---
-
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
 ## This repository's workflows
 
@@ -117,12 +115,12 @@ A tag with a suffix such as `-beta` or `-rc` is marked as a pre-release.
 
 ## Workflows for your own project
 
-The examples below run in your repository and use the Build Agent image. They are starting
+The examples below run in your repository and use Docker-BuildAgent image. They are starting
 points; for the workflows this repository itself runs, read the files in `.github/workflows`.
 
-## 🐳 Docker Image
+## Docker Image
 
-This workflow builds and pushes a Docker image using the Build Agent. It checks out your repository, runs the `build docker` command, and passes required secrets for authentication.
+This workflow builds and pushes a Docker image using Docker-BuildAgent. It checks out your repository, runs the `build docker` command, and passes required secrets for authentication.
 
 ```yaml
 name: Docker-CI
@@ -150,9 +148,9 @@ jobs:
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
 ```
 
-## 🟢 Node.js App
+## Node.js App
 
-This workflow builds a Node.js application using the Build Agent. It checks out your repository, runs the `build node` command, and passes required secrets for authentication.
+This workflow builds a Node.js application using Docker-BuildAgent. It checks out your repository, runs the `build node` command, and passes required secrets for authentication.
 
 ```yaml
 name: Node-CI
@@ -180,7 +178,7 @@ jobs:
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
 ```
 
-## 🟢 🐳 Node.js App in a Docker Image
+## Node.js App in a Docker Image
 
 ```yaml
 name: Node-in-Docker-CI
@@ -208,7 +206,7 @@ jobs:
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
 ```
 
-## 📝 Changelog Generation
+## Changelog Generation
 
 This workflow generates a changelog from Git commit history using the Forge build system. It can be configured to generate complete history or changes since a specific tag.
 
@@ -258,7 +256,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-## 🛠️ Custom Build
+## Custom Build
 
 Because the build agent has all the tooling, you can run any Bash/PowerShell/NPM/Angular CLI scripts.
 
@@ -287,3 +285,5 @@ jobs:
           GIT_USER: Some-Value
           GIT_PASS: ${{ secrets.GITHUB_TOKEN }}
 ```
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
