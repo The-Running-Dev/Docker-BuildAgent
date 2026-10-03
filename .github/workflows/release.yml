@@ -57,11 +57,12 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      # Checkout with full history for GitVersion
+      # Checkout with full history for GitVersion and submodules (the Dockerfile copies docs-template/)
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       # Setup build environment
       - name: Setup Environment
