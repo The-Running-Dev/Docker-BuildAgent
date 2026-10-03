@@ -63,6 +63,15 @@ The working directory is `/workspace`. The image is published as `ghcr.io/the-ru
 
 Every build mounts the project at `/workspace`.
 
+## Prerequisites
+
+- **Docker**, running. Every build runs in the image, and `build docker` and `build node-in-docker` also need
+  the Docker host: mount `docker.sock` or set `DOCKER_HOST`.
+- **Git history** for `build forge` (`fetch-depth: 0` in GitHub Actions).
+- To work on this repository you also need the .NET 8 SDK, PowerShell and the `docs-template/` submodule
+  (`git clone --recurse-submodules`). The first check there needs no Docker host:
+  `dotnet run --project forge/DocsCheck -c Release -- .`
+
 ## Quick start
 
 Mount your project at `/workspace` and run a build type. This builds a Docker image from your project (mount the Docker socket so the container can reach the Docker host):
@@ -181,9 +190,11 @@ docs-template/             the pinned Docusaurus-Template submodule that builds 
 design/                    the design chain and the contract (design/20-contract.md)
 PSModule.requirements.md   the PowerShell module contract
 .github/                   workflows and shared actions
-docs.ps1, docs-image.ps1, changelog.ps1   helper scripts for the docs site and the changelog
+changelog.ps1              regenerates CHANGELOG.md from the Git history
+scripts/build-docs-local.ps1   previews the documentation site with hot reload
+docs.ps1, docs-image.ps1   older preview helpers, not the supported flow
 ```
 
 ## Contributing
 
-For questions, issues or support, open an [issue](https://github.com/the-running-dev/Docker-BuildAgent/issues). The [Development Guide](https://build-agent.subzerodev.com/docs/architecture/development-guide) covers setup and the workflow.
+For questions, issues or support, open an [issue](https://github.com/the-running-dev/Docker-BuildAgent/issues). [CONTRIBUTING.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/CONTRIBUTING.md) is the short version and the [Development Guide](https://build-agent.subzerodev.com/docs/architecture/development-guide) covers setup and the workflow.

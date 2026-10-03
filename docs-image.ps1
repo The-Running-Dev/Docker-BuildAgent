@@ -2,6 +2,8 @@
 .SYNOPSIS
     Dynamically builds and executes a Docker command to run the Docusaurus development server.
 .DESCRIPTION
+    Not the supported docs-preview flow: use scripts/build-docs-local.ps1 instead.
+
     This script inspects the official 'docs-template' Docker image to discover its default file structure.
     It then compares this structure with the local directory files.
 

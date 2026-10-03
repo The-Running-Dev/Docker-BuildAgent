@@ -27,8 +27,8 @@ public sealed class ReleaseNotesTemplateTests
     }
 
     [Theory]
-    [InlineData("## 💥 Breaking Changes")]
-    [InlineData("## 🗑️ Deprecations")]
+    [InlineData("## Breaking Changes")]
+    [InlineData("## Deprecations")]
     public void S11_6_TemplateWithARequiredHeadingRemovedCannotPublish(string heading)
     {
         var notes = Template().Replace(heading, "## Other");

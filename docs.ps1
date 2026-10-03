@@ -5,6 +5,8 @@
     Builds and serves the Docker Build Agent documentation locally for development.
 
 .DESCRIPTION
+    Not the supported docs-preview flow: use scripts/build-docs-local.ps1 instead.
+
     This script provides a streamlined way to build and serve the Docusaurus documentation
     for local development. It performs two main phases:
     
