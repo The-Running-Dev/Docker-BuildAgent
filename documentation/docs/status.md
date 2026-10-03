@@ -26,7 +26,7 @@ This page displays real-time status information for the Docker BuildAgent projec
 
 - **Version**: Latest stable release information
 - **Docker**: Container registry status and image availability
-- **Platform**: Cross-platform support (Linux, Windows, macOS)
+- **Platform**: Supported hosts (Linux and Windows, macOS best-effort) and the amd64 image architecture, as stated on the [Compatibility and Support](./compatibility.md) page
 - **Downloads**: Community adoption and usage metrics
 
 #### 📚 Documentation & Demo

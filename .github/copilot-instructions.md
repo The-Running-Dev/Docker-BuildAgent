@@ -4,376 +4,254 @@ Canonical contract (image, build command, global tool, project configuration, Do
 
 Canonical contract (PowerShell module): [PSModule.requirements.md](../PSModule.requirements.md)
 
-This file explains the architecture and the development workflow; the contract owns the public surfaces.
+This file explains the architecture and the development workflow; the contract owns the public surfaces. It is the one place that lists the repository layout and the commands for building and testing it. Other pages link here rather than repeat them.
 
 ## Project Overview
 
-Docker-BuildAgent is a comprehensive CI/CD build system with a multi-build architecture built on .NET/Nuke. It supports containerized builds for Docker, Node.js, Angular, TypeScript, and .NET applications with cross-platform scripts and GitHub Actions integration.
+Docker-BuildAgent is a build-agent container image. It carries a set of NUKE-based build types (compiled from the `forge/` projects), a `build` command that runs them, and the tooling they need. Callers run it with `docker run <image> build <type> [args]`, through the PowerShell module, or through the `update` global tool for container updates.
+
+The image declares no `ENTRYPOINT`. `build` is a script on `PATH` that forwards to `scripts/nuke/build.ps1`, which runs the compiled build type.
+
+## Build types
+
+Five build types are accepted by `build <type>`: `docker`, `node`, `node-in-docker`, `node-template` and `forge`.
+
+| Type | Implementation | What it does |
+|---|---|---|
+| `docker` | `forge/Docker/` | Builds a container image, and optionally pushes it and creates a GitHub release |
+| `node` | `forge/Node/` | Builds a Node.js application and copies the output to the artifacts directory |
+| `node-in-docker` | `forge/NodeInDocker/` | Runs the Node build, then the Docker build |
+| `forge` | `forge/Forge/` | Generates the change log |
+| `node-template` | `scripts/nuke/build.ps1` (no forge project) | Builds a documentation site from a Node template repository |
+
+The parameters of each type are listed in `documentation/docs/parameters.md`, and the types in `documentation/docs/build-types.md`.
+
+## Forge project map
+
+`forge/Forge.sln` holds every project below and its test project. The "Contract section" column names the part of [design/20-contract.md](../design/20-contract.md) that owns the project's public behavior.
+
+| Project | Purpose | Test project | Contract section |
+|---|---|---|---|
+| `Common` | Base build class, components, services, parameters, entities, notifications and utilities shared by every build type | `Common.Tests` | Build parameters |
+| `Config` | Reads, checks and resolves the project configuration file and the precedence of parameter sources | `Config.Tests` | Project configuration and precedence; Persisted schemas (Project configuration file); Error semantics (Config) |
+| `Docker` | The `docker` build type and Docker template discovery | `Docker.Tests` | `build <type>` inside the image; Docker template discovery |
+| `Node` | The `node` build type | `Node.Tests` | `build <type>` inside the image |
+| `NodeInDocker` | The `node-in-docker` build type; it references `Node` and `Docker` | `NodeInDocker.Tests` | `build <type>` inside the image |
+| `Forge` | The `forge` build type (change log generation) | `Forge.Tests` | `build <type>` inside the image |
+| `Surface` | Derives, validates, serializes and compares the surface manifest | `Surface.Tests` | Types (Surface manifest); Persisted schemas (Surface manifest asset); Error semantics (Surface model) |
+| `Release` | Release version, release claim and release notes validation; the release pipeline types | `Release.Tests` | Types (Release version, Release claim); Error semantics (Release pipeline) |
+| `Update` | The container updater: health check, rollback, lock and update log | `Update.Tests` | Types (Container update, Prior image pin and prior container); Persisted schemas (Update log); Error semantics (Updater) |
+| `Tool` | The global tool executable; today it handles the `update` command and calls `Update` | none | Global tool |
+| `DocsCheck` | Checks that the documentation names real paths, commands, parameters and build types, and the canonical-contract rules | `DocsCheck.Tests` | Error semantics (Docs check) |
+
+How the projects relate:
+
+- `Docker`, `Node`, `NodeInDocker` and `Forge` are the executables that implement build types. They reference `Common` and `Config`.
+- `Surface` references `Common`. `Release` references `Common` and `Surface`. `DocsCheck` references `Surface`.
+- `Tool` references `Update`.
+- `Release` and `Surface` are not run by any workflow as a build step. They are exercised by their tests and, for `Surface`, by `DocsCheck`.
 
 ## Core Architecture
 
-### Multi-Build System (Forge Architecture)
-
-The project uses a component-based build system with 5 specialized build types:
-
-1. **Docker Build** (`forge/Docker/`) - Container image automation
-2. **Node Build** (`forge/Node/`) - JavaScript/TypeScript application builds
-3. **NodeInDocker Build** (`forge/NodeInDocker/`) - Combined Node + Container builds
-4. **Forge Build** (`forge/Forge/`) - Changelog generation and release orchestration
-5. **NodeTemplate Build** (integrated in `scripts/nuke/build.ps1`) - Template-based project generation
-
-All build types are invoked via the unified `build` command: `build <type> [args]`
-
 ### Base Class Pattern
 
-All builds inherit from `Base<TParams, TNotifications>` providing:
-- Dependency injection with ServiceLocator pattern
-- Consistent logging with Serilog 
-- Parameter validation and configuration management
-- Service injection for Git, GitHub, Docker, and Node.js operations
-- Notification systems (Discord, etc.)
+All build types inherit from `Base<TParams, TNotifications>` (`forge/Common/Base.cs`), which derives from NUKE's `NukeBuild`. It provides:
+
+- A per-build dependency injection container (`Microsoft.Extensions.DependencyInjection`). See `documentation/docs/architecture/dependency-injection.md`.
+- Console logging with the `forge` formatter.
+- Parameter hydration and the project configuration gate.
+- Services for Git, GitHub, Docker, Node.js and change log configuration.
+- Notifications (Discord).
 
 ### Component Interfaces
 
-Key interfaces for specialized functionality:
-- `ICleanComponent` - Provides cleanup target for removing artifacts
-- `IDockerComponent` - Docker operations and image management (build, push)
-- `INodeComponent` - Node.js package manager detection and execution (build, copy artifacts)
-- `IGitHubComponent` - GitHub release and Git tag management
-- `INotifications` - Multi-channel notification support (Discord, etc.)
+Interfaces in `forge/Common/Components/` that add targets to a build type:
 
-## Build Configuration System
+- `ICleanComponent`: the `Clean` target, which removes the artifacts directory contents.
+- `IDockerComponent`: the `BuildDockerImage` and `PushToRegistry` targets.
+- `INodeComponent`: the `GenerateEnvironment`, `BuildApplication` and `CopyToArtifacts` targets.
+- `IGitHubComponent`: the `PublishToGitHub` target (release and tag).
 
-### Configuration Files Structure (`.build/` directory)
-
-```
-.build/
-├── .app.env.map         # Application environment variable mapping
-├── .build.env.map       # Build environment variable mapping  
-├── .build.copy          # Files/directories to copy to artifacts
-└── .build.scripts       # Custom build commands to execute
-```
-
-### Environment Mapping Syntax
-
-```bash
-# .build.env.map example
-RegistryToken=env:GITHUB_TOKEN
-ImageTag=const:latest
-NotificationsWebHookUrl=env:DISCORD_WEBHOOK
-```
-
-- `env:VARIABLE` - Read from environment variable
-- `const:value` - Set constant value
-- `env:VARIABLE,default:value` - Environment with fallback
-
-### Build Scripts Convention
-
-```bash
-# .build.scripts example
-npm ci
-npm run build:prod
-pwsh deploy.ps1
-```
-
-## Key Components & Services
-
-### Common Services (`forge/Common/Services/`)
-
-- **GitService** - Git operations, tagging, changelog generation
-- **GitHubService** - GitHub API, releases, authentication  
-- **DockerService** - Container builds, registry operations
-- **NodeService** - Package manager detection (npm/pnpm/yarn), script execution
+`Base` itself provides `Setup`, and each build type defines `Build` as the target that ties its targets together. `documentation/docs/targets.md` lists the targets of each build type and their order.
 
 ### Parameter Inheritance Hierarchy
 
 ```
 ForgeParams (base parameters)
 ├── DockerParams (container-specific)
-├── NodeParams (Node.js-specific) 
+├── NodeParams (Node.js-specific)
 └── NodeInDockerParams (combined Docker + Node)
 ```
 
-### Utilities (`forge/Common/Utilities/`)
+Every public property of a parameter class is a build parameter and a project configuration key, so changing one changes a protected surface. Read the "Build parameters" section of `design/20-contract.md` first.
 
-- **Files.cs** - Environment file generation, configuration parsing
-- **Common.cs** - Version detection, path utilities
-- **Extensions/** - File system and process extensions
+### Common code (`forge/Common/`)
+
+- `Services/`: `GitService`, `GitHubService`, `DockerService`, `NodeService`, `ChangeLogConfigService`.
+- `Utilities/`: `Files.cs` (environment file generation and map file parsing), `Common.cs` (version detection and paths), `Docker.cs`, `Git.cs`, `GitHub.cs`, `Node.cs`, `EnvironmentLoader.cs`.
+- `Entities/`: `BuildConfig` (the `.build/` file names), version, change log and release entities.
+- `Extensions/`: file system, logging, object and string extensions.
+
+## Project configuration file
+
+A project can keep build settings in `buildagent.yml`, `buildagent.yaml` or `buildagent.json` at its root. The file holds `schemaVersion`, `buildType` and a `parameters` map keyed by the kebab-case parameter names. Secrets (`RegistryUser`, `RegistryToken` and `NotificationsWebHookUrl`) are rejected in the file. Reading and checking the file is the job of `forge/Config`, and each build type's `Main` passes a `ProjectConfigurationGate` to `Build`. The file format, precedence and errors are in `documentation/docs/project-configuration.md`, and samples are in `samples/`.
+
+## Build Configuration System (`.build/` directory)
+
+A consuming project can add these files under `.build/`. They are the names defined in `forge/Common/Entities/BuildConfig.cs`.
+
+```
+.build/
+├── .app.env.map         # Maps values into the application's .env file (project root)
+├── .build.env.map       # Maps values into the build's environment file (.build/.build.env)
+├── .build.copy          # Files and directories to copy to artifacts
+└── .build.scripts       # Commands to run during the build
+```
+
+### Environment mapping syntax
+
+```bash
+# .build.env.map example
+RegistryToken=env:GITHUB_TOKEN
+ImageTag=const:latest
+```
+
+- `env:VARIABLE` reads the value from an environment variable.
+- `const:value` sets a constant value.
+- A bare `VARIABLE` with no prefix also reads an environment variable.
+
+`ParseEnvironment` in `forge/Common/Utilities/Files.cs` implements this. There is no default-value syntax, and a line that resolves to nothing fails the build.
+
+### Scripts and copy lists
+
+```bash
+# .build.scripts: one command per line
+npm ci
+npm run build:prod
+
+# .build.copy: one path per line
+dist/
+package.json
+```
+
+The Node package manager is detected from lock files in the project root: `pnpm-lock.yaml` selects pnpm, `yarn.lock` selects yarn, anything else selects npm. `NodeService` and the static `Node` utility check them in a different order, so a project with both lock files gets different answers.
+
+## Which command runs what
+
+Run these from the repository root.
+
+| Goal | Command |
+|---|---|
+| Compile everything | `dotnet build forge/Forge.sln` |
+| Run all .NET tests | `dotnet test forge/Forge.sln` |
+| Run one test project | `dotnet test forge/Common.Tests` |
+| Check the documentation | `dotnet run --project forge/DocsCheck -c Release -- .` |
+| Run the PowerShell module tests (Pester 5) | `Invoke-Pester -Path scripts/powershell-module/Docker-BuildAgent.Tests.ps1 -CI -Output Detailed` |
+| Run a build type locally | `.\build.ps1 -type docker --dry-run true` (compiles `forge/Forge.sln` into `artifacts/`, then runs the type) |
+| Build the image | `dotnet build forge/Forge.sln -o artifacts -c Release`, then `docker build -t build-agent:dev .` |
+| Before opening a pull request | The .NET tests, the DocsCheck command and the Pester tests above |
+| CI on a pull request (`ci.yml`) | Module tests on Windows PowerShell 5.1 and PowerShell 7, the DocsCheck command, then `dotnet test forge/Forge.sln` with coverage, `nuke --type docker --dry-run true` and a docs-template build |
+| Release | The `release.yml` workflow (manual) or a pushed `v*` tag (`release-tag.yml`). See `documentation/docs/releases.md` |
+
+The `Dockerfile` copies the compiled build from `artifacts/` and needs the `docs-template/` submodule checked out.
 
 ## Build Execution Patterns
 
 ### Container-Based Execution (Recommended)
 
-All builds use the unified `build` command with type as first argument:
-
 ```bash
-# Docker build with automatic image tagging and registry push
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build docker --registry-url ghcr.io --registry-user username
+# Docker build with image tagging and registry push
+docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:latest build docker --registry-url ghcr.io --registry-user username
 
 # Node.js build with artifact output
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node --artifacts-dir ./dist
+docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:latest build node --artifacts-dir ./dist
 
 # Node + Docker combined build
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node-in-docker
+docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:latest build node-in-docker
 
-# Node template build for documentation sites
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node-template -AppDir documentation
+# Documentation site from a template
+docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:latest build node-template -AppDir documentation
 
-# Forge: Changelog and release management
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build forge --change-log-source all
+# Change log generation
+docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:latest build forge --change-log-source all
 ```
 
-### Using PowerShell Module
+A build that needs the Docker daemon also needs the Docker socket mounted (`-v /var/run/docker.sock:/var/run/docker.sock`).
+
+### Using the PowerShell module
 
 ```powershell
-# Import and configure the module
-Import-Module .\scripts\powershell-module\Docker-BuildAgent.psm1
+Import-Module .\scripts\powershell-module\Docker-BuildAgent.psd1
+
+# DockerImage, DockerHost and WorkspacePath are all mandatory
 Set-BuildAgentConfig `
     -DockerImage "ghcr.io/the-running-dev/build-agent:latest" `
+    -DockerHost "tcp://host.docker.internal:2375" `
     -WorkspacePath $PWD `
     -ArtifactsDir "./artifacts"
 
-# Execute builds via Invoke-Build
-Invoke-Build -type "docker" -args @{ imageName = "myapp"; tag = "v1.0"; registryUrl = "ghcr.io" }
-Invoke-Build -type "node" -args @{ packageManager = "pnpm"; artifactsDir = "./dist" }
+Invoke-Build -type "docker" -args @{ imageTag = "myapp"; registryUrl = "ghcr.io" }
+Invoke-Build -type "node" -args @{ artifactsDir = "./dist" }
 Invoke-Build -type "node-in-docker" -args @{}
-Invoke-Build -type "forge" -args @{ changeLogSource = "all" }
 ```
 
-### Local PowerShell Scripts (via unified build.ps1)
+`-DockerHost` must match `tcp://host:port`, `unix:///path` or `npipe:////./pipe/name`. Hashtable keys become kebab-case arguments (`imageTag` becomes `--image-tag`). The module's contract is `PSModule.requirements.md`.
+
+### Direct execution of a build type
+
+Build the solution first (the local `build.ps1` does this), then run the type through the local script:
 
 ```powershell
-# Using the unified build script directly
-.\scripts\nuke\build.ps1 docker -ImageName myapp -Tag v1.0
-.\scripts\nuke\build.ps1 node -ArtifactsDir ./dist
-.\scripts\nuke\build.ps1 node-in-docker -SkipDockerBuild $false
-.\scripts\nuke\build.ps1 forge -ChangeLogSource all
-.\scripts\nuke\build.ps1 node-template -AppDir documentation
+.\build.ps1 -type docker --dry-run true
+.\build.ps1 -type node --artifacts-dir ./dist
+.\build.ps1 -type node-in-docker --dry-run true
 ```
 
-### Direct NUKE Execution
-
-```bash
-# Build Docker images
-dotnet run --project forge/Docker/Docker.csproj -- --registry-url ghcr.io --registry-user username
-
-# Build Node.js applications
-dotnet run --project forge/Node/Node.csproj -- --artifacts-dir artifacts
-
-# Combined Node + Docker
-dotnet run --project forge/NodeInDocker/NodeInDocker.csproj -- --skip-docker-build false
-
-# Changelog and release
-dotnet run --project forge/Forge/Forge.csproj -- --change-log-source all
-```
+`-type` and `-isProd` are the script's own parameters. Everything else is forwarded to the build as `--kebab-case` arguments.
 
 ## PowerShell Automation (`scripts/`)
 
-### PowerShell Module (`scripts/powershell-module/`)
+- `scripts/powershell-module/`: the `Docker-BuildAgent` module (`.psm1`, `.psd1`), the Pester tests, and `Update-ModuleParameters.ps1`, which parses `forge/Common/Parameters/*.cs` and writes a `parameters.json` into the module folder. The module does not ship that file today.
+- `scripts/nuke/build.ps1`: the in-image wrapper behind `build <type>`. Its parameters are `-type` (positional, mandatory), `-workingDir`, `-artifactsDir` (the directory of compiled build DLLs, default `/nuke/forge`), the node-template parameters (`-appDir`, `-nodeTemplateRepositoryUrl`, `-nodeTemplateDirPath`, `-skipInstall`, `-packageManager`, `-isProduction`) and the remaining arguments, which pass to the build verbatim.
+- `scripts/nuke/nuke-helpers.psm1`: helper functions used by both build scripts (`Initialize-Build`, `Invoke-DotNetBuild`, `Invoke-Forge`, `Copy-Directory`, `Get-PackageManager`, `Invoke-SafeCommand`, and others). See `documentation/docs/architecture/powershell-helpers.md`.
+- `scripts/nuke/bin/build`: the executable on `PATH` in the image.
 
-New programmatic interface providing:
-- **Docker-BuildAgent.psm1** - Main module with configuration and `Invoke-Build`
-- **Docker-BuildAgent.psd1** - Module manifest for proper PowerShell import
-- **Update-ModuleParameters.ps1** - Script to sync module functions with C# parameters
+## GitHub Actions
 
-Module commands:
-- `Set-BuildAgentConfig` - Configure module for your environment (DockerImage, WorkspacePath, etc.)
-- `Invoke-Build` - Execute build types with a parameter hashtable
+The workflows are in `.github/workflows/`; shared steps are in `.github/actions/common` (environment setup) and `.github/actions/tests` (tests and coverage). `documentation/docs/ci-cd.md` describes each workflow.
 
-### Core Helper Module (`scripts/nuke/nuke-helpers.psm1`)
+| Workflow | Trigger |
+|---|---|
+| `ci.yml` | Pull requests, manual |
+| `build.yml` | Push to `main`, manual |
+| `release.yml` | Manual |
+| `release-tag.yml` | A pushed `v*` tag |
+| `docs.yml` | Documentation changes on `main`, manual, repository dispatch |
+| `module-tests.yml` | Called by `ci.yml`, `release.yml` and `release-tag.yml` |
+| `claude-code-review.yml` | Pull requests |
 
-Key functions for build automation:
-- `Invoke-Forge` - Execute multi-build workflows
-- `Copy-Directory` - Recursive copying with .gitignore management and exclude patterns
-- `Initialize-Build` - Environment setup and validation
-- `Invoke-DotNetBuild` - .NET compilation management
-- `Get-PackageManager` - Auto-detect npm/pnpm/yarn from lock files
-- `Invoke-SafeCommand` - Execute commands with comprehensive error handling
+Builds read `GITHUB_TOKEN` and the parameters `RegistryToken` and `NotificationsWebHookUrl` from the environment. The workflows pass them from repository secrets.
 
-### Build Script Architecture
+## Documentation System
 
-Consolidated into a single unified entry point:
-
-- `scripts/nuke/build.ps1` - Unified build script handling all build types:
-  - `build docker` - Container build automation
-  - `build node` - Node.js application builds
-  - `build node-in-docker` - Combined Node + Docker builds
-  - `build forge` - Release and changelog generation
-  - `build node-template` - Template-based project creation
-- `scripts/nuke/nuke-helpers.psm1` - Shared helper functions
-
-## Development Workflow
-
-### Environment Setup
-
-1. **Prerequisites**: .NET 8 SDK, Docker, Node.js, PowerShell 5.1+
-2. **Environment Variables**: Create `.env` file with GitHub tokens, registry credentials
-3. **Solution Build**: `dotnet build forge/Forge.sln`
-4. **Test Execution**: `dotnet test forge/Common.Tests/`
-
-### Build Target Dependencies
-
-Standard build pipeline flow:
-```
-Setup → Clean → GenerateEnvironment → BuildApplication → CopyToArtifacts → Build
-```
-
-### Package Manager Detection Logic
-
-Auto-detection based on lock files:
-1. `pnpm-lock.yaml` → pnpm
-2. `yarn.lock` → yarn  
-3. Default → npm
-
-## GitHub Actions Integration
-
-### Workflow Structure (`.github/workflows/`)
-
-- **CI Workflow** - Build validation, testing, multi-platform execution
-- **Release Workflow** - Automated releases with semantic versioning
-- **Documentation Workflow** - Docusaurus site deployment
-
-### Environment Variables for CI/CD
-
-```yaml
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
-  VERBOSITY: Normal
-  DRY_RUN: false
-```
-
-## Documentation System (`documentation/`)
-
-### Docusaurus Configuration
-
-- **Theme System** - CSS variable-based theming with dynamic switching
-- **Pre-build Process** - Automated markdown copying from project root
-- **Navigation Generation** - Dynamic navbar from markdown files
-
-### Build Process
-
-```bash
-npm run build:prod     # Production build with optimizations
-npm run build:dev      # Development build with hot reload
-```
+Pages live in `documentation/docs/`. The site itself is built from the pinned `docs-template/` submodule (Docusaurus), by `docs.yml` and as a check in `ci.yml`. `design/docs-classification.txt` says which document owns which public surface, and the DocsCheck command fails when a page names something that does not exist. Run it after any documentation change.
 
 ## Testing Strategy
 
-### Unit Testing (`forge/Common.Tests/`)
-
-- **Component Testing** - Build class validation and pipeline testing
-- **Service Testing** - Mock-based testing for external dependencies
-- **Configuration Testing** - Environment mapping and parameter validation
-
-### Integration Testing
-
-- Container-based build validation
-- Cross-platform script execution testing
-- GitHub Actions workflow validation
+- Unit tests use xUnit and Moq, one test project per forge project (except `Tool`), all in `forge/Forge.sln`.
+- Service tests mock the service interfaces. `forge/Common.Tests` also covers the base class and the dependency injection setup.
+- The PowerShell module has Pester 5 tests in `scripts/powershell-module/Docker-BuildAgent.Tests.ps1`.
+- `forge/DocsCheck.Tests` keeps the documentation classification and the checker honest.
 
 ## Security Considerations
 
-### Token Management
+- Keep tokens in environment variables. Build output hides GitHub tokens and URLs through the `StripForDisplay` patterns in `BuildConfig`, and the parameter display leaves out `RegistryToken`.
+- The project configuration file may not carry secrets.
+- The image does not set a `USER`, so builds run as the image's default user (root). Treat the image as a trusted build environment, and mount only the workspace and, when needed, the Docker socket.
+- The module prints "arguments hidden for security" instead of the argument list.
 
-- Use environment variables for all sensitive tokens
-- Implement token masking in build outputs via `StripForDisplay` patterns
-- Support for GitHub Personal Access Tokens with minimal required permissions
+## Conventions
 
-### Container Security
-
-- Non-root user execution in containers
-- Minimal base image with only required tools
-- Volume mounting for workspace isolation
-
-## Performance Optimizations
-
-### Build Caching
-
-- .NET build artifact caching
-- Node.js dependency caching with package manager detection
-- Docker layer caching for container builds
-
-### Parallel Execution
-
-- Multi-target builds with dependency management
-- Concurrent service operations where safe
-- Background process support for long-running tasks
-
-## Common Patterns & Best Practices
-
-### Error Handling
-
-- `Invoke-SafeCommand` for PowerShell operations with automatic error handling
-- Comprehensive logging with structured output (`[OK]`, `[ERROR]`, `[WARN]` prefixes)
-- Service-based error propagation with detailed context
-
-### Configuration Management
-
-- Convention over configuration with sensible defaults
-- Environment-specific overrides via mapping files
-- Validation at build initialization with early failure
-
-### Cross-Platform Compatibility
-
-- PowerShell Core support for cross-platform scripting
-- ASCII output prefixes for PowerShell 5.1 compatibility
-- Path handling abstractions for Windows/Linux compatibility
-
-## Quick Reference
-
-### Essential Commands
-
-```bash
-# Container builds using unified build command (recommended)
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build docker --registry-url ghcr.io
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node --artifacts-dir ./dist
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node-in-docker
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build node-template -AppDir docs
-docker run -v ./:/workspace -it ghcr.io/the-running-dev/build-agent:latest build forge --change-log-source all
-
-# PowerShell module
-Import-Module .\scripts\powershell-module\Docker-BuildAgent.psm1
-Set-BuildAgentConfig -DockerImage ghcr.io/the-running-dev/build-agent:latest -WorkspacePath $PWD
-Invoke-Build -type "docker" -args @{ imageName = "myapp" }
-Invoke-Build -type "node" -args @{ packageManager = "pnpm" }
-
-# Direct NUKE execution
-dotnet run --project forge/Docker/Docker.csproj -- --registry-url ghcr.io
-dotnet run --project forge/Node/Node.csproj -- --artifacts-dir artifacts
-dotnet run --project forge/NodeInDocker/NodeInDocker.csproj
-dotnet run --project forge/Forge/Forge.csproj -- --change-log-source all
-```
-
-### Environment Variables
-
-```bash
-# Required
-GITHUB_TOKEN=ghp_xxxxxxxxxxxx
-REGISTRY_TOKEN=ghp_xxxxxxxxxxxx
-
-# Optional  
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-VERBOSITY=Normal
-DRY_RUN=false
-FORCE_PUSH=false
-```
-
-### Build Configuration Files
-
-```bash
-# .build.scripts
-npm ci
-npm run build:prod
-pwsh deploy.ps1
-
-# .build.copy
-dist/
-package.json
-README.md
-
-# .build.env.map
-ImageTag=env:BUILD_NUMBER,default:latest
-CreateRelease=const:true
-```
+- Error handling in PowerShell goes through `Invoke-SafeCommand`, and log lines use ASCII prefixes such as `[OK]`, `[ERROR]` and `[WARN]` so they render in Windows PowerShell 5.1.
+- The `build` wrapper propagates the build's exit status. Statuses are listed in the contract.
+- Commit messages use a lowercase conventional prefix (`fix:`, `docs:`, `feat:`). Do not rewrite pushed history.
