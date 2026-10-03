@@ -4,9 +4,7 @@ title: Development Guide
 sidebar_position: 3
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
-How to set up, build, test and change Docker-BuildAgent. The repository layout, the forge
+How to set up, build, test and change Docker-BuildAgent. The repository layout, the Forge
 project map and the command tables live in one place,
 [`.github/copilot-instructions.md`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/.github/copilot-instructions.md).
 This page does not repeat them, so read that file for what is where and for which command runs what.
@@ -35,7 +33,7 @@ It exits 0 when the documentation matches the code.
 From the repository root:
 
 ```bash
-# Compile every forge project and test project
+# Compile every Forge project and test project
 dotnet build forge/Forge.sln
 
 # Run every test project. CI runs the same solution (with coverage and in Release).
@@ -93,7 +91,7 @@ The image build also needs the `docs-template/` submodule to be checked out.
 
 ## Tests
 
-The tests use xUnit and Moq. Each forge project except `Tool` has a sibling `<Project>.Tests`
+The tests use xUnit and Moq. Each Forge project except `Tool` has a sibling `<Project>.Tests`
 project, and every test project is part of `forge/Forge.sln`. A test looks like this one, from
 [`forge/Common.Tests/DependencyInjection/ServiceLocatorTests.cs`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/forge/Common.Tests/DependencyInjection/ServiceLocatorTests.cs):
 
@@ -166,3 +164,5 @@ The workflows are in `.github/workflows/`. [CI/CD](../ci-cd.md) describes what e
 | `docs.yml` (Docs) | Pushes to `main` that change the documentation, manual dispatch and a repository dispatch event |
 | `module-tests.yml` (Module Tests) | Called by `ci.yml`, `release.yml` and `release-tag.yml` |
 | `claude-code-review.yml` | Pull requests |
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

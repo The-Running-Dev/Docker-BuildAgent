@@ -4,8 +4,6 @@ title: Troubleshooting and FAQ
 sidebar_position: 13
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 This page covers common problems with `build` and the answers to frequent questions. The first thing to check is
 the exit status. [Exit Codes](./exit-codes.md) says what each status means.
 
@@ -75,3 +73,5 @@ the exit status. [Exit Codes](./exit-codes.md) says what each status means.
   - A: No. The format is `yyyy.MM.dd`.
 
 For more help, see the project README or open an issue on GitHub.
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

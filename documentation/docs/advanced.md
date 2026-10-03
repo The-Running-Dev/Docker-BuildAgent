@@ -4,8 +4,6 @@ title: Advanced
 sidebar_position: 9
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 You can run any tool in the image for a reproducible environment, and you can run the `build` command with
 selected targets. A `build docker` run builds an image, so it needs the host's Docker socket mounted into the
 container; without it the Docker CLI inside the image has no daemon to talk to and the build fails.
@@ -18,7 +16,7 @@ docker run --rm -it \
     ghcr.io/the-running-dev/build-agent:latest build docker
 ```
 
-## Tools Available in the Build Agent
+## Tools Available in Docker-BuildAgent
 
 The image comes with these tools:
 
@@ -86,3 +84,5 @@ docker run --rm -it \
 docker run --rm -it -v "${PWD}:/workspace" ghcr.io/the-running-dev/build-agent:latest \
     pwsh -Command "tsc src/index.ts --outDir dist"
 ```
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

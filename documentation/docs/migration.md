@@ -10,10 +10,6 @@ This guide covers every breaking change in 2.0.0 and the move from a floating ta
 version. 2.0.0 is not published yet, so the version-pinned image and module described below
 do not exist until it is released. What is protected from now on is stated in [Compatibility and Support](./compatibility.md).
 
-Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
-Canonical contract (PowerShell module): [PSModule.requirements.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/PSModule.requirements.md)
-
 ## Breaking changes in 2.0.0
 
 - [PowerShell module: default image is version-pinned](#powershell-module-default-image-is-version-pinned-200)
@@ -47,14 +43,7 @@ Canonical contract (PowerShell module): [PSModule.requirements.md](https://githu
 be obtained could be replaced by another version.
 
 **Now:** `Invoke-Build` and `Set-BuildAgentConfig` raise terminating errors whose
-`FullyQualifiedErrorId` is the code and whose `Exception.Data['ExitCode']` is the exit status:
-
-| Code | Exit status | Cause |
-|---|---|---|
-| `WorkspaceInvalid` | 3 | The workspace path is absent or not a directory. |
-| `DockerUnavailable` | 5 | The Docker daemon cannot be reached. |
-| `ImageUnavailable` | 5 | The configured image cannot be obtained. It never falls back to another version. |
-| `BuildFailed` | the container's own | The container exited non-zero; its status is carried unchanged. |
+`FullyQualifiedErrorId` is the code and whose `Exception.Data['ExitCode']` is the exit status. The codes and their causes are listed in [Errors](./powershell-module.md#errors). A configured image that cannot be obtained never falls back to another version.
 
 **What to do:** match on the code rather than on message text, and treat an image that cannot
 be pulled as a failure to fix, not a fallback to expect.
@@ -65,9 +54,8 @@ be pulled as a failure to fix, not a fallback to expect.
 a generated value replaced a variable you had already set.
 
 **Now:** a variable already set in the process environment keeps its value. The generated value
-applies only where nothing is set. Configuration precedence, highest first: invocation
-arguments, module configuration, process environment, map-derived environment, project
-configuration file, declared defaults.
+applies only where nothing is set. The order in which a setting is taken from several places is in
+[Project Configuration File](./project-configuration.md#precedence).
 
 **What to do:** if you relied on a generated value replacing a variable that is already set,
 unset that variable before the build, or set the value you want explicitly.
@@ -90,3 +78,7 @@ build that names one reproduces. To move:
    reference.
 4. Upgrade deliberately: change the pinned version, read that release's breaking-changes
    section, and run your build.
+
+Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
+
+Canonical contract (PowerShell module): [PSModule.requirements.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/PSModule.requirements.md)

@@ -4,8 +4,6 @@ title: "PowerShell Module"
 sidebar_position: 14
 ---
 
-Canonical contract (PowerShell module): [PSModule.requirements.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/PSModule.requirements.md)
-
 # PowerShell Module
 
 `Docker-BuildAgent` is a PowerShell module that runs a build in the build-agent image without you
@@ -125,3 +123,5 @@ catch {
 ```
 
 For what changed in 2.0.0, see the [migration guide](./migration.md).
+
+Canonical contract (PowerShell module): [PSModule.requirements.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/PSModule.requirements.md)

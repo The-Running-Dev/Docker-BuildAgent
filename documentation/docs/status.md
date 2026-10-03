@@ -12,7 +12,7 @@ import Badges from '@site/src/components/Badges';
 
 ## Understanding Project Status
 
-This page shows live repository badges for the Docker BuildAgent project. Each badge is rendered from the repository or a workflow status and links to the detail behind it. The badge list is defined in `documentation/src/config/badge-config.ts`; the [README](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/README.md) shows a shorter subset.
+This page shows live repository badges for the Docker-BuildAgent project. Each badge is rendered from the repository or a workflow status and links to the detail behind it. The badge list is defined in `documentation/src/config/badge-config.ts`; the [README](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/README.md) shows a shorter subset.
 
 Badges that only restate a fixed claim, such as a hard-coded uptime or quality grade, are not shown, because no process in this repository produces those results.
 

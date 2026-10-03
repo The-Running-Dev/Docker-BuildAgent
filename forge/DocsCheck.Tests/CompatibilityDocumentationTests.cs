@@ -71,7 +71,7 @@ public sealed class CompatibilityDocumentationTests
 
         // Every breaking-change bullet in the release notes has a migration section: the notes name three.
         var notes = Read(ReleaseNotesPath);
-        var breaking = notes.Split("## 🗑️ Deprecations")[0];
+        var breaking = notes.Split("## Deprecations")[0];
         Assert.Equal(3, breaking.Split('\n').Count(l => l.StartsWith("- **", StringComparison.Ordinal)));
     }
 

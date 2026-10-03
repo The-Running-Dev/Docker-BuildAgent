@@ -4,9 +4,7 @@ title: Docker Templates
 sidebar_position: 6
 ---
 
-Canonical contract (Docker-template discovery, build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
-The Build Agent supports flexible Docker template discovery to make it easy to use custom templates in your projects. When you run a build and no `Dockerfile` exists in your project directory, the agent will:
+Docker-BuildAgent supports flexible Docker template discovery to make it easy to use custom templates in your projects. When you run a build and no `Dockerfile` exists in your project directory, the agent will:
 
 1. Try to determine your application type from the files in the project root.
 2. Search for matching templates in multiple locations (see [Template Discovery Order](#template-discovery-order)).
@@ -25,18 +23,18 @@ The template file name is `Dockerfile.<type>`. The type is the first rule that m
 | `node` | `tsconfig.json` exists |
 | `unknown` | none of the above, or there is no `package.json` |
 
-The Build Agent image ships two templates, `Dockerfile.angular` and `Dockerfile.node`. For any other type, supply
+Docker-BuildAgent image ships two templates, `Dockerfile.angular` and `Dockerfile.node`. For any other type, supply
 your own `Dockerfile.<type>` in a template directory, or put a `Dockerfile` in the project. When no template
 matches, the build fails and the error lists the locations it searched.
 
-## 🔍 Template Discovery Order
+## Template Discovery Order
 
-The Build Agent looks for `Dockerfile.<appType>` in these directories and uses the first one that contains it:
+Docker-BuildAgent looks for `Dockerfile.<appType>` in these directories and uses the first one that contains it:
 
 1. **The configured `TemplatesDir`** - the value as given when it names an existing directory, otherwise the same value resolved against your project root
 2. **`<project-root>/.github/templates/`**
 3. **`<project-root>/templates/`**
-4. **`/nuke/templates/`** - the built-in templates inside the Build Agent image
+4. **`/nuke/templates/`** - the built-in templates inside Docker-BuildAgent image
 
 `TemplatesDir` defaults to `/nuke/templates`, so with nothing set the first and last locations are the same directory. A template is only used when no Dockerfile exists at the configured path. When none of the four contains a matching template, the build fails and the error lists every location it searched.
 
@@ -94,3 +92,5 @@ artifacts directory needs a `package.json` with a `start` script. As with the An
 inside the template and `--artifacts-dir` does not change it.
 
 [View Dockerfile](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/templates/Dockerfile.node)
+
+Canonical contract (Docker-template discovery, build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

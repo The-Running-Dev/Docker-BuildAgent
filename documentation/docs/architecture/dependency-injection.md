@@ -32,8 +32,9 @@ When NUKE initializes the build, `Base` calls `InitializeDependencyInjection()`.
    type overrides it to add its own registrations.
 4. Builds the `ServiceProvider`, which is exposed on the build as `ServiceProvider`.
 
-Both `InitializeDependencyInjection()` and `ConfigureServices()` are `protected virtual`. Each
-build gets its own provider; nothing is shared between builds.
+Both `InitializeDependencyInjection()` and `ConfigureServices()` are `protected virtual`. No build type
+currently overrides `ConfigureServices()`, so every build gets exactly the shared services and the
+notification implementation. Each build gets its own provider; nothing is shared between builds.
 
 `Base` exposes the common services as properties (`GitService`, `GitHubService`,
 `NotificationService`, `Logger`) that resolve from `ServiceProvider`. The build components in

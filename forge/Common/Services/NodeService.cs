@@ -201,7 +201,7 @@ public class NodeService : INodeService
         {
             pm = "pnpm";
         }
-        if (File.Exists(Path.Join(parameters.RootDirectory, "yarn.lock")))
+        else if (File.Exists(Path.Join(parameters.RootDirectory, "yarn.lock")))
         {
             pm = "yarn";
         }

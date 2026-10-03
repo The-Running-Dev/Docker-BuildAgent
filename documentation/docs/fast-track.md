@@ -1,52 +1,29 @@
 ---
 id: fast-track
-title: 🚀 Fast Track
+title: Fast Track
 sidebar_position: 1
 ---
 
-Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
-
 ## Prerequisites
 
-- **Docker**, running. Every build runs in the image. `build docker` and `build node-in-docker` also need the
-  Docker host: mount `docker.sock` or set `DOCKER_HOST`.
-- **Git history** for `build forge` (`fetch-depth: 0` in GitHub Actions).
-- A project with the files the build needs; see [What each build needs](#what-each-build-needs).
+- **Docker**, running. Every build runs in the image. [What each build needs](build-types#what-each-build-needs) says which builds also need the Docker host, and which project files and tokens each one uses.
 
 ## Choose a build
 
-| You have | Run | You get |
-|---|---|---|
-| A project with a `Dockerfile`, or a type that has a [template](docker-templates) | `build docker` | An image, pushed in CI (and released with `--create-github-release true`) |
-| A Node.js application that is not containerized | `build node` | The built application in the artifacts directory |
-| A Node.js application that ships as an image | `build node-in-docker` | The Node build, then the image |
-| A documentation site | `build node-template` | The site built from a template repository |
-| A Git history | `build forge` | `CHANGELOG.md` |
-
-## What each build needs
-
-| Build | Docker host | Your project provides | To push or release in CI |
-|---|---|---|---|
-| `build docker` | Yes: mount `docker.sock` or set `DOCKER_HOST` | A `Dockerfile`, or none when a template matches | `RegistryToken` and `GITHUB_TOKEN` |
-| `build node` | No | A `build:prod` npm script, or `.build/.build.scripts` | Not applicable |
-| `build node-in-docker` | Yes | The same as `build node` | `RegistryToken` and `GITHUB_TOKEN` |
-| `build node-template` | No | A documentation directory; the template comes from a repository | Not applicable |
-| `build forge` | No | The full Git history (`fetch-depth: 0` in GitHub Actions) and a `.build/` directory (the build stops if it is missing) | Not applicable |
-
-Every build mounts the project at `/workspace`.
+[Choose a build](build-types#choose-a-build) lists the five build types and the project each one suits. The examples below cover the common ones.
 
 ## Quick Start Examples
 
-The Build Agent uses a unified `build` command with different types. Here are the most common scenarios to get you started quickly:
+Docker-BuildAgent has one `build` command with several types. These are the most common scenarios:
 
-> 💡 **Need help choosing?** Check out our comprehensive [Build Types Reference](build-types) for detailed comparisons, parameters, and decision guidance.
+Not sure which type to use? See [Build Types](build-types) for the comparison, the parameters and the details.
 
-### 🐳 Docker Image Build
+### Docker Image Build
 
 Creates a Docker image from your project; the project directory is the Docker build context.
 
 1. Map your project directory (`./`) to `/workspace`
-2. Expose the Docker host to the container, either through docker.sock volume bind (on Linux) or DOCKER_HOST environment variable.
+2. Expose the Docker host to the container, either through a `docker.sock` volume bind (on Linux) or the `DOCKER_HOST` environment variable.
 3. Optional: provide a Dockerfile in your project directory, or use a [Docker Template](docker-templates) automatically.
 4. Execute `build docker`
 
@@ -68,9 +45,9 @@ docker run \
      build docker
 ```
 
-This will run the `Docker` forge with all its [targets](targets#docker) and default [parameters](parameters#docker), and build your Docker image.
+This runs the `docker` build type with all its [targets](targets#docker) and default [parameters](parameters#docker), and builds your Docker image.
 
-### 🟢 Node.js Application Build
+### Node.js Application Build
 
 1. Map your project directory (`./`) to `/workspace`
 2. Define a `build:prod` npm script inside your `package.json`
@@ -83,20 +60,20 @@ This will run the `Docker` forge with all its [targets](targets#docker) and defa
     build node
 ```
 
-This will run the `Node` forge with all its [targets](targets#node) and default [parameters](parameters#node), and build your Node application.
+This runs the `node` build type with all its [targets](targets#node) and default [parameters](parameters#node), and builds your Node application.
 
-By default, the `Node` build target runs 3 scripts, using the package manager it detects (`npm` below):
+By default, the `node` build runs three scripts, using the package manager it detects (`npm` below):
 
 1. `rm -rf node_modules`
 2. `npm install`
 3. `npm run build:prod`
 
-You can customize this by specifying your own `.build.scripts`, see [customization](customization).
+To change this, provide your own `.build/.build.scripts`; see [customization](customization).
 
-### 🟢 🐳 Node.js + Docker Combined Build
+### Node.js + Docker Combined Build
 
 1. Map your project directory (`./`) to `/workspace`
-2. Expose the Docker host to the container, either through docker.sock volume bind (on Linux) or DOCKER_HOST environment variable.
+2. Expose the Docker host to the container, either through a `docker.sock` volume bind (on Linux) or the `DOCKER_HOST` environment variable.
 3. Define a `build:prod` npm script inside your `package.json`
 4. Execute `build node-in-docker`
 
@@ -108,9 +85,9 @@ You can customize this by specifying your own `.build.scripts`, see [customizati
     build node-in-docker
 ```
 
-This will run the `Node` forge with all its [targets](targets#node) and default [parameters](parameters#node), and build your Node application. And after that, it will run the `Docker` forge with all its [targets](targets#docker) and default [parameters](parameters#docker), and build your Docker image.
+This runs the `node` build type with all its [targets](targets#node) and default [parameters](parameters#node), and builds your Node application. It then runs the `docker` build type with all its [targets](targets#docker) and default [parameters](parameters#docker), and builds your Docker image.
 
-### 📝 Changelog Generation
+### Changelog Generation
 
 1. Map your project directory (`./`) to `/workspace`
 2. Execute `build forge` with the changelog options
@@ -129,12 +106,14 @@ This will run the `Node` forge with all its [targets](targets#node) and default 
     build forge --change-log-source all
 ```
 
-This will generate a formatted changelog from Git commit history and save it to `CHANGELOG.md`. The changelog uses the format `yyyy.MM.dd` for dates and groups commits by date in descending order.
+This generates a formatted changelog from the Git commit history and saves it to `CHANGELOG.md`. Dates use the format `yyyy.MM.dd`, and commits are grouped by date, newest first.
 
-## 📚 Learn More
+## Learn More
 
-These examples show the most common use cases. For complete information about all build types, parameters, and advanced scenarios:
+These examples show the common cases. For every build type, parameter and advanced scenario:
 
-- **[Build Types Reference](build-types)** - Comprehensive guide to all 5 build commands
-- **[Parameters](parameters)** - Detailed parameter documentation
-- **[Customization](customization)** - Advanced configuration options
+- [Build Types](build-types): all five build types
+- [Parameters](parameters): every parameter
+- [Customization](customization): advanced configuration
+
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
