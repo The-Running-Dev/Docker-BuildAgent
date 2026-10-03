@@ -1,70 +1,86 @@
 ---
 id: advanced
-title: "⚡ Advanced"
+title: Advanced
 sidebar_position: 9
 ---
 
-You can run various tools inside the container for reproducible environments:
+Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
-```pwsh
+You can run any tool in the image for a reproducible environment, and you can run the `build` command with
+selected targets.
+
+```bash
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     -w "/workspace" \
-    build-agent:latest pwsh -Command "./build.ps1 --type docker"
+    ghcr.io/the-running-dev/build-agent:latest build docker
 ```
 
-## 🛠️ Tools Available in the Build Agent
+## Tools Available in the Build Agent
 
-The Build Agent Docker image comes pre-installed with a variety of tools for advanced automation and scripting:
+The image comes with these tools:
 
-- 🟢 Node.js & NPM
-- 🅰️ Angular CLI (`ng`)
-- 🟣 .NET 8 SDK (`dotnet`)
-- 🐳 Docker CLI (`docker`)
-- 💻 PowerShell (`pwsh`)
-- 🗃️ Git
-- 🔢 GitVersion
-- 🏗️ Nuke Build
-- 📝 TypeScript (`tsc`)
-- 🌐 angular-cli-ghpages
+- Node.js and npm
+- Angular CLI (`ng`)
+- TypeScript (`tsc`) and `tsx`
+- .NET SDKs 8, 9 and 10 (`dotnet`)
+- Docker CLI (`docker`), with the buildx and compose plugins
+- PowerShell (`pwsh`)
+- Git
+- GitVersion
+- Nuke global tool (`nuke`)
+- angular-cli-ghpages
 
-Example:
-```pwsh
+Run a tool by giving its command in place of `build`:
+
+```bash
 docker run --rm -it \
     -v "${PWD}:/workspace" \
     -w "/workspace" \
-    build-agent:latest <Provide a Call to Your Tool>
+    ghcr.io/the-running-dev/build-agent:latest <your command>
 ```
-
-Below are some fictional examples of how you might call the agent to use these tools:
 
 ### Example: Run Angular CLI
 
-```pwsh
-pwsh -Command "ng build --configuration production"
+```bash
+docker run --rm -it -v "${PWD}:/workspace" ghcr.io/the-running-dev/build-agent:latest \
+    pwsh -Command "ng build --configuration production"
 ```
 
-### Example: Use GitVersion to get semantic version
+### Example: Use GitVersion to get the semantic version
 
-```pwsh
-pwsh -Command "gitversion /output json"
+```bash
+docker run --rm -it -v "${PWD}:/workspace" ghcr.io/the-running-dev/build-agent:latest \
+    pwsh -Command "gitversion /output json"
 ```
 
-### Example: Build and push a Docker image
+### Example: Run part of a build
 
-```pwsh
-docker build -t my-app:latest .
-docker push my-app:latest
+Pass `--target` to run one target and the targets before it. This builds the image and stops before the push:
+
+```bash
+docker run --rm -it \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "${PWD}:/workspace" \
+    ghcr.io/the-running-dev/build-agent:latest \
+    build docker --target BuildDockerImage
 ```
 
-### Example: Run a custom Nuke build target
+The targets of each build type are in [Targets](./targets.md).
 
-```pwsh
-pwsh -Command "nuke --target Publish"
+### Example: Build and push a Docker image yourself
+
+```bash
+docker run --rm -it \
+    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v "${PWD}:/workspace" \
+    ghcr.io/the-running-dev/build-agent:latest \
+    pwsh -Command "docker build -t my-app:latest . && docker push my-app:latest"
 ```
 
 ### Example: Compile TypeScript
 
-```pwsh
-tsc src/index.ts --outDir dist
+```bash
+docker run --rm -it -v "${PWD}:/workspace" ghcr.io/the-running-dev/build-agent:latest \
+    pwsh -Command "tsc src/index.ts --outDir dist"
 ```

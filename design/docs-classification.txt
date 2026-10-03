@@ -21,6 +21,7 @@ documentation/docs/build-types.md	reference	design/20-contract.md	Explains each 
 documentation/docs/ci-cd.md	reference	design/20-contract.md	CI examples that invoke the build command.
 documentation/docs/compatibility.md	reference	design/20-contract.md	The compatibility promise page (S11).
 documentation/docs/docker-templates.md	reference	design/20-contract.md	Explains Docker template discovery.
+documentation/docs/exit-codes.md	reference	design/20-contract.md	Exit statuses of the build command, with the contract-only ones marked.
 documentation/docs/fast-track.md	reference	design/20-contract.md	Quick start with the build command.
 documentation/docs/migration.md	reference	design/20-contract.md	Migration guide to 2.0.0 (S11).
 documentation/docs/parameters.md	reference	design/20-contract.md	Lists build parameters, which are also configuration keys.

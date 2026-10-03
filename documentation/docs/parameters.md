@@ -1,181 +1,160 @@
 ---
 id: parameters
-title: ⚙️ Parameters
+title: Parameters
 sidebar_position: 3
 ---
 
 Canonical contract (build command, project configuration): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
+Each build type has one table below. A row is one setting, and the columns show every way to set it:
 
-This document lists all available settings for Forge, Docker, and Node.js build processes. All parameters can be passed to the build system as **NUKE parameters** (command-line arguments, e.g. `--param value`). These can also be set via environment variables or in the `.build.env.map` configuration file, depending on your CI/CD setup.
+| Column | Meaning |
+|---|---|
+| Flag | The command-line argument, for example `build docker --image-tag my-app`. A boolean flag takes `true` or `false`. |
+| Environment variable | The process environment variable of that name. The same name works as a line in `.build/.build.env.map`, for example `ImageTag=const:my-app`. |
+| Config key | The key under `parameters` in the [project configuration file](./project-configuration.md). |
+| Default | The value used when nothing sets the setting. |
 
----
+The flag column shows the kebab-case form, which is also the config key. NUKE ignores case and dashes
+when it matches a flag, so `--create-github-release true` and `--create-git-hub-release true` are the same
+argument. When one setting is given in several places, the order of precedence is in
+[Project Configuration File](./project-configuration.md#precedence).
 
-## 🛠️ Forge (Common Settings)
+These tables are generated from the `*Params` classes in `forge/Common/Parameters` and the NUKE `[Parameter]`
+fields in `forge/`. Do not edit them by hand. After a parameter changes, run
+`pwsh scripts/Update-ParameterDocs.ps1`. The script rewrites the four tables and
+`pwsh scripts/Update-ParameterDocs.ps1 -Check` reports whether the page is out of date.
 
-These are the base parameters available to all builds. **NodeParams** and **DockerParams** both inherit from ForgeParams, so all settings below are available to Node and Docker builds as well.
+In the tables:
 
-<Tabs>
-<TabItem value="env" label="Environment" default>
-| Variable                   | Description                                       | Default        |
-|----------------------------|---------------------------------------------------|----------------|
-| `RepositoryUrl`            | The URL of the source code repository.            |                |
-| `Notifications`            | Enable/disable notifications (bool).              | false          |
-| `ForceNotifications`       | Force notifications even if not required (bool).  | false          |
-| `NotificationsWebHookUrl`  | Webhook URL for sending notifications.            |                |
-| `ForcePush`                | Force push actions (bool).                        | false          |
-| `DryRun`                   | Run the build in dry-run mode (bool).             | false          |
-| `Verbosity`                | Verbosity level for build output (enum).          | Normal         |
-</TabItem>
-<TabItem value="nuke" label="NUKE Parameters">
-| Variable                         | Description                                       | Default        |
-|----------------------------------|---------------------------------------------------|----------------|
-| `--repository-url`               | The URL of the source code repository.            |                |
-| `--notifications`                | Enable/disable notifications (bool).              | false          |
-| `--force-notifications`          | Force notifications even if not required (bool).  | false          |
-| `--notifications-web-hook-url`   | Webhook URL for sending notifications.            |                |
-| `--force-push`                   | Force push actions (bool).                        | false          |
-| `--dry-run`                      | Run the build in dry-run mode (bool).             | false          |
-| `--verbosity`                    | Verbosity level for build output (enum).          | Normal         |
-</TabItem>
-</Tabs>
+- `none` in a flag or environment variable column means the build type has no such flag. The build does not
+  read that setting from an argument or from the environment.
+- `none (secret)` in the config key column means the setting is a secret. The project configuration file
+  rejects it with `SecretKeyRejected`. Supply it by flag, environment variable or `.build/.build.env.map`.
+- `set by the build` means the build computes the value on every run from the repository, the version or
+  other settings. The project configuration file accepts the key, but the build overwrites the value, so
+  setting it has no effect.
+- `empty` is an empty string and `none` in the default column means no default.
 
----
+## Forge
 
-## 🐳 Docker
+`build forge` generates the change log. Every other table below starts with the same shared settings as this
+one. `--change-log-source` belongs to `build forge` only. The build reads it directly, so it has no config key.
 
-**Inherits all settings from Forge.**
+| Flag | Environment variable | Config key | Default |
+|---|---|---|---|
+| `--notifications` | `Notifications` | `notifications` | `true` |
+| `--force-notifications` | `ForceNotifications` | `force-notifications` | `false` |
+| `--notifications-web-hook-url` | `NotificationsWebHookUrl` | none (secret) | none |
+| `--force-push` | `ForcePush` | `force-push` | `false` |
+| `--dry-run` | `DryRun` | `dry-run` | `false` |
+| `--verbosity` | `Verbosity` | `verbosity` | `Normal` |
+| `--change-log-source` | `ChangeLogSource` | none | none |
+| none | none | `config` | set by the build |
+| none | none | `root-directory` | set by the build |
+| none | none | `repository-url` | set by the build |
+| none | none | `version` | set by the build |
+| none | none | `change-log-config` | set by the build |
 
-<Tabs>
-<TabItem value="env" label="Environment" default>
-| Variable              | Description                                             | Default        |
-|-----------------------|---------------------------------------------------------|----------------|
-| `TemplatesDir`        | Directory path for Dockerfile templates.                | /nuke/templates|
-| `Dockerfile`          | Path to the Dockerfile.                                 | Dockerfile     |
-| `ImageTag`            | Tag for the container image.                            | container-app  |
-| `RegistryUrl`         | Registry URL for pushing the Docker image.              |                |
-| `RegistryUser`        | Registry user name.                                     |                |
-| `RegistryToken`       | Registry authentication token.                          |                |
-| `CreateGitHubRelease` | Whether to create a GitHub release after build (bool).  | false          |
-| `PreRelease`          | Whether to mark the GitHub release as pre-release (bool)| false          |
-</TabItem>
-<TabItem value="nuke" label="NUKE Parameters">
-| Parameter                 | Description                                             | Default        |
-|---------------------------|---------------------------------------------------------|----------------|
-| `--templates-dir`         | Directory path for Dockerfile templates.                | /nuke/templates|
-| `--docker-file`           | Path to the Dockerfile.                                 | Dockerfile     |
-| `--image-tag`             | Tag for the container image.                            | container-app  |
-| `--registry-url`          | Registry URL for pushing the Docker image.              |                |
-| `--registry-user`         | Registry user name.                                     |                |
-| `--registry-token`        | Registry authentication token.                          |                |
-| `--create-github-release` | Whether to create a GitHub release after build (bool).  | false          |
-| `--pre-release`           | Whether to mark the GitHub release as pre-release (bool)| false          |
-</TabItem>
-</Tabs>
+`--notifications` is true unless you pass `--notifications false`. A notification is sent only when a webhook
+URL is also set, and only in a CI run (never in a local build or dry run) unless `--force-notifications true`
+is given.
 
----
+### Change log source
 
-## 🔄 NodeInDocker
+`--change-log-source` selects the commits that `GenerateChangeLog` writes:
 
-**Inherits all settings from both Docker and Node.js (and therefore Forge).**
+- Not set, or an empty value: the commits since the last Git tag.
+- `all`: the complete commit history.
+- Any other value: the commits since that tag, for example `v1.0.0`.
 
-The NodeInDocker build type combines parameters from both Docker and Node.js builds, giving you access to all configuration options from both parent types. This enables comprehensive control over the two-phase build process.
+The target writes `CHANGELOG.md` in the project root, puts the new entries before any existing content,
+and groups commits by date, latest first, with the date written as `yyyy.MM.dd`. The date format is fixed.
 
-<Tabs>
-<TabItem value="env" label="Environment" default>
-| Variable              | Description                                             | Default        | Source |
-|-----------------------|---------------------------------------------------------|----------------|--------|
-| `ArtifactsDir`        | Directory path for storing Node.js build artifacts.     | artifacts      | Node   |
-| `TemplatesDir`        | Directory path for Dockerfile templates.                | /nuke/templates| Docker |
-| `Dockerfile`          | Path to the Dockerfile.                                 | Dockerfile     | Docker |
-| `ImageTag`            | Tag for the container image.                            | container-app  | Docker |
-| `RegistryUrl`         | Registry URL for pushing the Docker image.              |                | Docker |
-| `RegistryUser`        | Registry user name.                                     |                | Docker |
-| `RegistryToken`       | Registry authentication token.                          |                | Docker |
-| `CreateGitHubRelease` | Whether to create a GitHub release after build (bool).  | false          | Docker |
-| `PreRelease`          | Whether to mark the GitHub release as pre-release (bool)| false          | Docker |
-</TabItem>
-<TabItem value="nuke" label="NUKE Parameters">
-| Parameter                 | Description                                             | Default        | Source |
-|---------------------------|---------------------------------------------------------|----------------|--------|
-| `--artifacts-dir`         | Directory path for storing Node.js build artifacts.     | artifacts      | Node   |
-| `--templates-dir`         | Directory path for Dockerfile templates.                | /nuke/templates| Docker |
-| `--docker-file`           | Path to the Dockerfile.                                 | Dockerfile     | Docker |
-| `--image-tag`             | Tag for the container image.                            | container-app  | Docker |
-| `--registry-url`          | Registry URL for pushing the Docker image.              |                | Docker |
-| `--registry-user`         | Registry user name.                                     |                | Docker |
-| `--registry-token`        | Registry authentication token.                          |                | Docker |
-| `--create-github-release` | Whether to create a GitHub release after build (bool).  | false          | Docker |
-| `--pre-release`           | Whether to mark the GitHub release as pre-release (bool)| false          | Docker |
-</TabItem>
-</Tabs>
+## Docker
 
-**Note**: NodeInDocker also inherits all Forge (common) parameters shown above, including notifications, verbosity, dry-run mode, and force-push options.
+| Flag | Environment variable | Config key | Default |
+|---|---|---|---|
+| `--notifications` | `Notifications` | `notifications` | `true` |
+| `--force-notifications` | `ForceNotifications` | `force-notifications` | `false` |
+| `--notifications-web-hook-url` | `NotificationsWebHookUrl` | none (secret) | none |
+| `--force-push` | `ForcePush` | `force-push` | `false` |
+| `--dry-run` | `DryRun` | `dry-run` | `false` |
+| `--verbosity` | `Verbosity` | `verbosity` | `Normal` |
+| `--templates-dir` | `TemplatesDir` | `templates-dir` | `/nuke/templates` |
+| `--docker-file` | `DockerFile` | `docker-file` | `Dockerfile` |
+| `--image-tag` | `ImageTag` | `image-tag` | `container-app` |
+| `--registry-url` | `RegistryUrl` | `registry-url` | empty |
+| `--registry-user` | `RegistryUser` | none (secret) | empty |
+| `--registry-token` | `RegistryToken` | none (secret) | empty |
+| `--create-git-hub-release` | `CreateGitHubRelease` | `create-git-hub-release` | `false` |
+| `--pre-release` | `PreRelease` | `pre-release` | `false` |
+| none | none | `config` | set by the build |
+| none | none | `root-directory` | set by the build |
+| none | none | `repository-url` | set by the build |
+| none | none | `version` | set by the build |
+| none | none | `change-log-config` | set by the build |
+| none | none | `tags` | set by the build |
+| none | none | `release-tag` | set by the build |
 
----
+`build docker` has no `--tags` flag. The image tags come from `--image-tag`, `--registry-url` and the
+version on every run. With `--create-github-release true` the image gets both a `latest` tag and a version
+tag. Without it, only `latest`. The release tag is always `v` followed by the version.
 
-## � Forge (Changelog Generation)
+## Node
 
-**Inherits all common settings from Forge base parameters.**
+| Flag | Environment variable | Config key | Default |
+|---|---|---|---|
+| `--notifications` | `Notifications` | `notifications` | `true` |
+| `--force-notifications` | `ForceNotifications` | `force-notifications` | `false` |
+| `--notifications-web-hook-url` | `NotificationsWebHookUrl` | none (secret) | none |
+| `--force-push` | `ForcePush` | `force-push` | `false` |
+| `--dry-run` | `DryRun` | `dry-run` | `false` |
+| `--verbosity` | `Verbosity` | `verbosity` | `Normal` |
+| `--artifacts-dir` | `ArtifactsDir` | `artifacts-dir` | `artifacts` |
+| none | none | `config` | set by the build |
+| none | none | `root-directory` | set by the build |
+| none | none | `repository-url` | set by the build |
+| none | none | `version` | set by the build |
+| none | none | `change-log-config` | set by the build |
 
-<Tabs>
-<TabItem value="env" label="Environment" default>
-| Variable            | Description                                                    | Default      |
-|---------------------|----------------------------------------------------------------|--------------|
-| `ChangeLogSource`   | Source for changelog generation (null/""/tag/"all").          | null (last tag) |
-</TabItem>
-<TabItem value="nuke" label="NUKE Parameters">
-| Parameter            | Description                                                    | Default      |
-|----------------------|----------------------------------------------------------------|--------------|
-| `--change-log-source`| Source for changelog generation (null/""/tag/"all").          | null (last tag) |
-</TabItem>
-</Tabs>
+`build node` declares the Docker flags too (`--templates-dir`, `--registry-url`, `--registry-user`,
+`--registry-token`, `--image-tag`, `--docker-file`), but it never reads them and they are not in the table.
 
-**ChangeLogSource Options**:
+## Node in Docker
 
-- `null` or `""` (empty): Generate changelog since the last Git tag
-- `all`: Generate complete commit history
-- `specific-tag`: Generate changelog since the specified tag (e.g., "v1.0.0")
+| Flag | Environment variable | Config key | Default |
+|---|---|---|---|
+| `--notifications` | `Notifications` | `notifications` | `true` |
+| `--force-notifications` | `ForceNotifications` | `force-notifications` | `false` |
+| `--notifications-web-hook-url` | `NotificationsWebHookUrl` | none (secret) | none |
+| `--force-push` | `ForcePush` | `force-push` | `false` |
+| `--dry-run` | `DryRun` | `dry-run` | `false` |
+| `--verbosity` | `Verbosity` | `verbosity` | `Normal` |
+| `--templates-dir` | `TemplatesDir` | `templates-dir` | `/nuke/templates` |
+| `--docker-file` | `DockerFile` | `docker-file` | `Dockerfile` |
+| `--image-tag` | `ImageTag` | `image-tag` | `container-app` |
+| `--registry-url` | `RegistryUrl` | `registry-url` | empty |
+| `--registry-user` | `RegistryUser` | none (secret) | empty |
+| `--registry-token` | `RegistryToken` | none (secret) | empty |
+| `--create-git-hub-release` | `CreateGitHubRelease` | `create-git-hub-release` | `false` |
+| none | none | `pre-release` | `false` |
+| `--artifacts-dir` | `ArtifactsDir` | `artifacts-dir` | `artifacts` |
+| none | none | `config` | set by the build |
+| none | none | `root-directory` | set by the build |
+| none | none | `repository-url` | set by the build |
+| none | none | `version` | set by the build |
+| none | none | `change-log-config` | set by the build |
+| none | none | `tags` | set by the build |
+| none | none | `release-tag` | set by the build |
 
-**Output Configuration**:
-
-- **File**: Saves to `CHANGELOG.md` in the project root
-- **Format**: Prepends new content to existing changelog
-- **Date Format**: Uses `yyyy.MM.dd` format for all dates
-- **Grouping**: Groups commits by date in descending order (latest first)
-
----
-
-## 🔄 Node
-
-**Inherits all settings from Forge.**
-
-<Tabs>
-<TabItem value="env" label="Environment" default>
-| Variable         | Description                                         | Default     |
-|------------------|-----------------------------------------------------|-------------|
-| `ArtifactsDir`   | Directory path for storing build artifacts.         | artifacts   |
-</TabItem>
-<TabItem value="nuke" label="NUKE Parameters">
-| Parameter         | Description                                         | Default     |
-|-------------------|-----------------------------------------------------|-------------|
-| `--artifacts-dir` | Directory path for storing build artifacts.         | artifacts   |
-</TabItem>
-</Tabs>
+`build node-in-docker` has no `--pre-release` flag. The `pre-release` key is accepted in the project
+configuration file, but nothing in this build type reads it, so its GitHub release is never marked as a
+pre-release. The image always gets both a `latest` tag and a version tag.
 
 ## Example
 
-Tell the build process to create a GitHub release (`false` by default):
-
-Create `.build.env.map`, with:
-
-```env
-CreateGitHubRelease=const:true
-```
-
-Use a NUKE parameter:
+Tell the build to create a GitHub release (`false` by default). Use a flag:
 
 ```pwsh
 & docker run `
@@ -183,4 +162,19 @@ Use a NUKE parameter:
      -v ./:/workspace `
      -it ghcr.io/the-running-dev/build-agent:latest `
      build docker --create-github-release true
+```
+
+Or put it in `.build/.build.env.map`:
+
+```env
+CreateGitHubRelease=const:true
+```
+
+Or set it in `buildagent.yml`:
+
+```yaml
+schemaVersion: 1
+buildType: docker
+parameters:
+  create-git-hub-release: true
 ```
