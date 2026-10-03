@@ -21,7 +21,7 @@
     PrivateData          = @{
         PSData = @{
             ReleaseNotes = @(
-                'Initial release of the module.'
+                '2.0.0: the default image is pinned to the module version; launcher failures carry stable error codes and exit statuses; map-derived environment no longer overwrites a variable that is already set. See the 2.0.0 release notes in the project documentation.'
             )
         }
     }
