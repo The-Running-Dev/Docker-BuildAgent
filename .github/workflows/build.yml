@@ -1,55 +1,29 @@
 
-# Continuous Deployment Workflow
+# Build Workflow
 #
-# This workflow handles continuous deployment for the Docker Build Agent project.
-# It builds and publishes Docker images to the container registry on every main branch push,
-# but does NOT create GitHub releases (use the "Create Release" workflow for that).
+# Builds and publishes the `latest` Docker image on every push to main. It writes no versioned
+# tag, no GitHub release and no git tag: a push to main moves `latest` and nothing else
+# (design/20-contract.md I15). Versioned images and releases come only from release.yml and
+# release-tag.yml.
 #
-# Workflow Configuration:
-#   - Name: Deploy
-#   - Triggers:
-#     * Manual dispatch (workflow_dispatch) for on-demand deployments
-#     * Automatic execution on pushes to the main branch
-#   - Ignores: Changes only to documentation/ and .github/ directories
-#   - Permissions: packages:write, contents:write for registry push
+# Triggers:
+#   - Push to main, unless the push changes only documentation/** and .github/**
+#   - Manual dispatch (workflow_dispatch): runs the tests and the dry run, never publishes
 #
-# Deployment Process:
-#   1. Checkout repository with full git history for proper versioning
-#   2. Execute shared setup actions (.github/actions/common)
-#   3. Run comprehensive test suite with coverage reporting
-#   4. Build and publish Docker images to container registry (NO release creation)
-#   5. Detect documentation changes and trigger docs rebuild if needed
+# Steps:
+#   1. Check out the repository with full history and submodules
+#   2. Run the shared setup action (.github/actions/common)
+#   3. Run every test project in forge/Forge.sln with coverage (.github/actions/tests)
+#   4. Dry-run the Docker build (nuke --type docker --dry-run true)
+#   5. On a push to main only: build and push the image (nuke --type docker --create-github-release false)
+#   6. On a push to main only: if the commit changed files under documentation/, dispatch
+#      Update-Documentation, which docs.yml listens for
 #
-# Quality Assurance:
-#   - Executes all test projects before deployment
-#   - Generates coverage reports for release validation
-#   - Ensures only tested code reaches production
-#   - Validates build integrity before publishing artifacts
+# Concurrency: shares the buildagent-publish group with release.yml and release-tag.yml, so only
+# one publisher runs at a time (see the concurrency block below).
 #
-# Environment Variables:
-#   - GITHUB_TOKEN: GitHub authentication for releases and API access
-#   - RegistryToken: Container registry authentication token
-#   - NotificationsWebHookUrl: Discord webhook for deployment notifications
-#
-# Release Artifacts:
-#   - Docker images pushed to GitHub Container Registry (ghcr.io)
-#   - GitHub release with semantic versioning and changelog
-#   - Git tags created automatically via GitVersion
-#   - Discord notifications for successful deployments
-#   - Test and coverage reports for release validation
-#
-# Documentation Integration:
-#   - Automatically detects documentation changes in commits
-#   - Triggers documentation site rebuild when docs are updated
-#   - Maintains documentation synchronization with releases
-#
-# Notes:
-#   - Only runs on main branch pushes or manual triggers
-#   - Creates production releases with --create-github-release flag
-#   - Automatically triggers documentation deployment if docs changed
-#   - Uses GitVersion for semantic versioning and changelog generation
-#   - Includes comprehensive testing before any deployment
-#   - Fails fast if tests don't pass, preventing broken releases
+# Environment: GITHUB_TOKEN, RegistryToken, NotificationsWebHookUrl (Discord notification, optional)
+# Permissions: packages:write, contents:write, checks:write, pull-requests:write
 #
 name: Build
 

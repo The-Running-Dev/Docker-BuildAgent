@@ -9,7 +9,10 @@
 #   - Name: Docs
 #   - Triggers:
 #     * Manual dispatch (workflow_dispatch) for on-demand documentation builds
-#     * Automatic trigger on push to main/default branch
+#     * Repository dispatch of type Update-Documentation (sent by build.yml, release.yml
+#       and release-tag.yml)
+#     * Push to main that changes docs-template, documentation/** or
+#       scripts/setup-docs-submodule.ps1
 #   - Permissions: pages:write, id-token:write
 #
 # Build Process:

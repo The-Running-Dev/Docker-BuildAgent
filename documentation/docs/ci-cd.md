@@ -6,49 +6,88 @@ sidebar_position: 8
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
-## 🚀 Release Strategy
+## This repository's workflows
 
-The Build Agent project uses a **controlled release strategy** to distinguish between development builds and official releases:
+Docker-BuildAgent builds, tests, publishes and documents itself with seven GitHub Actions
+workflows in `.github/workflows`. Each file's header comment describes it; this table is the
+overview.
 
-### Development Workflow
+| Workflow (`name:`) | File | Runs on | Publishes |
+|---|---|---|---|
+| **CI** | `ci.yml` | Pull requests and manual runs | Nothing |
+| **Build** | `build.yml` | Pushes to `main` (except changes only under `documentation/**` or `.github/**`) and manual runs | `latest` image, on a push only |
+| **Release** | `release.yml` | Manual runs | Versioned image, `latest` and a GitHub release |
+| **Release-from-Tag** | `release-tag.yml` | Pushes of a `v*` tag | Versioned image, `latest` and a GitHub release |
+| **Docs** | `docs.yml` | Pushes to `main` that change `documentation/**`, `docs-template` or `scripts/setup-docs-submodule.ps1`; a repository dispatch of type `Update-Documentation`; manual runs | The documentation site, to GitHub Pages |
+| **Module Tests** | `module-tests.yml` | Called by CI, Release and Release-from-Tag; it has no trigger of its own | Nothing |
+| **Claude Code Review** | `claude-code-review.yml` | Pull requests when opened, updated, marked ready for review or reopened | Nothing; posts review comments on the pull request |
 
-- **Push to main** → Triggers "Deploy" workflow → Builds and publishes Docker images (no GitHub releases)
-- **Pull requests** → Triggers "CI" workflow → Validation and testing only
+CI does not run on pushes to feature branches: open a pull request, or run it manually.
 
-### Workflow Types
+### CI
 
-The repository includes multiple GitHub Actions workflows for different purposes:
+CI has three jobs:
 
-- **CI Workflow** (`.github/workflows/ci.yml`): Runs on pull requests and feature branches for validation
-- **Build Workflow** (`.github/workflows/build.yml`): Builds and publishes Docker images on every main branch push
-- **Create Release Workflow** (`.github/workflows/release.yml`): Manual workflow to create official releases
-- **Tag Release Workflow** (`.github/workflows/release-tag.yml`): Creates releases when version tags are pushed
+- **Module Tests** calls the Module Tests workflow.
+- **Docs Check** runs `dotnet run --project forge/DocsCheck -c Release -- .`. It fails the pull
+  request when a document names a path, command, parameter, build type or template-discovery
+  location that the repository does not have, or breaks the canonical-contract rules.
+- **Build & Validate** runs after Module Tests. It runs every test project in `forge/Forge.sln` with
+  coverage (test results appear as a check run, and a coverage summary is posted on the pull
+  request), makes a dry run of the Docker build with `nuke --type docker --dry-run true`, and
+  builds the documentation site from `docs-template`.
 
-### Release Workflow
+### Build
 
-- **Manual releases**: Use "Create Release" workflow in GitHub Actions
-- **Tag-based releases**: Push a version tag (e.g., `git tag v1.2.3 && git push origin v1.2.3`)
+Build runs the tests, makes a dry run of the Docker build, and on a push to `main` builds and
+pushes the image. A push to `main` moves `latest` and writes no versioned tag and no GitHub
+release. A manual run of Build does the tests and the dry run only; it does not push.
+When a push to `main` changes files under `documentation/`, Build also dispatches
+`Update-Documentation`, which Docs listens for.
 
-### Pre-releases
+### Release and Release-from-Tag
 
-Tags with suffixes like `v1.0.0-beta.1` or `v1.0.0-rc.1` are automatically marked as pre-releases.
+Both run the Module Tests workflow and the test projects, then build and push the image under the
+version tag and `latest`, create the GitHub release and dispatch `Update-Documentation`. Release
+is started by hand; Release-from-Tag starts when a `v*` tag is pushed. See
+[Release Management](releases.md) for versions, pre-releases and what a release contains.
+
+### One publisher at a time
+
+Build, Release and Release-from-Tag share one concurrency group, `buildagent-publish`, with
+`cancel-in-progress: false`. At most one of them runs at a time, and a run already in progress
+always finishes. GitHub keeps only one pending run per group, so a newer pending run replaces an
+older one: if a queued release disappears, run it again.
+
+### Module Tests
+
+Module Tests runs the PowerShell module's Pester tests on `windows-latest` under Windows
+PowerShell 5.1 and PowerShell 7. Both must pass: CI, Release and Release-from-Tag each depend on
+it. `docker` is mocked, so a Windows runner is enough.
+
+### Docs
+
+Docs checks out the repository with submodules, builds the site from `docs-template`
+(`pnpm --dir docs-template build`) and deploys `docs-template/artifacts` to GitHub Pages.
 
 ---
 
-## 📦 Creating Official Releases
+## Creating official releases
 
-### Option 1: Manual Release (Recommended)
+### Option 1: manual release
 
-1. Go to **Actions** tab in your GitHub repository
-2. Select **"Create Release"** workflow
-3. Click **"Run workflow"**
-4. Optionally specify:
-   - Custom version (e.g., `v1.2.3`)
-   - Mark as pre-release
-   - Custom release notes
-5. Click **"Run workflow"** button
+1. Go to the **Actions** tab of the repository.
+2. Select the **Release** workflow.
+3. Choose **Run workflow**.
+4. Set **Mark as Pre-Release** for a beta or release candidate.
+5. Choose **Run workflow**.
 
-### Option 2: Tag-Based Release
+The workflow takes one working input, the pre-release flag. The version always comes from
+GitVersion: a **Release Version** input exists, but a run that supplies it fails with an explicit
+error instead of ignoring it. There is no release-notes input; the notes are generated from the
+commit history.
+
+### Option 2: tag-based release
 
 ```bash
 # Create and push a version tag
@@ -60,100 +99,14 @@ git tag v1.0.0-beta.1
 git push origin v1.0.0-beta.1
 ```
 
----
-
-## 📦 Example Workflows
-
-### Create Release Workflow
-
-```yaml
-name: Create Release
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Release version (optional, leave empty for auto-version)'
-        required: false
-        type: string
-      prerelease:
-        description: 'Mark as pre-release'
-        required: false
-        type: boolean
-        default: false
-
-permissions:
-  packages: write
-  contents: write
-
-jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Build Environment
-        uses: ./.github/actions/common
-
-      - name: Run Tests & Generate Coverage
-        uses: ./.github/actions/tests
-
-      - name: Build and Create Release
-        run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            nuke --type docker --create-github-release true --version "${{ github.event.inputs.version }}" --pre-release "${{ github.event.inputs.prerelease }}"
-          else
-            nuke --type docker --create-github-release true --pre-release "${{ github.event.inputs.prerelease }}"
-          fi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
-```
-
-### Deploy Workflow (Continuous Deployment)
-
-```yaml
-name: Deploy
-on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'documentation/**'
-
-permissions:
-  packages: write
-  contents: write
-
-jobs:
-  deploy:
-    name: Build & Deploy
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Build Environment
-        uses: ./.github/actions/common
-
-      - name: Run Tests & Generate Coverage
-        uses: ./.github/actions/tests
-
-      - name: Build and Publish to Registry
-        run: nuke --type docker --create-github-release false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
-```
+A tag with a suffix such as `-beta` or `-rc` is marked as a pre-release.
 
 ---
+
+## Workflows for your own project
+
+The examples below run in your repository and use the Build Agent image. They are starting
+points; for the workflows this repository itself runs, read the files in `.github/workflows`.
 
 ## 🐳 Docker Image
 
@@ -291,6 +244,7 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
 
 ## 🛠️ Custom Build
 

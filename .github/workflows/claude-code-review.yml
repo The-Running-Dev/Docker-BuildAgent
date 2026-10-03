@@ -1,3 +1,9 @@
+# Automated code review
+#
+# Runs on pull requests when they are opened, updated, marked ready for review or reopened, and
+# posts review comments on the pull request. It needs the CLAUDE_CODE_OAUTH_TOKEN secret and
+# publishes nothing.
+
 name: Claude Code Review
 
 on:
