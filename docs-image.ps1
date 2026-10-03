@@ -97,7 +97,6 @@ $dockerArgs = @(
 $dockerArgs += $volumeMounts
 $docsDir = Join-Path (Join-Path $localPath "documentation") "docs"
 $pagesDir = Join-Path (Join-Path (Join-Path $localPath "documentation") "src") "pages"
-$navbarLinksFile = Join-Path (Join-Path (Join-Path $localPath "documentation") "src") "navbarLinks.ts"
 
 if (Test-Path $docsDir) {
     $dockerArgs += "--mount", ("type=bind,source=`"{0}`",target=`"/template/docs`"" -f (Resolve-Path $docsDir).Path)
@@ -105,10 +104,6 @@ if (Test-Path $docsDir) {
 
 if (Test-Path $pagesDir) {
     $dockerArgs += "--mount", ("type=bind,source=`"{0}`",target=`"/template/src/pages`"" -f (Resolve-Path $pagesDir).Path)
-}
-
-if (Test-Path $navbarLinksFile) {
-    $dockerArgs += "--mount", ("type=bind,source=`"{0}`",target=`"/template/src/navbarLinks.ts`"" -f (Resolve-Path $navbarLinksFile).Path)
 }
 
 $dockerArgs += "--mount", "type=volume,target=/template/node_modules" # Anonymous volume to protect node_modules

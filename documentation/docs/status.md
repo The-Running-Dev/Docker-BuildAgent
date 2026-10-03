@@ -1,5 +1,6 @@
 ---
-title: 📊 Status
+id: status
+title: Status
 sidebar_position: 999
 ---
 
@@ -9,53 +10,47 @@ import Badges from '@site/src/components/Badges';
 
 ---
 
-## 📈 Understanding Project Status
+## Understanding Project Status
 
-This page displays real-time status information for the Docker BuildAgent project, providing comprehensive insights into build health, deployment status, code quality, security posture, and community engagement.
+This page shows live repository badges for the Docker BuildAgent project. Each badge is rendered from the repository or a workflow status and links to the detail behind it. The badge list is defined in `documentation/src/config/badge-config.ts`; the [README](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/README.md) shows a shorter subset.
 
-### Badge Categories Explained
+Badges that only restate a fixed claim, such as a hard-coded uptime or quality grade, are not shown, because no process in this repository produces those results.
 
-#### 🔄 Build & Release
+### Badge Categories
 
-- **CI/Release**: Automated testing and deployment pipeline status
-- **Tests**: Current test suite execution results
-- **Coverage**: Code coverage percentage and reporting
-- **Quality Gate**: Overall code quality assessment and standards compliance
+#### Build & Release
 
-#### 📦 Distribution & Deployment
+- **CI and Release**: Status of the `ci.yml` and `release.yml` workflows
+- **Coverage**: Link to the coverage report produced by the CI test run
 
-- **Version**: Latest stable release information
-- **Docker**: Container registry status and image availability
+#### Distribution & Deployment
+
+- **Version**: Latest GitHub release
+- **Docker**: Link to the container image on GitHub Container Registry
+- **Deployments**: GitHub Pages deployments of the documentation site
 - **Platform**: Supported hosts (Linux and Windows, macOS best-effort) and the amd64 image architecture, as stated on the [Compatibility and Support](./compatibility.md) page
-- **Downloads**: Community adoption and usage metrics
+- **Downloads**: Release download count
 
-#### 📚 Documentation & Demo
+#### Documentation
 
-- **Docs**: Live documentation site availability
-- **Demo**: Working demonstration applications
-- **Wiki**: Additional project resources and guides
-- **Changelog**: Release notes and version history
+- **Docs**: Link to the documentation site
+- **Wiki**: Link to the repository wiki
+- **Changelog**: Link to the [changelog](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/documentation/src/pages/CHANGELOG.md)
 
-#### 🔒 Quality & Security
+#### License & Language
 
-- **Security**: Vulnerability scanning and security assessment
-- **License**: Open source license compliance
-- **Dependencies**: Package security and update status
-- **Code Quality**: Static analysis and maintainability scores
+- **License**: MIT licence
+- **Language**: Top language reported by GitHub
 
-#### 👥 Community & Activity
+#### Community & Activity
 
-- **Stars/Forks**: Project popularity and community interest
-- **Contributors**: Development team and contributor statistics
-- **Issues/PRs**: Community involvement and maintenance activity
-- **Discussions**: Project communication and support channels
+- **Stars, Forks and Contributors**: Repository popularity and contributor count
+- **Issues and Pull Requests**: Open issues and a link to pull requests
+- **Discussions**: Repository discussions
 
-#### 📈 Development Metrics
+#### Development Metrics
 
-- **Commits**: Development activity and velocity
-- **Code Size**: Repository and codebase statistics
-- **Release Frequency**: Deployment cadence and stability
-
----
-
-_All badges are automatically updated in real-time and provide direct links to detailed information. This unified status system ensures consistency between the README and documentation._
+- **Commits and Last Commit**: Commit activity
+- **Code Size and Repo Size**: Repository size statistics
+- **Latest Release**: Date of the latest release
+- **Lines of Code**: Link to the repository

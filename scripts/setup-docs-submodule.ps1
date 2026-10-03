@@ -36,7 +36,7 @@ Write-Host "[START] Setting Up Docusaurus Template as Git Submodule..." -Foregro
 
 # 1. Add submodule (idempotent)
 Write-Host "[SETUP] Adding Git Submodule..." -ForegroundColor Yellow
-$hasSubmodule = Test-Path ".gitmodules" -and (Select-String -Path ".gitmodules" -Pattern "\[submodule \"docs-template\"\]" -Quiet)
+$hasSubmodule = (Test-Path ".gitmodules") -and (Select-String -Path ".gitmodules" -Pattern '\[submodule "docs-template"\]' -Quiet)
 
 if ($hasSubmodule) {
     Write-Host "[INFO] Submodule already configured. Updating..." -ForegroundColor Yellow

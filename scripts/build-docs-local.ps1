@@ -23,7 +23,7 @@
 .NOTES
     Requirements:
     - pnpm must be installed globally
-    - Docusaurus template must be set up via setup-docs-submodule.ps1
+    - The docs-template submodule must be checked out (git submodule update --init docs-template)
     
     When editing:
     - ./documentation/docs/* changes appear immediately
@@ -39,10 +39,10 @@ $docsSourceDir = './documentation/docs'
 Write-Host "[START] Starting Documentation Development Server..." -ForegroundColor Cyan
 Write-Host ""
 
-# Verify template directory exists
-if (-not (Test-Path $templateDir)) {
-    Write-Error "Template Directory not Found at $templateDir"
-    Write-Host "Run ./scripts/setup-docs-submodule.ps1 first" -ForegroundColor Yellow
+# Verify the template submodule is checked out (an uninitialized submodule is an empty directory)
+if (-not (Test-Path (Join-Path $templateDir 'package.json'))) {
+    Write-Error "Template Directory is Missing or Empty at $templateDir"
+    Write-Host "Run: git submodule update --init docs-template" -ForegroundColor Yellow
     exit 1
 }
 

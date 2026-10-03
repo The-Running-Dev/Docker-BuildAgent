@@ -1,8 +1,8 @@
 {
-  "label": "🛠️ Development",
+  "label": "Architecture",
   "position": 16,
   "link": {
     "type": "generated-index",
-    "description": "Guides for developers and advanced users to contribute and extend the system."
+    "description": "How the Forge build system is structured, configured and extended."
   }
 }

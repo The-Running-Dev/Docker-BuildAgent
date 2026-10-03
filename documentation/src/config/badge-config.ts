@@ -1,6 +1,5 @@
 // Auto-generated BadgeConfig TS class from badge-config.json
 export interface TemplateVariables {
-  demoUrl: string;
   docsUrl: string;
   user: string;
   repository: string;
@@ -21,7 +20,6 @@ export interface BadgeCategory {
 
 export class BadgeConfig {
   static templateVariables: TemplateVariables = {
-    demoUrl: '',
     docsUrl: 'https://build-agent.subzerodev.com',
     user: 'the-running-dev',
     repository: 'Docker-BuildAgent',
@@ -44,19 +42,9 @@ export class BadgeConfig {
           link: 'https://github.com/{user}/{repository}/actions/workflows/release.yml',
         },
         {
-          name: 'Tests',
-          url: 'https://img.shields.io/badge/Tests-Passing-brightgreen?logo=github-actions&logoColor=white',
-          link: 'https://github.com/{user}/{repository}/actions/workflows/ci.yml',
-        },
-        {
           name: 'Coverage',
           url: 'https://img.shields.io/badge/Coverage-Report-green?logo=codecov&logoColor=white',
           link: 'https://github.com/{user}/{repository}/actions/workflows/ci.yml',
-        },
-        {
-          name: 'Quality Gate',
-          url: 'https://img.shields.io/badge/Quality%20Gate-Passed-success?logo=sonarqube&logoColor=white',
-          link: 'https://github.com/{user}/{repository}/actions',
         },
       ],
     },
@@ -86,11 +74,6 @@ export class BadgeConfig {
           link: 'https://github.com/{user}/{repository}',
         },
         {
-          name: 'Image Size',
-          url: 'https://img.shields.io/badge/Image%20Size-Optimized-blue?logo=docker&logoColor=white',
-          link: 'https://github.com/{user}/{repository}/pkgs/container/build-agent',
-        },
-        {
           name: 'Download Count',
           url: 'https://img.shields.io/github/downloads/{user}/{repository}/total?logo=github&logoColor=white&label=Downloads',
           link: 'https://github.com/{user}/{repository}/releases',
@@ -99,22 +82,12 @@ export class BadgeConfig {
     },
     {
       key: 'documentation',
-      title: 'Documentation & Demo',
+      title: 'Documentation',
       icon: 'faBook',
       badges: [
         {
           name: 'Docs',
           url: 'https://img.shields.io/badge/Docs-Live-blue?logo=gitbook&logoColor=white',
-          link: '{docsUrl}',
-        },
-        {
-          name: 'Demo',
-          url: 'https://img.shields.io/badge/Demo-Barstrad-green?logo=angular&logoColor=white',
-          link: '{demoUrl}',
-        },
-        {
-          name: 'Uptime',
-          url: 'https://img.shields.io/badge/Uptime-99.9%25-brightgreen?logo=statuspage&logoColor=white',
           link: '{docsUrl}',
         },
         {
@@ -125,20 +98,15 @@ export class BadgeConfig {
         {
           name: 'Changelog',
           url: 'https://img.shields.io/badge/Changelog-Updated-blue?logo=keepachangelog&logoColor=white',
-          link: 'https://github.com/{user}/{repository}/blob/main/CHANGELOG.md',
+          link: 'https://github.com/{user}/{repository}/blob/main/documentation/src/pages/CHANGELOG.md',
         },
       ],
     },
     {
       key: 'quality',
-      title: 'Quality & Security',
+      title: 'License & Language',
       icon: 'faShieldAlt',
       badges: [
-        {
-          name: 'Security',
-          url: 'https://img.shields.io/badge/Security-Scanned-success?logo=security&logoColor=white',
-          link: 'https://github.com/{user}/{repository}/security',
-        },
         {
           name: 'License',
           url: 'https://img.shields.io/badge/License-MIT-blue?logo=opensourceinitiative&logoColor=white',
@@ -147,21 +115,6 @@ export class BadgeConfig {
         {
           name: 'Language',
           url: 'https://img.shields.io/github/languages/top/{user}/{repository}?logo=csharp&logoColor=white&label=Language',
-          link: 'https://github.com/{user}/{repository}',
-        },
-        {
-          name: 'Vulnerabilities',
-          url: 'https://img.shields.io/badge/Vulnerabilities-0-success?logo=snyk&logoColor=white',
-          link: 'https://github.com/{user}/{repository}/security',
-        },
-        {
-          name: 'Dependencies',
-          url: 'https://img.shields.io/badge/Dependencies-Up%20to%20Date-success?logo=renovatebot&logoColor=white',
-          link: 'https://github.com/{user}/{repository}/security/dependabot',
-        },
-        {
-          name: 'Code Quality',
-          url: 'https://img.shields.io/badge/Code%20Quality-A-success?logo=codeclimate&logoColor=white',
           link: 'https://github.com/{user}/{repository}',
         },
       ],
