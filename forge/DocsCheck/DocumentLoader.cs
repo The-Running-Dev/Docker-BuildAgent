@@ -18,7 +18,10 @@ internal enum SegmentKind
     CodeStatement,
 }
 
-internal sealed record Document(string Path, IReadOnlyList<Segment> Segments);
+/// <summary>A defect in the document's own text (an unclosed code fence, corrupted characters) rather than in a name it uses.</summary>
+internal sealed record StructuralIssue(int Line, DocsCheckErrorCode Code, string Name, string Message);
+
+internal sealed record Document(string Path, IReadOnlyList<Segment> Segments, IReadOnlyList<StructuralIssue> Issues);
 
 /// <summary>
 /// Finds the documents the check covers (S10.5: documentation site sources, the README, the PowerShell
@@ -30,6 +33,10 @@ internal static class DocumentLoader
     private static readonly Regex TrailingComment = new(@"(^|\s)(#|//).*$", RegexOptions.Compiled);
     private static readonly Regex HelpKeyword = new(@"^\s*\.[A-Z]+\b", RegexOptions.Compiled);
     private static readonly Regex PowerShellPrompt = new(@"^\s*PS[^>]*>\s*", RegexOptions.Compiled);
+
+    // U+FFFD, or UTF-8 text that was decoded as Windows-1252 or Latin-1 and saved again (an em dash, an accented letter or an emoji turned into two or three odd characters).
+    private static readonly Regex CorruptedText = new(
+        $"{(char)0xFFFD}|{(char)0xE2}{(char)0x20AC}|[{(char)0xC3}{(char)0xC2}][\x80-\xBF]|{(char)0xF0}{(char)0x178}", RegexOptions.Compiled);
 
     public static IReadOnlyList<string> Discover(string root)
     {
@@ -65,16 +72,35 @@ internal static class DocumentLoader
         var isPowerShell = relativePath.EndsWith(".psm1", StringComparison.OrdinalIgnoreCase)
             || relativePath.EndsWith(".ps1", StringComparison.OrdinalIgnoreCase);
 
-        return new Document(relativePath, isPowerShell ? SplitPowerShellHelp(lines) : SplitMarkdown(lines));
+        var issues = new List<StructuralIssue>();
+        var segments = isPowerShell ? SplitPowerShellHelp(lines) : SplitMarkdown(lines, issues);
+        FindCorruptedText(lines, issues);
+
+        return new Document(relativePath, segments, issues);
     }
 
     /// <summary>Reads only the canonical-contract markers of a file that is not itself checked.</summary>
     public static Document LoadMarkdownOnly(string root, string relativePath) => Load(root, relativePath);
 
-    private static List<Segment> SplitMarkdown(string[] lines)
+    private static void FindCorruptedText(string[] lines, List<StructuralIssue> issues)
+    {
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var match = CorruptedText.Match(lines[i]);
+            if (match.Success)
+            {
+                issues.Add(new StructuralIssue(i + 1, DocsCheckErrorCode.CorruptedText, match.Value,
+                    $"The text contains corrupted characters ('{match.Value}'): the file was saved with the wrong encoding."));
+            }
+        }
+    }
+
+    private static List<Segment> SplitMarkdown(string[] lines, List<StructuralIssue> issues)
     {
         var segments = new List<Segment>();
         var inFence = false;
+        var fenceStart = 0;
+        var fenceMarker = string.Empty;
         var pending = new List<string>();
         var pendingStart = 0;
 
@@ -83,11 +109,17 @@ internal static class DocumentLoader
             var line = lines[i];
             var trimmed = line.TrimStart();
 
-            if (trimmed.StartsWith("```", StringComparison.Ordinal) || trimmed.StartsWith("~~~", StringComparison.Ordinal))
+            var marker = trimmed.StartsWith("```", StringComparison.Ordinal) ? "```" : trimmed.StartsWith("~~~", StringComparison.Ordinal) ? "~~~" : string.Empty;
+            if (marker.Length > 0 && (!inFence || marker == fenceMarker))
             {
                 if (inFence)
                 {
                     FlushStatement(segments, pending, pendingStart);
+                }
+                else
+                {
+                    fenceStart = i + 1;
+                    fenceMarker = marker;
                 }
 
                 inFence = !inFence;
@@ -119,6 +151,12 @@ internal static class DocumentLoader
         }
 
         FlushStatement(segments, pending, pendingStart);
+        if (inFence)
+        {
+            issues.Add(new StructuralIssue(fenceStart, DocsCheckErrorCode.UnclosedCodeFence, fenceMarker,
+                $"The code fence opened at line {fenceStart} is never closed, so everything after it renders as code."));
+        }
+
         return segments;
     }
 
