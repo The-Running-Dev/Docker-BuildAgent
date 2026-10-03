@@ -1,4 +1,18 @@
-## History (2026.01.29)
+# Changelog
+
+Entries from 2025.05.26 to 2025.08.06 are the commit messages of that period, unedited; the version tags are `v0.0.0` to `v1.1.0-2`. Release notes for 2.0.0 are in the [2.0.0 release notes](https://build-agent.subzerodev.com/docs/release-notes/release-notes-2-0-0).
+
+## Unreleased (2.0.0)
+
+2.0.0 has not been published. The notes below summarise what is in the repository; the [2.0.0 release notes](https://build-agent.subzerodev.com/docs/release-notes/release-notes-2-0-0) and the [migration guide](https://build-agent.subzerodev.com/docs/migration) are the full account.
+
+- A project configuration file (`buildagent.yml`, `buildagent.yaml` or `buildagent.json`) sets the build type and its parameters, and is validated before any target runs.
+- A health-checked update of a running container, with rollback.
+- The PowerShell module's default image is pinned to the module's own version; launcher failures carry a stable error code and exit status; map-derived environment no longer overwrites a variable that is already set.
+- Build exit statuses are documented on the [exit codes](https://build-agent.subzerodev.com/docs/exit-codes) page.
+- The documentation is checked in CI against the code: names, paths and links in the docs must exist.
+
+## History
 
 ### 2025.08.06
 
