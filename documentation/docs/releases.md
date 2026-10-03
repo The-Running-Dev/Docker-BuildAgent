@@ -80,6 +80,14 @@ pre-release.
 A version that already exists is never republished. A versioned image tag or a git tag for the
 version makes it taken. Do not delete a tag, a release or an image to try again.
 
+:::note Not enforced by the workflows yet
+The code that enforces this rule (`forge/Release`) and the compatibility check that compares the
+public surface with the previous release (`forge/Surface`) are in the repository and tested, but
+no workflow calls either one. Publishing still goes through the existing release target, which
+creates or updates the GitHub release. Until they are wired in, "published once" is the rule to
+follow, and no release is stopped automatically for breaking a protected surface.
+:::
+
 ## Versioning
 
 The version comes from **GitVersion** in `ContinuousDelivery` mode, configured in

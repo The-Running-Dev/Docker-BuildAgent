@@ -39,7 +39,7 @@ docker run \
      build docker
 ```
 
-This will run the `Docker` forge with all it's [targets](targets#-docker-targets) and default [parameters](parameters#-docker), and build your Docker image.
+This will run the `Docker` forge with all it's [targets](targets#docker) and default [parameters](parameters#docker), and build your Docker image.
 
 ### 🟢 Node.js Application Build
 
@@ -54,7 +54,7 @@ This will run the `Docker` forge with all it's [targets](targets#-docker-targets
     build node
 ```
 
-This will run the `Node` forge with all it's [targets](targets#-node-targets) and default [parameters](parameters#-node), and build your Node application.
+This will run the `Node` forge with all it's [targets](targets#node) and default [parameters](parameters#node), and build your Node application.
 
 By default, the `Node` build target runs 2 scripts:
 
@@ -78,7 +78,7 @@ You can customize this by specifying your own `.build.scripts`, see [customizati
     build node-in-docker
 ```
 
-This will run the `Node` forge with all it's [targets](targets#-node-targets) and default [parameters](parameters#-node), and build your Node application. And after that, it will run the `Docker` forge with all it's [targets](targets#-docker-targets) and default [parameters](parameters#-docker), and build your Docker image.
+This will run the `Node` forge with all it's [targets](targets#node) and default [parameters](parameters#node), and build your Node application. And after that, it will run the `Docker` forge with all it's [targets](targets#docker) and default [parameters](parameters#docker), and build your Docker image.
 
 ### 📝 Changelog Generation
 

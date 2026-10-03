@@ -42,10 +42,11 @@ The Build Agent looks for `Dockerfile.<appType>` in these directories and uses t
 
 `TemplatesDir` defaults to `/nuke/templates`, so with nothing set the first and last locations are the same directory. A template is only used when no Dockerfile exists at the configured path. When none of the four contains a matching template, the build fails and the error lists every location it searched.
 
-This approach allows you to:
-- ✅ Store templates in your own repository (recommended)
-- ✅ Override built-in templates with project-specific ones
-- ✅ Fall back to container templates for quick starts
+This lets you:
+
+- Store templates in your own repository (recommended)
+- Override built-in templates with project-specific ones
+- Fall back to container templates for quick starts
 
 ## Storing Templates in Your Repository
 
