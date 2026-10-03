@@ -1,539 +1,242 @@
 ---
 id: configuration-compatibility
-title: ⚙️ Configuration & Compatibility
+title: Configuration and Compatibility
 sidebar_position: 4
 ---
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
-This guide covers configuration options, compatibility considerations, and environment-specific settings for the Docker Build Agent.
+Canonical contract (PowerShell module): [PSModule.requirements.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/PSModule.requirements.md)
 
-## PowerShell Compatibility
+Where a build gets its settings, which environment variables it reads, and what to know when
+running it on different machines. Supported hosts and the compatibility promise are on the
+[Compatibility and Support](../compatibility.md) page, and the list of parameters is on the
+[Parameters](../parameters.md) page. This page does not repeat either.
 
-### Version Requirements
+## Where settings come from
 
-The Docker Build Agent supports multiple PowerShell versions:
+A build parameter can be set in several places. When the same one is set in more than one, the
+highest of these wins:
 
-- **PowerShell 5.1** (Windows PowerShell): Full compatibility
-- **PowerShell 7+** (PowerShell Core): Full compatibility, cross-platform support
-- **Minimum Version**: PowerShell 5.1 or later required
+1. An argument on the command line
+2. PowerShell module configuration (`Set-BuildAgentConfig`)
+3. The process environment
+4. The environment generated from `.build/.build.env.map`
+5. The [project configuration file](../project-configuration.md) (`buildagent.yml`)
+6. The parameter's declared default
 
-### ASCII Output Mode
+The project file never sets secrets.
 
-For maximum compatibility, especially with PowerShell 5.1 and CI environments, all output uses ASCII characters instead of Unicode emojis.
+## Environment variables
 
-#### ASCII Prefix Mapping
+A parameter is read from an environment variable named exactly like the parameter, in PascalCase.
+The variable for `--registry-token` is `RegistryToken`, and the one for `--dry-run` is `DryRun`.
+Names are not upper-snake-case, and a variable such as `REGISTRY_TOKEN` is not read by the build.
 
-| Context | ASCII Prefix | Usage |
-|---------|-------------|--------|
-| Successful operations | `[OK]` | Build completions, successful tasks |
-| Error conditions | `[ERROR]` | Build failures, critical issues |
-| Warning messages | `[WARN]` | Non-critical issues, deprecations |
-| Configuration setup | `[CONFIG]` | Environment setup, parameter configuration |
-| File operations | `[COPY]` | File and directory operations |
-| Build processes | `[BUILD]` | Compilation, image creation |
-| Processing operations | `[PROCESS]` | Data processing, transformations |
-| Package management | `[SETUP]` | Dependencies, installations |
-| Detection/validation | `[DETECT]` / `[CHECK]` | Auto-detection, validation |
-| Installation operations | `[INSTALL]` / `[CLONE]` | Downloads, git operations |
-| Cleanup operations | `[CLEAN]` | Temporary file removal |
-| Informational messages | `[INFO]` | Status updates, progress |
-| Skipped operations | `[SKIP]` | Conditional skips |
-| Push operations | `[PUSH]` | Registry pushes, deployments |
-| Git tagging | `[TAG]` | Version tagging |
+| Variable | Used by | Meaning |
+|---|---|---|
+| `RegistryUrl` | docker, node, node-in-docker | Registry to push to. The path part is dropped for the registry login |
+| `RegistryUser` | docker, node, node-in-docker | Registry user |
+| `RegistryToken` | docker, node, node-in-docker | Registry token. The build also uses it for the GitHub API when it creates a release |
+| `ImageTag` | docker, node, node-in-docker | Name and tag of the image |
+| `DockerFile` | docker, node, node-in-docker | Dockerfile to build |
+| `TemplatesDir` | docker, node, node-in-docker | Directory of Dockerfile templates |
+| `CreateGitHubRelease` | docker, node-in-docker | `true` creates a GitHub release |
+| `PreRelease` | docker | `true` marks the release as a pre-release |
+| `ArtifactsDir` | node, node-in-docker | Directory the build output is copied to |
+| `Notifications` | all | `true` or `false`, sends notifications |
+| `ForceNotifications` | all | Sends notifications for a local build |
+| `NotificationsWebHookUrl` | all | Discord webhook URL |
+| `DryRun` | all | `true` skips the push and the tag |
+| `ForcePush` | all | Allows push and tag for a local build |
+| `Verbosity` | all | `Quiet`, `Minimal`, `Normal` or `Verbose` |
+| `ChangeLogSource` | forge | Where the change log starts: empty for the last tag, `all`, or a tag |
 
-### Execution Policy
+`RegistryUser`, `RegistryToken` and `NotificationsWebHookUrl` are secrets. Put them in the process
+environment or in `.build/.build.env.map`, never in the project file. A `.env` file at the project
+root is not read by the build, as described next.
 
-Ensure PowerShell execution policy allows script execution:
+## Mapping files and `.env`
 
-```powershell
-# Check current execution policy
-Get-ExecutionPolicy
+The `.build/` directory of a project can hold two mapping files. Each line is `Name=source`, and
+lines that start with `#` are ignored.
 
-# Set execution policy (if needed)
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
+| File | Generates | Used for |
+|---|---|---|
+| `.build/.build.env.map` | `.build/.build.env`, loaded into the build's own environment | Setting build parameters |
+| `.build/.app.env.map` | `.env` in the project root | Giving a Node application its environment (the `GenerateEnvironment` target of node builds) |
 
-## Environment Configuration
-
-### Required Environment Variables
-
-These environment variables are essential for full functionality:
-
-```bash
-# GitHub Integration
-GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-GITHUB_ACTOR=your-username
-
-# Container Registry
-REGISTRY_URL=ghcr.io
-REGISTRY_USER=your-username
-REGISTRY_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
-
-# Optional: Notifications
-NOTIFICATIONS_WEBHOOK_URL=https://discord.com/api/webhooks/...
-```
-
-### Optional Environment Variables
-
-```bash
-# Build Configuration
-VERBOSITY=Normal                    # Quiet, Minimal, Normal, Verbose
-DRY_RUN=false                      # true/false
-FORCE_PUSH=false                   # true/false
-NOTIFICATIONS=true                 # true/false
-
-# Directory Paths
-ARTIFACTS_DIR=artifacts            # Relative or absolute path
-TEMPLATES_DIR=/nuke/templates      # Docker template directory
-ROOT_DIRECTORY=/workspace          # Project root directory
-
-# Version Control
-REPOSITORY_URL=https://github.com/owner/repo
-CHANGELOG_FROM=start               # start, last-tag, specific-tag
-
-# Build Specific
-IMAGE_TAG=latest                   # Docker image tag
-DOCKER_FILE=Dockerfile             # Dockerfile name
-CREATE_GITHUB_RELEASE=false        # true/false for releases
-```
-
-### Environment File Configuration
-
-You can also use `.env` files for configuration:
-
-```bash
-# .env file example
-GITHUB_TOKEN=your_token_here
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-DRY_RUN=false
-```
-
-## ASCII Output Compatibility
-
-For enhanced PowerShell 5.1+ compatibility across different platforms, the project uses ASCII alternatives instead of emoji characters in console output.
-
-### Console Output Mapping
-
-All emoji characters have been replaced with ASCII alternatives in square brackets:
-
-| Original Emoji | ASCII Replacement | Usage Context |
-|---------------|-------------------|---------------|
-| ✅ | `[OK]` | Successful operations and completions |
-| ❌ | `[ERROR]` | Error conditions and failures |
-| ⚠️ | `[WARN]` | Warning messages and non-critical issues |
-| 🔧 | `[CONFIG]` | Configuration and environment setup |
-| 📁 | `[COPY]` | File and directory copying operations |
-| 🚀 | `[BUILD]` / `[RELEASE]` | Build operations / GitHub releases |
-| 🔄 | `[PROCESS]` | Processing operations (changelog generation) |
-| 📦 | `[SETUP]` | Package management and setup |
-| 🔍 | `[SEARCH]` | Search and discovery operations |
-| 🎯 | `[TARGET]` | Target-specific operations |
-| 🔨 | `[ACTION]` | Build actions and operations |
-| 📊 | `[INFO]` | Information display and reporting |
-
-### Implementation Example
-
-Instead of:
+The source is `const:value` for a constant, `env:NAME` for the value of an environment variable,
+or a bare `NAME`, which also reads an environment variable. There is no default-value syntax.
+This repository's own file is a working example:
 
 ```text
-✅ Build completed successfully
-🚀 Deploying to production
-⚠️ Warning: Missing configuration
+# .build/.build.env.map
+RegistryToken=env:RegistryToken
+NotificationsWebHookUrl=env:NotificationsWebHookUrl
+ImageTag=const:build-agent
+RegistryUrl=const:ghcr.io/the-running-dev
+RegistryUser=const:the-running-dev
+CreateGitHubRelease=const:false
 ```
 
-The system outputs:
+Two rules matter in practice:
 
-```text
-[OK] Build completed successfully
-[BUILD] Deploying to production
-[WARN] Warning: Missing configuration
-```
+- A line whose source resolves to nothing is reported as `<Name> is Empty, Set <source>`. For
+  `.build.env.map` the build stops before any target runs, and for `.app.env.map` the
+  `GenerateEnvironment` target fails. Leave the line out if the value is optional.
+- A value already in the process environment is not overwritten by the generated file.
 
-This ensures consistent output across different terminal environments and PowerShell versions.
+The `.env` file in the project root is generated by the build from `.app.env.map`, for the
+application being built. The build itself does not load it, so a hand-written `.env` does not
+configure the build. To set build parameters for local runs, export the variables or use a
+mapping file.
 
-Create a `.env` file in your project root for local development:
+## Console output
+
+Build output uses plain ASCII prefixes so it renders the same in Windows PowerShell 5.1, in
+PowerShell 7 and in CI logs. The forge logger prefixes each line with the time and a level, as in
+`10:42:07 [INF] message`.
+
+| Prefix | Meaning |
+|---|---|
+| `[OK]` | A step succeeded |
+| `[ERROR]` | A step failed |
+| `[WARN]` | A problem that does not stop the build |
+| `[INFO]` | Progress information |
+| `[SKIP]` | A step that was skipped |
+| `[CONFIG]`, `[COPY]`, `[BUILD]`, `[CLEAN]`, `[DETECT]`, `[CHECK]`, `[INSTALL]`, `[CLONE]`, `[PUSH]`, `[TAG]`, `[GITHUB]` | The kind of operation that is running |
+
+## Docker
+
+### Registry login
+
+The build logs in to the registry itself, using `RegistryUrl`, `RegistryUser` and `RegistryToken`,
+so a separate `docker login` is not needed. Pass the values as arguments or environment:
 
 ```bash
-# .env file (automatically loaded by build scripts)
-GITHUB_TOKEN=your_token_here
-REGISTRY_URL=ghcr.io
-REGISTRY_USER=your_username
-REGISTRY_TOKEN=your_token_here
-VERBOSITY=Verbose
-DRY_RUN=true
-```
-
-### Build Environment Maps
-
-Use `.build.env.map` for more complex environment variable mapping:
-
-```text
-# .build.env.map
-CreateGitHubRelease=const:true
-ImageTag=env:BUILD_NUMBER,default:latest
-RegistryUrl=env:CONTAINER_REGISTRY,default:ghcr.io
-Verbosity=env:BUILD_VERBOSITY,default:Normal
-```
-
-## Docker Configuration
-
-### Container Registry Setup
-
-#### GitHub Container Registry (GHCR)
-
-```bash
-# Login to GHCR
-echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_ACTOR --password-stdin
-
-# Configure for builds
-export REGISTRY_URL=ghcr.io
-export REGISTRY_USER=$GITHUB_ACTOR
-export REGISTRY_TOKEN=$GITHUB_TOKEN
-```
-
-#### Azure Container Registry (ACR)
-
-```bash
-# Login to ACR
-az acr login --name myregistry
-
-# Configure for builds
-export REGISTRY_URL=myregistry.azurecr.io
-export REGISTRY_USER=myregistry
-export REGISTRY_TOKEN=$(az acr credential show -n myregistry --query "passwords[0].value" -o tsv)
-```
-
-#### Docker Hub
-
-```bash
-# Login to Docker Hub
-docker login -u $DOCKER_USERNAME -p $DOCKER_TOKEN
-
-# Configure for builds
-export REGISTRY_URL=docker.io
-export REGISTRY_USER=$DOCKER_USERNAME
-export REGISTRY_TOKEN=$DOCKER_TOKEN
-```
-
-### Docker Engine Configuration
-
-#### Docker Socket Access
-
-For Docker-in-Docker scenarios:
-
-```bash
-# Linux/macOS
-docker run \
+docker run --rm \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v ./:/workspace \
-  -it ghcr.io/the-running-dev/build-agent:latest \
-  build docker
-
-# Windows (Docker Desktop)
-docker run \
-  -v //var/run/docker.sock:/var/run/docker.sock \
-  -v ${PWD}:/workspace \
-  -it ghcr.io/the-running-dev/build-agent:latest \
-  build docker
+  -e RegistryToken="$GITHUB_TOKEN" \
+  ghcr.io/the-running-dev/build-agent:latest \
+  build docker --registry-url ghcr.io/my-org --registry-user my-user
 ```
 
-#### Docker Daemon Configuration
+The registry can be any that accepts a token as the password. Only the host part of `RegistryUrl`
+is used for the login.
 
-For custom Docker daemon settings, configure `/etc/docker/daemon.json`:
+### Docker daemon access
 
-```json
-{
-  "insecure-registries": ["localhost:5000"],
-  "registry-mirrors": ["https://mirror.gcr.io"],
-  "log-driver": "json-file",
-  "log-opts": {
-    "max-size": "10m",
-    "max-file": "3"
-  }
-}
-```
+A build that builds or pushes an image needs a Docker daemon. On Linux, mount the socket as shown
+above, which gives the build the same access as the user running it. Mount it only for code you
+trust, as the [compatibility page](../compatibility.md#docker-socket) says.
 
-## Node.js Configuration
+The PowerShell module passes `DOCKER_HOST` to the container from `-DockerHost`, which is mandatory
+in `Set-BuildAgentConfig`. It accepts `tcp://host:port`, `unix:///path` and
+`npipe:////./pipe/name`. For a `unix:///` value the module also mounts that socket path into the
+container.
 
-### Package Manager Detection
+## Node.js
 
-The build system automatically detects package managers:
+The build detects the package manager from the project root: `pnpm-lock.yaml` selects pnpm,
+`yarn.lock` selects yarn, and anything else selects npm. A project should keep only one lock file,
+because the code does not give both the same answer.
+
+A node build runs the commands in `.build/.build.scripts`, one per line. Lines that start with
+`npm`, `pnpm` or `yarn` run that package manager, and `bash` or `sh` lines run a shell:
 
 ```text
-Priority Order:
-1. pnpm-lock.yaml → pnpm
-2. yarn.lock → yarn  
-3. package-lock.json → npm
-4. Default → npm
-```
-
-### Custom Build Scripts
-
-Create `.build.scripts` file to override default build commands:
-
-```text
-# .build.scripts
+# .build/.build.scripts
 npm ci
 npm run lint
-npm run test
 npm run build:prod
 ```
 
-### Node.js Version Management
+With no scripts file, or an empty one, the build removes `node_modules`, then runs
+`<package manager> install` and `<package manager> run build:prod`.
 
-For projects requiring specific Node.js versions:
+The image is built on Node.js 22 and carries pnpm 10.16.0, so a project builds with the image's
+Node version, not the `engines` field of its `package.json`.
 
-```json
-// package.json
-{
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
-  }
-}
-```
+## Version numbers
 
-## Git Configuration
-
-### GitVersion Configuration
-
-Configure semantic versioning with `GitVersion.yml`:
+The build asks GitVersion for the version by running `dotnet-gitversion /output json` in the
+project root, and reads `GitVersion.yml` from there. The image ships GitVersion 6.5.1, so the file
+uses the version 6 syntax. If the project has no `.git` directory the version is `0.0.0`.
+This repository's `GitVersion.yml` is an example:
 
 ```yaml
-# GitVersion.yml
-mode: Mainline
+mode: ContinuousDelivery
+next-version: v2.0.0
+tag-prefix: v
+
 branches:
   main:
-    tag: ''
-  develop:
-    tag: 'beta'
+    regex: ^main$
+    increment: Minor
+    is-release-branch: false
   feature:
-    tag: 'alpha'
-ignore:
-  sha: []
-merge-message-formats: {}
+    regex: ^features?[/-](?<BranchName>.+)
+    increment: Inherit
+    source-branches: [main]
+  release:
+    regex: ^releases?[/-](?<BranchName>.+)
+    increment: Patch
+    source-branches: [main]
+  hotfix:
+    regex: ^hotfix(es)?[/-](?<BranchName>.+)
+    increment: Patch
+    source-branches: [main]
+  pull-request:
+    regex: ^(pull|pr)[/-](?<BranchName>.+)
+    increment: Inherit
+    source-branches: [main, feature, release, hotfix]
+    label: pr-{BranchName}
+
+commit-message-incrementing: Enabled
 ```
 
-### Git Credentials
+A file written for GitVersion 5 needs migrating, because version 6 renamed some keys and values
+(for example the branch `tag` is now `label`, and the `Mainline` mode is now `TrunkBased`). See
+the GitVersion documentation for the full list.
 
-#### Personal Access Token
+## Notifications
 
-```bash
-# Configure Git with PAT
-git config --global user.name "Your Name"
-git config --global user.email "your.email@example.com"
-git config --global credential.helper store
+Discord notifications are sent when `Notifications` is on (it is by default) and
+`NotificationsWebHookUrl` is set. They are sent for a build that is not local and not a dry run,
+or for any build when `ForceNotifications` is set. The implementation is registered through the
+[dependency injection](./dependency-injection.md) setup.
 
-# Store credentials
-echo "https://${GITHUB_TOKEN}@github.com" > ~/.git-credentials
-```
+## Running in CI
 
-#### SSH Key Authentication
-
-```bash
-# Generate SSH key
-ssh-keygen -t ed25519 -C "your.email@example.com"
-
-# Add to SSH agent
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/id_ed25519
-
-# Add public key to GitHub
-cat ~/.ssh/id_ed25519.pub
-```
-
-## Notification Configuration
-
-### Discord Notifications
-
-Configure Discord webhook notifications:
-
-```bash
-# Set Discord webhook URL
-export NOTIFICATIONS_WEBHOOK_URL="https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
-
-# Enable notifications
-export NOTIFICATIONS=true
-export FORCE_NOTIFICATIONS=false  # Only send on failures by default
-```
-
-### Custom Notification Services
-
-Extend notification system by implementing `INotifications`:
-
-```csharp
-public class SlackNotifications : INotifications
-{
-    public async Task SendSuccessAsync(string message)
-    {
-        // Implement Slack notification
-    }
-    
-    public async Task SendFailureAsync(string message)
-    {
-        // Implement Slack notification
-    }
-}
-```
-
-## Platform-Specific Configuration
-
-### Windows Configuration
-
-```powershell
-# PowerShell execution policy
-Set-ExecutionPolicy RemoteSigned -Scope CurrentUser
-
-# Windows-specific paths
-$env:ARTIFACTS_DIR = ".\artifacts"
-$env:TEMPLATES_DIR = ".\templates"
-
-# Docker Desktop configuration
-$env:DOCKER_HOST = "tcp://localhost:2375"  # If using TCP
-```
-
-### Linux Configuration
-
-```bash
-# Docker group membership
-sudo usermod -aG docker $USER
-newgrp docker
-
-# Linux-specific paths
-export ARTIFACTS_DIR="./artifacts"
-export TEMPLATES_DIR="./templates"
-
-# SELinux considerations (if applicable)
-sudo setsebool -P container_manage_cgroup on
-```
-
-### macOS Configuration
-
-```bash
-# Docker Desktop for Mac
-# Uses Docker socket at /var/run/docker.sock by default
-
-# Homebrew Node.js management
-brew install node@18
-brew link node@18
-
-# macOS-specific paths
-export ARTIFACTS_DIR="./artifacts"
-export TEMPLATES_DIR="./templates"
-```
-
-## CI/CD Platform Configuration
-
-### GitHub Actions
+Any CI system that can run `docker run` and set environment variables can run a build. The
+workflows in this repository pass the secrets like this:
 
 ```yaml
-# .github/workflows/build.yml
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  REGISTRY_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
-  NOTIFICATIONS_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK }}
-  VERBOSITY: Normal
-  DRY_RUN: false
+  RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+  NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
 ```
 
-### Azure DevOps
+`.github/workflows/ci.yml` and `release.yml` use this block, and [CI/CD](../ci-cd.md) describes the
+workflows. Other CI systems are best-effort, as the compatibility page states.
 
-```yaml
-# azure-pipelines.yml
-variables:
-  GITHUB_TOKEN: $(github-token)
-  REGISTRY_URL: $(container-registry-url)
-  REGISTRY_TOKEN: $(container-registry-token)
-  VERBOSITY: Normal
-```
+## Troubleshooting
 
-### GitLab CI
+| Symptom | Cause and fix |
+|---|---|
+| `execution of scripts is disabled on this system` when running `.\build.ps1` | PowerShell's execution policy. `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` allows local scripts |
+| `permission denied while trying to connect to Docker daemon` | The user cannot reach the daemon. On Linux, add the user to the `docker` group and start a new shell |
+| `unauthorized: authentication required` on push | `RegistryUser` or `RegistryToken` is missing or wrong, or the token cannot write to `RegistryUrl` |
+| `<Name> is Empty, Set <source>` then `Build Env Incomplete` | A mapping file line resolved to nothing. Set the variable it names, or remove the line |
+| The build ignores a `.env` file | The build never reads it. See [Mapping files and `.env`](#mapping-files-and-env) |
+| A variable such as `REGISTRY_TOKEN` has no effect | Variable names are PascalCase parameter names, for example `RegistryToken` |
 
-```yaml
-# .gitlab-ci.yml
-variables:
-  GITHUB_TOKEN: $GITHUB_TOKEN
-  REGISTRY_URL: registry.gitlab.com
-  REGISTRY_TOKEN: $CI_REGISTRY_PASSWORD
-  VERBOSITY: Normal
-```
-
-## Troubleshooting Configuration
-
-### Common Configuration Issues
-
-#### PowerShell Execution Policy
+To see what a build would do without pushing anything, run it with `--dry-run true`. Add
+`--verbosity Verbose` for more output:
 
 ```powershell
-# Error: "execution of scripts is disabled on this system"
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\build.ps1 -type docker --dry-run true --verbosity Verbose
 ```
-
-#### Docker Permission Issues
-
-```bash
-# Error: "permission denied while trying to connect to Docker daemon"
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-#### Registry Authentication
-
-```bash
-# Error: "unauthorized: authentication required"
-echo $REGISTRY_TOKEN | docker login $REGISTRY_URL -u $REGISTRY_USER --password-stdin
-```
-
-#### Environment Variable Issues
-
-```bash
-# Debug environment variables
-env | grep -E "(GITHUB|REGISTRY|DOCKER)"
-
-# Check specific variables
-echo "GITHUB_TOKEN: ${GITHUB_TOKEN}"
-echo "REGISTRY_URL: ${REGISTRY_URL}"
-```
-
-### Debugging Configuration
-
-#### Verbose Logging
-
-```bash
-# Enable verbose logging
-export VERBOSITY=Verbose
-
-# Run with debugging
-./build.ps1 -type docker --verbosity Verbose --dry-run true
-```
-
-#### Configuration Validation
-
-```powershell
-# Validate PowerShell environment
-$PSVersionTable
-Get-ExecutionPolicy
-
-# Validate Docker environment
-docker version
-docker info
-
-# Validate .NET environment
-dotnet --version
-dotnet --list-sdks
-```
-
-#### Test Configuration
-
-```bash
-# Test with minimal configuration
-docker run \
-  -v ./:/workspace \
-  -e VERBOSITY=Verbose \
-  -e DRY_RUN=true \
-  -it ghcr.io/the-running-dev/build-agent:latest \
-  build node
-```
-
-This configuration guide ensures compatibility across different environments and platforms while providing comprehensive setup instructions for all supported scenarios.

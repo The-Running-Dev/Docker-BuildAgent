@@ -1,498 +1,90 @@
 ---
 id: dependency-injection
-title: 🔧 Dependency Injection
+title: Dependency Injection
 sidebar_position: 2
 ---
 
-The Forge build system includes a comprehensive dependency injection container that manages all services, making the code more testable, maintainable, and following modern .NET best practices.
-
-## Overview
-
-The Forge build system now includes a comprehensive dependency injection container that manages all services including:
-
-- **IGitService**: Git operations and repository management
-- **IGitHubService**: GitHub API operations and release management
-- **IDockerService**: Docker operations and container management
-- **INodeService**: Node.js operations and package management
-- **INotifications**: Build notification services
-- **ILogger**: Logging services (via Microsoft.Extensions.Logging)
-
-## Key Components
-
-### 1. ServiceCollectionExtensions
-
-Located in `Common/DependencyInjection/ServiceCollectionExtensions.cs`, this class provides extension methods for configuring services:
-
-```csharp
-var services = new ServiceCollection();
-services.AddForgeServices(); // Adds core Forge services
-services.AddNotificationServices<MyNotifications>(); // Adds notification services
-```
-
-### 2. ServiceLocator
-
-Located in `Common/DependencyInjection/ServiceLocator.cs`, this provides a service locator pattern for backward compatibility:
-
-```csharp
-// Initialize once at application startup
-ServiceLocator.InitializeWithDefaultServices<NoNotifications>();
-
-// Get services anywhere in your code
-var gitService = ServiceLocator.GetRequiredService<IGitService>();
-```
-
-### 3. Base Class Integration
-
-The `Base<TParams, TNotifications>` class automatically sets up dependency injection:
-
-```csharp
-public class MyBuild : Base<MyParams, MyNotifications>
-{
-    // Services are automatically available as properties
-    // this.Git - IGitService instance
-    // this.GitHub - IGitHubService instance
-    // this.Docker - IDockerService instance
-    // this.Node - INodeService instance
-    // this.NotificationService - TNotifications instance
-}
-```
-
-## Usage Patterns
-
-### Pattern 1: Basic Build Class (Recommended)
-
-Create your build class by inheriting from `Base<TParams, TNotifications>`:
-
-```csharp
-public class MyBuild : Base<DockerParams, DiscordNotifications>
-{
-    public Target BuildTarget => _ => _
-        .Executes(async () =>
-        {
-            // Use services directly as properties
-            var currentBranch = await Git.GetCurrentBranchAsync();
-            var repositoryUrl = await Git.GetRepositoryUrlAsync();
-            
-            // Docker operations
-            await Docker.BuildImageAsync("Dockerfile", "myapp", new[] { "latest" });
-            
-            // GitHub operations
-            await GitHub.CreateReleaseAsync("v1.0.0", "Release v1.0.0", "Release notes");
-            
-            // Node.js operations
-            var packageManager = await Node.DetectPackageManagerAsync(".");
-            await Node.InstallDependenciesAsync(".", packageManager);
-        });
-}
-```
-
-### Pattern 2: Custom Service Registration
-
-Override `ConfigureServices` to add your own services:
-
-```csharp
-public class MyBuild : Base<DockerParams, DiscordNotifications>
-{
-    protected override void ConfigureServices(IServiceCollection services)
-    {
-        // Add your custom services
-        services.AddSingleton<IMyCustomService, MyCustomService>();
-        services.AddScoped<IAnotherService, AnotherService>();
-        
-        // Override existing services if needed
-        services.AddSingleton<IGitService, MyCustomGitService>();
-    }
-    
-    public Target BuildTarget => _ => _
-        .Executes(() =>
-        {
-            // Get custom services from the container
-            var customService = ServiceProvider.GetRequiredService<IMyCustomService>();
-        });
-}
-```
-
-### Pattern 3: Service Locator (For Legacy Code)
-
-Use the service locator pattern in static methods or legacy code:
-
-```csharp
-public static class LegacyBuildHelper
-{
-    static LegacyBuildHelper()
-    {
-        // Initialize once
-        if (!ServiceLocator.IsInitialized)
-        {
-            ServiceLocator.InitializeWithDefaultServices<NoNotifications>();
-        }
-    }
-    
-    public static async Task DoSomethingAsync()
-    {
-        var gitService = ServiceLocator.GetRequiredService<IGitService>();
-        var currentBranch = await gitService.GetCurrentBranchAsync();
-        // Use the service...
-    }
-}
-```
-
-### Pattern 4: Manual Container Setup
-
-For advanced scenarios, manually configure the container:
-
-```csharp
-var services = new ServiceCollection();
-
-// Add Forge services
-services.AddForgeServices();
-services.AddNotificationServices<MyNotifications>();
-
-// Add logging with custom configuration
-services.AddLogging(builder =>
-{
-    builder.AddConsole();
-    builder.AddFile("/logs/build.log");
-    builder.SetMinimumLevel(LogLevel.Debug);
-});
-
-// Add custom services
-services.AddSingleton<IMyService, MyService>();
-
-var serviceProvider = services.BuildServiceProvider();
-
-// Use services
-var gitService = serviceProvider.GetRequiredService<IGitService>();
-```
-
-## Service Interfaces
-
-### IGitService
-
-Handles Git operations including repository management, tagging, and commit operations:
-
-```csharp
-public interface IGitService
-{
-    Task<string> GetCurrentBranchAsync();
-    Task<bool> CreateTagAsync(string tagName, string message);
-    Task<bool> PushTagAsync(string tagName);
-    Task<string> GetRepositoryUrlAsync();
-}
-```
-
-### IGitHubService
-
-Manages GitHub API operations for releases and repository interactions:
-
-```csharp
-public interface IGitHubService
-{
-    Task<bool> CreateReleaseAsync(string tagName, string releaseName, string body);
-    Task<bool> UploadReleaseAssetAsync(string releaseId, string filePath);
-    Task<Repository> GetRepositoryAsync(string owner, string name);
-}
-```
-
-### IDockerService
-
-Handles Docker operations including image building, tagging, and registry operations:
-
-```csharp
-public interface IDockerService
-{
-    Task<bool> BuildImageAsync(string dockerfilePath, string imageName, string[] tags);
-    Task<bool> PushImageAsync(string imageName, string registry);
-    Task<bool> TagImageAsync(string sourceImage, string targetImage);
-}
-```
-
-### INodeService
-
-Manages Node.js operations including package management and build processes:
-
-```csharp
-public interface INodeService
-{
-    Task<string> DetectPackageManagerAsync(string workingDirectory);
-    Task<bool> InstallDependenciesAsync(string workingDirectory, string packageManager);
-    Task<bool> RunBuildScriptAsync(string workingDirectory, string script);
-}
-```
-
-## Service Lifetimes
-
-The default service registrations use the following lifetimes:
-
-- **IGitService**: Singleton (one instance per container)
-- **IGitHubService**: Singleton (one instance per container)
-- **IDockerService**: Singleton (one instance per container)
-- **INodeService**: Singleton (one instance per container)
-- **INotifications**: Singleton (one instance per container)
-- **ILogger**: Singleton (configured by Microsoft.Extensions.Logging)
-
-You can override these when registering custom services:
-
-```csharp
-services.AddScoped<IGitService, MyGitService>(); // New instance per scope
-services.AddTransient<IGitService, MyGitService>(); // New instance every time
-```
-
-## Testing with Dependency Injection
-
-The DI system makes testing much easier:
-
-```csharp
-[Test]
-public async Task TestBuildProcess()
-{
-    // Arrange
-    var services = new ServiceCollection();
-    services.AddTransient<IGitService, MockGitService>();
-    services.AddTransient<IDockerService, MockDockerService>();
-    services.AddTransient<ILogger<MyBuild>, MockLogger<MyBuild>>();
-    
-    var serviceProvider = services.BuildServiceProvider();
-    
-    var build = new MyBuild();
-    build.SetServiceProvider(serviceProvider);
-    
-    // Act
-    var result = await build.ExecuteAsync();
-    
-    // Assert
-    Assert.That(result, Is.True);
-}
-```
-
-### Mock Service Example
-
-```csharp
-public class MockGitService : IGitService
-{
-    public Task<string> GetCurrentBranchAsync() => Task.FromResult("main");
-    
-    public Task<bool> CreateTagAsync(string tagName, string message) => Task.FromResult(true);
-    
-    public Task<bool> PushTagAsync(string tagName) => Task.FromResult(true);
-    
-    public Task<string> GetRepositoryUrlAsync() => Task.FromResult("https://github.com/test/repo");
-}
-```
-
-## Migration Guide
-
-### Migrating from Static Services
-
-**Before:**
-
-```csharp
-// Old static usage
-var commits = GitService.GetCommitsSince("v1.0.0");
-var release = GitHubService.CreateRelease(parameters);
-```
-
-**After:**
-
-```csharp
-// New DI usage in build classes
-var commits = await Git.GetCommitsSinceAsync("v1.0.0");
-var release = await GitHub.CreateReleaseAsync(parameters);
-
-// Or using service locator in static contexts
-var gitService = ServiceLocator.GetRequiredService<IGitService>();
-var commits = await gitService.GetCommitsSinceAsync("v1.0.0");
-```
-
-### Updating Build Classes
-
-1. Change your base class to inherit from `Base<TParams, TNotifications>`
-2. Use the `Git`, `GitHub`, `Docker`, `Node`, and `NotificationService` properties
-3. Override `ConfigureServices` if you need custom services
-
-## Advanced Configuration
-
-### Environment-Specific Configuration
-
-Services can be configured differently based on environment:
-
-```csharp
-services.AddForgeServices(options =>
-{
-    options.GitHubApiUrl = Environment.GetEnvironmentVariable("GITHUB_API_URL") ?? "https://api.github.com";
-    options.DockerRegistry = Environment.GetEnvironmentVariable("DOCKER_REGISTRY") ?? "ghcr.io";
-});
-```
-
-### Custom Service Implementation
-
-```csharp
-public class CustomGitService : IGitService
-{
-    private readonly ILogger<CustomGitService> _logger;
-    
-    public CustomGitService(ILogger<CustomGitService> logger)
-    {
-        _logger = logger;
-    }
-    
-    public async Task<string> GetCurrentBranchAsync()
-    {
-        _logger.LogInformation("Getting current Git branch");
-        // Custom implementation
-        return "main";
-    }
-    
-    // Implement other interface methods...
-}
-```
-
-## Best Practices
-
-### 1. Interface Segregation
-
-Keep interfaces focused and small:
-
-```csharp
-// Good - focused interface
-public interface IGitTagService
-{
-    Task<bool> CreateTagAsync(string tagName, string message);
-    Task<bool> PushTagAsync(string tagName);
-}
-
-// Bad - too broad
-public interface IGitEverythingService
-{
-    // Too many responsibilities
-}
-```
-
-### 2. Dependency Injection Guidelines
-
-- **Use Constructor Injection in Custom Services**: Follow standard DI patterns
-- **Register Services at Startup**: Configure all services during container setup
-- **Use Interfaces**: Always depend on abstractions, not concrete types
-- **Dispose Properly**: The base class handles disposal, but be mindful in custom code
-- **Avoid Service Locator in New Code**: Prefer constructor injection over service locator
-- **Test with Mocks**: Use the DI system to inject mocks during testing
-
-### 3. Service Implementation
-
-```csharp
-public class GitService : IGitService
-{
-    private readonly ILogger<GitService> _logger;
-    
-    public GitService(ILogger<GitService> logger)
-    {
-        _logger = logger;
-    }
-    
-    public async Task<string> GetCurrentBranchAsync()
-    {
-        _logger.LogInformation("Getting current Git branch");
-        // Implementation
-        return await Task.FromResult("main");
-    }
-}
-```
-
-### 4. Error Handling
-
-Services should handle errors gracefully and provide meaningful logging:
-
-```csharp
-public async Task<bool> CreateReleaseAsync(string tagName, string releaseName, string body)
-{
-    try
-    {
-        _logger.LogInformation($"Creating GitHub release: {releaseName}");
-        // Implementation
-        return true;
-    }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, $"Failed to create GitHub release: {releaseName}");
-        return false;
-    }
-}
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Service Not Registered**: Ensure you've called `AddForgeServices()` or registered the service manually
-2. **Generic Constraints**: Notification services must be reference types with parameterless constructors
-3. **Disposal Issues**: Services are automatically disposed when the container is disposed
-4. **Static Context**: Use `ServiceLocator` for accessing services in static methods
-
-### Error Messages
-
-- `"Service of type X is not registered"`: Add the service to the container using `services.AddSingleton<T>()`
-- `"ServiceLocator is not initialized"`: Call `ServiceLocator.Initialize()` or `ServiceLocator.InitializeWithDefaultServices<T>()`
-- `"ServiceLocator is already initialized"`: Only initialize once, or call `ServiceLocator.Reset()` first
-
-### Debug Tips
-
-1. **Enable Verbose Logging**: Set logging level to Debug to see service resolution
-2. **Check Service Registration**: Verify services are registered in the correct order
-3. **Validate Dependencies**: Ensure all service dependencies are also registered
-4. **Use Container Validation**: Call `serviceProvider.GetRequiredService<T>()` to test registration
-
-## Migration from Legacy Code
-
-### Step 1: Identify External Dependencies
-
-Find code that directly calls external tools or APIs:
-
-```csharp
-// Legacy code
-Process.Start("git", "tag v1.0.0");
-Process.Start("docker", "build -t myapp .");
-```
-
-### Step 2: Create Service Interfaces
-
-Define interfaces for these operations:
-
-```csharp
-public interface IGitService
-{
-    Task<bool> CreateTagAsync(string tagName);
-}
-```
-
-### Step 3: Implement Services
-
-Create implementations that handle the actual work:
-
-```csharp
-public class GitService : IGitService
-{
-    public async Task<bool> CreateTagAsync(string tagName)
-    {
-        // Implementation using Process.Start or LibGit2Sharp
-        return true;
-    }
-}
-```
-
-### Step 4: Update Build Classes
-
-Inject services into build classes and use them instead of direct calls:
-
-```csharp
-public class MyBuild : Base<MyParams, MyNotifications>
-{
-    // Use this.Git instead of Process.Start("git", ...)
-    public Target CreateTag => _ => _
-        .Executes(async () =>
-        {
-            await Git.CreateTagAsync("v1.0.0");
-        });
-}
-```
-
-This dependency injection architecture provides a solid foundation for testable, maintainable build processes while maintaining backward compatibility with existing code through the service locator pattern.
+How the Forge build types get their services. This page describes the wiring and points at the
+code; the code is the authority on signatures and lifetimes, so read it before relying on this
+summary.
+
+## Where it lives
+
+| Concern | File |
+|---|---|
+| The base class every build type inherits | [`forge/Common/Base.cs`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/forge/Common/Base.cs) |
+| Service registration | [`forge/Common/DependencyInjection/ServiceCollectionExtensions.cs`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/forge/Common/DependencyInjection/ServiceCollectionExtensions.cs) |
+| The static container used by a few static code paths | [`forge/Common/DependencyInjection/ServiceLocator.cs`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/forge/Common/DependencyInjection/ServiceLocator.cs) |
+| The services themselves | [`forge/Common/Services/`](https://github.com/The-Running-Dev/Docker-BuildAgent/tree/main/forge/Common/Services) |
+| The notification implementations | [`forge/Common/Notifications/`](https://github.com/The-Running-Dev/Docker-BuildAgent/tree/main/forge/Common/Notifications) |
+
+## How a build gets its services
+
+Every build type derives from `Base<TParams, TNotifications>`, which derives from NUKE's
+`NukeBuild`. `TParams` is the build's parameter class and `TNotifications` is the notification
+implementation to register (each build type uses `DiscordNotifications`).
+
+When NUKE initializes the build, `Base` calls `InitializeDependencyInjection()`. That method:
+
+1. Registers the shared services with `AddForgeServices()`.
+2. Registers the notification implementation with `AddNotificationServices<TNotifications>()`.
+3. Calls the `ConfigureServices(IServiceCollection)` hook, which does nothing by default. A build
+   type overrides it to add its own registrations.
+4. Builds the `ServiceProvider`, which is exposed on the build as `ServiceProvider`.
+
+Both `InitializeDependencyInjection()` and `ConfigureServices()` are `protected virtual`. Each
+build gets its own provider; nothing is shared between builds.
+
+`Base` exposes the common services as properties (`GitService`, `GitHubService`,
+`NotificationService`, `Logger`) that resolve from `ServiceProvider`. The build components in
+[`forge/Common/Components/`](https://github.com/The-Running-Dev/Docker-BuildAgent/tree/main/forge/Common/Components)
+resolve the service they need from the same `ServiceProvider` rather than constructing it.
+
+## What is registered
+
+`AddForgeServices()` and `AddNotificationServices<TNotifications>()` register the services below.
+`GitService`, `GitHubService`, `NodeService` and `DockerService` are registered under both their
+concrete type and their interface, and the interface resolves to the concrete registration.
+`ChangeLogConfigService` is registered only under `IChangeLogConfigService`. The notification
+implementation is registered twice, as `INotifications` and as its own type, each a singleton.
+
+| Service | Lifetime |
+|---|---|
+| `GitService`, `GitHubService` | Singleton |
+| `ChangeLogConfigService` | Scoped |
+| `NodeService` (through `AddNodeServices()`) | Scoped |
+| `DockerService` (through `AddDockerServices()`) | Scoped |
+| The notification implementation | Singleton |
+
+It also replaces the default logging providers with a console logger that uses the `forge`
+formatter, which prints `HH:mm:ss [INF] message`.
+
+A build never creates a scope, so a scoped service resolved from the root provider behaves as one
+instance for the whole build.
+
+## The static container
+
+`ServiceLocator` is a separate, static holder for one provider. It exists for code that has no
+access to the build instance. The only production use is in `Base.Build`, which initializes it
+with the default services and uses it to mark the project directory as a safe git directory before
+the targets run. Everything else should take its services from the build's `ServiceProvider`.
+
+`DockerServiceDecorator` and `DockerSimulationService` are not registered by
+`AddForgeServices()`. Only tests use them.
+
+## Testing
+
+The tests are in `forge/Common.Tests` and use xUnit and Moq:
+
+- [`DependencyInjection/ServiceLocatorTests.cs`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/forge/Common.Tests/DependencyInjection/ServiceLocatorTests.cs)
+  covers the static container.
+- [`Build/BaseTests.cs`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/forge/Common.Tests/Build/BaseTests.cs)
+  covers `Base`, including how services are registered.
+- [`Services/`](https://github.com/The-Running-Dev/Docker-BuildAgent/tree/main/forge/Common.Tests/Services)
+  has one test class per service.
+
+To test code that depends on a service, depend on its interface (`IGitService`, `IGitHubService`,
+`IDockerService`, `INodeService`, `IChangeLogConfigService`, `INotifications`) and pass a Moq mock,
+or build a small `ServiceCollection` in the test.
+
+See the [development guide](./development-guide.md) for how to build and run the tests.
