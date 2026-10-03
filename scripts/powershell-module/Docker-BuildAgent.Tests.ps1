@@ -176,3 +176,69 @@ Describe 'Exported surface (S9.9)' {
         (Get-Command Invoke-Build).Parameters.Keys | Should -Contain 'type'
     }
 }
+
+# Every exported function must carry comment-based help that Get-Help can render: a synopsis, a
+# description, at least one example, and a description for every parameter the function declares.
+# The cases come from the manifest and the module source, so a function added later is covered
+# without editing this file.
+Describe 'Comment-based help' {
+    BeforeDiscovery {
+        $manifestPath = Join-Path $PSScriptRoot 'Docker-BuildAgent.psd1'
+        $modulePath = Join-Path $PSScriptRoot 'Docker-BuildAgent.psm1'
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($modulePath, [ref]$null, [ref]$null)
+        $definitions = @($ast.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true))
+
+        $helpCases = foreach ($name in @((Test-ModuleManifest -Path $manifestPath).ExportedFunctions.Keys | Sort-Object)) {
+            $definition = $definitions | Where-Object { $_.Name -eq $name } | Select-Object -First 1
+            $declared = @()
+            if ($definition -and $definition.Body.ParamBlock) {
+                $declared = @($definition.Body.ParamBlock.Parameters | ForEach-Object { $_.Name.VariablePath.UserPath })
+            }
+            @{
+                Name       = $name
+                Defined    = [bool]$definition
+                Parameters = @($declared | ForEach-Object { @{ Parameter = $_ } })
+            }
+        }
+    }
+
+    Context '<Name>' -ForEach $helpCases {
+        BeforeAll {
+            Import-FreshModule
+            $script:help = Get-Help -Name $Name -Full
+        }
+
+        It 'is defined in the module source' {
+            $Defined | Should -BeTrue
+        }
+
+        It 'has a synopsis' {
+            $synopsis = ([string]$script:help.Synopsis).Trim()
+            $synopsis | Should -Not -BeNullOrEmpty
+            # Without help, Get-Help substitutes the generated syntax, which starts with the command name.
+            $synopsis | Should -Not -Match ('^' + [regex]::Escape($Name) + '\s')
+        }
+
+        It 'has a description' {
+            ($script:help.Description | Out-String).Trim() | Should -Not -BeNullOrEmpty
+        }
+
+        It 'has at least one example' {
+            # Without help, Get-Help has no examples property to enumerate, so drop the null it yields.
+            @($script:help.Examples.Example | Where-Object { $_ }).Count | Should -BeGreaterThan 0
+        }
+
+        It 'describes parameter <Parameter>' -ForEach $Parameters {
+            $entry = @($script:help.Parameters.Parameter) | Where-Object { $_.Name -eq $Parameter } | Select-Object -First 1
+            $entry | Should -Not -BeNullOrEmpty
+            ($entry.Description | Out-String).Trim() | Should -Not -BeNullOrEmpty
+        }
+
+        It 'documents no parameter the function does not declare' {
+            $declared = @($Parameters | ForEach-Object { $_.Parameter.ToUpperInvariant() })
+            $definition = (Get-Command -Name $Name -Module $script:ModuleName).ScriptBlock.Ast
+            $documented = @($definition.GetHelpContent().Parameters.Keys)
+            @($documented | Where-Object { $_ -notin $declared }) | Should -BeNullOrEmpty
+        }
+    }
+}
