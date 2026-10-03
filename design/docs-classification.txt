@@ -24,8 +24,11 @@ documentation/docs/docker-templates.md	reference	design/20-contract.md	Explains 
 documentation/docs/fast-track.md	reference	design/20-contract.md	Quick start with the build command.
 documentation/docs/migration.md	reference	design/20-contract.md	Migration guide to 2.0.0 (S11).
 documentation/docs/parameters.md	reference	design/20-contract.md	Lists build parameters, which are also configuration keys.
+documentation/docs/powershell-module.md	reference	PSModule.requirements.md	The module page: install, functions and error codes.
+documentation/docs/project-configuration.md	reference	design/20-contract.md	The project configuration file: keys, precedence and rejected input.
 documentation/docs/release-notes/2.0.0.md	reference	PSModule.requirements.md	Release notes; the module change is the surface it explains.
 documentation/docs/releases.md	reference	design/20-contract.md	Release process; shows the build command.
+documentation/docs/update-tool.md	reference	design/20-contract.md	The update and rollback tool: commands and exit statuses.
 documentation/src/pages/index.md	reference	design/20-contract.md	The site landing page; mirrors the README.
 
 documentation/docs/advanced.md	non-overlapping	-	Names no protected-surface name the docs check covers.

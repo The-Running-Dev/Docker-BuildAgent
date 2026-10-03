@@ -1,0 +1,122 @@
+---
+id: powershell-module
+title: "PowerShell Module"
+sidebar_position: 14
+---
+
+Canonical contract (PowerShell module): [PSModule.requirements.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/PSModule.requirements.md)
+
+# PowerShell Module
+
+`Docker-BuildAgent` is a PowerShell module that runs a build in the build-agent image without you
+writing the `docker run` command. It supports Windows PowerShell 5.1 and PowerShell 7.
+
+## Installing
+
+:::caution Not yet published
+The module is not published to the PowerShell Gallery. Its publishing depends on an open decision,
+**U-1** in the contract (who owns the Gallery listing and its keys). Until that is settled there is
+no `Install-Module` command to run.
+:::
+
+To use it from a checkout of this repository:
+
+```powershell
+Import-Module ./scripts/powershell-module/Docker-BuildAgent.psd1
+```
+
+The module's default image is `ghcr.io/the-running-dev/build-agent:<module version>`, and 2.0.0 is
+not released yet. Until it is, pass `-DockerImage` to `Set-BuildAgentConfig` with an image that
+exists. See [Release Management](./releases.md).
+
+## What it exports
+
+| Member | Kind |
+|---|---|
+| `Set-BuildAgentConfig` | function |
+| `Invoke-Build` | function |
+| `BuildAgentConfig` | variable |
+
+## Set-BuildAgentConfig
+
+Sets the configuration that `Invoke-Build` uses for the rest of the session.
+
+```powershell
+Set-BuildAgentConfig `
+    -DockerImage "ghcr.io/the-running-dev/build-agent:latest" `
+    -DockerHost "tcp://host.docker.internal:2375" `
+    -WorkspacePath $PWD `
+    -ArtifactsDir "./artifacts" `
+    -AdditionalParameters @{ imageTag = "my-app" }
+```
+
+| Parameter | Required | Meaning |
+|---|---|---|
+| `-DockerImage` | yes | The image to run. Used exactly as given. |
+| `-DockerHost` | yes | The Docker daemon the build talks to. Must look like `tcp://host:port`, `unix:///path` or `npipe:////./pipe/name`. |
+| `-WorkspacePath` | yes | The directory to build. It is mounted at `/workspace`. It must exist. |
+| `-ArtifactsDir` | no | Output directory for the Node build types. Default `./artifacts`. |
+| `-Environment` | no | `development` (default) or `production`. Stored in the configuration; it is not passed to the build. |
+| `-AdditionalParameters` | no | A hashtable of build parameters applied to every `Invoke-Build`. |
+
+Before any call, the configuration holds defaults: the version-pinned image, `DockerHost` of
+`tcp://host.docker.internal:2375`, and an empty parameter set.
+
+## Invoke-Build
+
+Runs one build.
+
+```powershell
+Invoke-Build -type docker -buildArgs @{ imageTag = "my-app"; registryUrl = "ghcr.io/example" }
+```
+
+| Parameter | Required | Meaning |
+|---|---|---|
+| `-type` | yes | `docker`, `node`, `node-in-docker`, `node-template` or `forge`. |
+| `-buildArgs` (alias `-args`) | no | A hashtable of build parameters for this run. |
+| `-validateArgs` | no | Fail before running if a key is not a known parameter of the build type. |
+
+What it does:
+
+1. Merges the parameters from `Set-BuildAgentConfig` with `-buildArgs`. `-buildArgs` wins.
+2. For the Node build types, adds `artifactsDir` from the configuration if you did not pass it.
+3. Checks the workspace exists, then makes sure the image is present locally, pulling it if not.
+   It never substitutes a different image.
+4. Runs `docker run --rm` with the workspace mounted at `/workspace`, `DOCKER_HOST` set, and
+   `build <type>` followed by the parameters. For a `unix://` host it also mounts the socket.
+5. Turns each key into a kebab-case option (`imageTag` becomes `--image-tag`). A list becomes the
+   option repeated once per item, and a null value is left out.
+
+The build's own output streams to the console. Parameter values are not printed.
+
+A [project configuration file](./project-configuration.md) in the workspace is read by the build
+itself. Values you pass here rank above it.
+
+## Errors
+
+A failure is a terminating error. Its `FullyQualifiedErrorId` is a stable code and its
+`Exception.Data['ExitCode']` is the status a script should exit with. Match on the code, not the
+message.
+
+| Code | Exit status | Raised by | Cause |
+|---|---|---|---|
+| `WorkspaceInvalid` | 3 | both | The workspace path does not exist or is not a directory. |
+| `DockerUnavailable` | 5 | `Invoke-Build` | The Docker daemon cannot be reached. |
+| `ImageUnavailable` | 5 | `Invoke-Build` | The configured image cannot be obtained. |
+| `BuildFailed` | the container's own | `Invoke-Build` | The build exited non-zero. Its status is carried unchanged, so `2` for invalid configuration passes through. |
+
+A key that `-validateArgs` rejects raises an ordinary error naming the unknown parameters, without
+a code.
+
+```powershell
+try {
+    Invoke-Build -type docker
+}
+catch {
+    $code = $_.FullyQualifiedErrorId
+    $status = $_.Exception.Data['ExitCode']
+    exit $status
+}
+```
+
+For what changed in 2.0.0, see the [migration guide](./migration.md).
