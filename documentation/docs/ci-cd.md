@@ -137,7 +137,7 @@ jobs:
         run: build docker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
 ```
 
 ## 🟢 Node.js App
@@ -167,7 +167,7 @@ jobs:
         run: build node
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
 ```
 
 ## 🟢 🐳 Node.js App in a Docker Image
@@ -195,7 +195,7 @@ jobs:
         run: build node-in-docker
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.GITHUBPACKAGESTOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
 ```
 
 ## 📝 Changelog Generation

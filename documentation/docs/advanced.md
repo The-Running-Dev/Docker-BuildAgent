@@ -7,11 +7,13 @@ sidebar_position: 9
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
 You can run any tool in the image for a reproducible environment, and you can run the `build` command with
-selected targets.
+selected targets. A `build docker` run builds an image, so it needs the host's Docker socket mounted into the
+container; without it the Docker CLI inside the image has no daemon to talk to and the build fails.
 
 ```bash
 docker run --rm -it \
     -v "${PWD}:/workspace" \
+    -v /var/run/docker.sock:/var/run/docker.sock \
     -w "/workspace" \
     ghcr.io/the-running-dev/build-agent:latest build docker
 ```

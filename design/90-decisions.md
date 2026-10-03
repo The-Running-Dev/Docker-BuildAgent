@@ -41,7 +41,7 @@ Every entry below, newest first, by date and title. The entries are not edited; 
 - 2026-08-21 — Retain the existing broad `.claude/` ignore
 
 ## Open
-<A staging area, not a home. Things noticed mid-slice that were deliberately not acted on. `/track` turns each into a GitHub issue and removes it from here. An item that is a *decision* rather than a *todo* belongs below as an entry, not in an issue.>
+_A staging area, not a home. Things noticed mid-slice that were deliberately not acted on. `/track` turns each into a GitHub issue and removes it from here. An item that is a *decision* rather than a *todo* belongs below as an entry, not in an issue._
 
 ---
 

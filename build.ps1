@@ -8,7 +8,7 @@
     This PowerShell script provides a convenient wrapper around the Forge build system for local development.
     It compiles the .NET solution and then executes the specified build type using the Forge executables.
     
-    The script supports multiple build types (docker, node, node-in-docker, node-template) and can pass
+    The script supports multiple build types (docker, forge, node, node-in-docker, node-template) and can pass
     additional arguments to the underlying build system. It automatically manages artifacts directory
     creation and solution compilation before executing the build workflow.
 
@@ -20,6 +20,7 @@
 .PARAMETER type
     Specifies the build type to execute. Valid values are:
     - 'docker' (default): Docker image build process
+    - 'forge': Change log generation
     - 'node': Node.js application build process  
     - 'node-in-docker': Combined Node.js + Docker build process
     - 'node-template': Documentation site build using templates

@@ -20,7 +20,7 @@
     This script takes no parameters. Configuration is hardcoded for consistency.
 
 .EXAMPLE
-    .\build-docs.ps1
+    .\docs.ps1
     
     Builds the documentation and starts a development server at http://localhost:3000
 
