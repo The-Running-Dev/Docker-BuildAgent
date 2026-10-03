@@ -7,7 +7,7 @@ runs:
     # Run all tests with coverage collection
     - name: Run Tests & Generate Coverage
       run: |
-        dotnet test forge/Common.Tests/Common.Tests.csproj \
+        dotnet test forge/Forge.sln \
           --configuration Release \
           --collect:"XPlat Code Coverage" \
           --results-directory ./test-results \
