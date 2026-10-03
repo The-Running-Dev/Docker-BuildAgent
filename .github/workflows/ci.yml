@@ -1,54 +1,35 @@
 
 # Continuous Integration Workflow
 #
-# This workflow provides automated testing and validation for the Docker Build Agent project.
-# It runs on pull requests and feature branch pushes to ensure code quality and build integrity
-# before changes are merged to the main branch.
+# Validates a change before it is merged. It never publishes anything.
 #
-# Workflow Configuration:
-#   - Name: CI
-#   - Triggers: 
-#     * Manual dispatch (workflow_dispatch)
-#     * Pull requests to any branch
-#     * Pushes to any branch except main
-#   - Ignores: Changes only to documentation/ and .github/ directories
-#   - Permissions: packages:write, contents:write, checks:write, pull-requests:write
+# Triggers:
+#   - Pull requests (any target branch)
+#   - Manual dispatch (workflow_dispatch)
+#   It does not run on pushes to feature branches: open a pull request, or dispatch it by hand.
+#   There is no path filter, so documentation-only changes run it too.
 #
-# Build Process:
-#   1. Skip duplicate actions to optimize CI resources
-#   2. Checkout repository with full git history (fetch-depth: 0)
-#   3. Execute shared setup actions (.github/actions/common)
-#   4. Run all tests with coverage collection and inline reporting
-#   5. Generate and publish coverage reports to PRs and workflow summary
-#   6. Run Docker build in dry-run mode for validation
+# Jobs:
+#   - ModuleTests: calls module-tests.yml (Pester on Windows PowerShell 5.1 and PowerShell 7).
+#   - DocsCheck: runs forge/DocsCheck and the site home page check; fails the pull request when a
+#     document names something the repository does not have, or the home page has drifted from README.md.
+#   - Build ("Build & Validate"): runs after ModuleTests.
+#       1. Skips duplicate runs for the same content (skip-duplicate-actions)
+#       2. Checks out the repository with full history and submodules
+#       3. Runs the shared setup action (.github/actions/common)
+#       4. Runs every test project in forge/Forge.sln with coverage (.github/actions/tests): test
+#          results as a check run, a coverage summary as a sticky pull request comment, and the
+#          coverage report as a workflow artifact
+#       5. Dry-runs the Docker build (nuke --type docker --dry-run true)
+#       6. Builds the documentation site from docs-template without deploying it
 #
-# Testing & Coverage:
-#   - Executes all test projects using dotnet test with XPlat Code Coverage
-#   - Generates TRX test result files for inline display
-#   - Creates HTML and Cobertura coverage reports
-#   - Publishes test results as GitHub check runs
-#   - Posts coverage summaries as PR comments
-#   - Uploads detailed coverage reports as workflow artifacts
+# Environment (Build job, dry-run step):
+#   - GITHUB_TOKEN, RegistryToken, NotificationsWebHookUrl
 #
-# Environment Variables:
-#   - GITHUB_TOKEN: GitHub authentication for API access and check runs
-#   - RegistryToken: Container registry authentication token  
-#   - NotificationsWebHookUrl: Discord webhook for build notifications
+# Permissions: packages:write, contents:write, checks:write, pull-requests:write
 #
-# Purpose:
-#   - Validate builds without publishing artifacts
-#   - Run comprehensive test suites with coverage analysis
-#   - Test Docker image creation and build processes
-#   - Ensure changes don't break existing functionality
-#   - Provide fast feedback on pull requests with inline results
-#
-# Notes:
-#   - Uses dry-run mode to prevent accidental deployments
-#   - Runs only for non-main branches and pull requests
-#   - Skips execution if only documentation files changed
-#   - Includes duplicate action prevention for resource optimization
-#   - Test results appear directly in PR checks and workflow summary
-#   - Coverage reports are posted as sticky PR comments
+# Publishing is done by build.yml (a push to main) and by release.yml and release-tag.yml
+# (releases); see documentation/docs/ci-cd.md and documentation/docs/releases.md.
 #
 name: CI
 
@@ -84,6 +65,10 @@ jobs:
       # discovery location the tree and surface manifest lack, or breaks the canonical-contract rules.
       - name: Check Documentation Names
         run: dotnet run --project forge/DocsCheck -c Release -- .
+
+      # The site home page is generated from README.md; fails when the two have drifted apart.
+      - name: Check Site Home Page Matches README
+        run: pwsh scripts/sync-site-home.ps1 -Check
 
   Build:
     needs: ModuleTests
