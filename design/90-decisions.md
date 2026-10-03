@@ -2,6 +2,44 @@
 
 Append-only. Newest at the top. The rejected alternatives are the point — without them, every future session relitigates the same choice.
 
+## Index
+
+Every entry below, newest first, by date and title. The entries are not edited; this list follows them.
+
+- 2026-09-29 — The build path owes the call into Config; the contract stands and issue #11 stays open until it lands
+- 2026-09-28 — Retire the per-repo `tools/` kit copies; the machine-wide kit's tools are authoritative
+- 2026-09-28 — Record this repository's documents and every decision-log entry in `design/state/`
+- 2026-09-27 — `Config` takes `YamlDotNet` as a product dependency, promoted from test-only
+- 2026-09-25 — S3's `ReleasePipeline` ships as a standalone, fully-tested library; the live `nuke` release target still calls the old create-or-update path
+- 2026-09-21 — S2.14 and S2.15 cannot be honored as worded: neither a renamed container nor a retagged image can be given a label after creation
+- 2026-09-21 — Delete the stale per-repo kit-command copies and retire the infrastructure built around them
+- 2026-09-21 — `/sync` to kit v2026.09.20: add one lesson to `agent.md`; `codex/PROFILES.md` divergence was a CRLF/LF false positive
+- 2026-09-20 — A push to `main` moves `latest` only; versioned tags come only from releases
+- 2026-09-20 — The PowerShell module's default image pins to the module's own version
+- 2026-09-20 — "Direct invocation" means a packaged host-invokable tool, not host-side builds
+- 2026-09-20 — Automated update-path verification is Linux-only; Windows host coverage is a stated gap
+- 2026-09-20 — An unreadable update-log line refuses every update on that host
+- 2026-09-20 — Compatibility evidence stays readable, and an item never leaves the manifest quietly
+- 2026-09-20 — Product-owned Docker objects are named by hash and attributed by label
+- 2026-09-20 — The project configuration file is `buildagent.{yml,yaml,json}` with one spelling per key
+- 2026-09-19 — Collapse AGENTS.md to a pointer at the current AgentKit install
+- 2026-09-19 — The surface gate fails on any manifest difference it does not name compatible
+- 2026-09-19 — An update refuses a container whose replacement cannot be created faithfully
+- 2026-09-19 — A stale update lock is reported, never taken over, and the pull moves outside it
+- 2026-09-19 — Update lock is keyed on the container name, not the container id
+- 2026-09-17 — Surface baseline is the manifest attached to the previous published release
+- 2026-09-17 — Configuration precedence places module config and map files explicitly
+- 2026-09-17 — One configuration validator shared by every build type
+- 2026-09-17 — Container update restores by renaming the original container back
+- 2026-09-17 — Update lock is a never-started container at the daemon
+- 2026-09-17 — Release existence is a draft-release claim bound to a commit
+- 2026-09-17 — Global tool launches the versioned image
+- 2026-09-17 — Maintain Docker-BuildAgent as a supported public product
+- 2026-09-17 — Protect public surfaces with semantic versions and immutable tags
+- 2026-09-17 — Retain and define all four unresolved feature issues
+- 2026-08-21 — Install the two AgentKit session hooks
+- 2026-08-21 — Retain the existing broad `.claude/` ignore
+
 ## Open
 <A staging area, not a home. Things noticed mid-slice that were deliberately not acted on. `/track` turns each into a GitHub issue and removes it from here. An item that is a *decision* rather than a *todo* belongs below as an entry, not in an issue.>
 
