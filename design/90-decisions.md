@@ -6,6 +6,12 @@ Append-only. Newest at the top. The rejected alternatives are the point — with
 
 Every entry below, newest first, by date and title. The entries are not edited; this list follows them.
 
+- 2026-10-04 — A sink's identity is recorded just before it is written, and a package is identified by its content without the repository signature
+- 2026-10-04 — A re-run for a published release's own commit moves only `latest`
+- 2026-10-03 — `latest` moves last, after the release is published
+- 2026-10-03 — The release claim records each artifact's identity, and a resume skips a sink only on a match
+- 2026-10-03 — The release claim starts with an atomic git ref
+- 2026-10-03 — The Updater owns its webhook notifier and depends on no Build-types code
 - 2026-09-29 — The build path owes the call into Config; the contract stands and issue #11 stays open until it lands
 - 2026-09-28 — Retire the per-repo `tools/` kit copies; the machine-wide kit's tools are authoritative
 - 2026-09-28 — Record this repository's documents and every decision-log entry in `design/state/`
@@ -42,6 +48,46 @@ Every entry below, newest first, by date and title. The entries are not edited; 
 
 ## Open
 _A staging area, not a home. Things noticed mid-slice that were deliberately not acted on. `/track` turns each into a GitHub issue and removes it from here. An item that is a *decision* rather than a *todo* belongs below as an entry, not in an issue._
+
+---
+
+### 2026-10-04 — A sink's identity is recorded just before it is written, and a package is identified by its content without the repository signature
+Context: `20-contract.md` U-13, raised while applying the 2026-10-03 decision on F4. That decision recorded every artifact's identity at build time, but a resume rebuilds, and neither the image nor the packages are built byte-reproducibly, so a resume's identities never matched the ones recorded. Separately, nuget.org adds a repository signature to a package on upload, so the package it serves has a different SHA-256 from the one pushed.
+Chosen: The build computes identities and records none. At the versioned-sink step, every sink that already holds the version is compared against the identity the claim records for it, and a sink with no recorded identity does not match. For each sink that does not hold the version, the run records this build's identity in the claim immediately before writing it. A rebuild therefore never replaces the identity of a sink that holds the version. A package's identity is its content hash: the SHA-256 over its entries in ordinal path order, each taken as its path and content, excluding the repository signature file `.signature.p7s`. The image's identity stays its registry digest. This replaces the step at which the 2026-10-03 decision on F4 records identities; that entry's other terms stand.
+Rejected: Require byte-reproducible builds — the image layers and the package archives carry timestamps from several tools, and the guarantee would rest on every tool in the chain. Compare the SHA-256 of the file as served — it differs from the one pushed on any feed that signs on upload. Trust the hash the feed reports — the feed's hash is of its signed copy, and reading it ties the check to one feed's API.
+Reversibility: expensive — the identities and the hash definition become part of every claim a published release carries.
+
+### 2026-10-04 — A re-run for a published release's own commit moves only `latest`
+Context: `20-contract.md` U-14, raised while applying the 2026-10-03 decision on F8. That decision fixed a failed `latest` move by re-running it, but a re-run of the release pipeline refused a published version as existing (I5), only CI may write (I14), and nothing re-ran the move alone.
+Chosen: A release run that finds the version already published for its own commit takes a completion path instead of refusing. It checks that the git tag points at the commit and that every versioned sink holds the version with the identity the claim records, then moves `latest` and stops. A sink that does not match fails as `SinkArtifactMismatch`. A version that is not the highest published release is refused as `VersionAlreadyExists`, so a re-run never moves `latest` back. The path writes no versioned sink, so I5 holds; it runs in CI like any release, so I14 holds.
+Rejected: A separate workflow or command that moves `latest` to a named version — a second writer of a public surface, with its own permissions and no claim to check against. Treat a stale `latest` as acceptable until the next release — consumers of `latest` stay on the previous version for an unbounded time. Let a maintainer retag by hand — I14 forbids writing a sink outside CI.
+Reversibility: cheap — the completion path is local to the pipeline's existence check, and removing it restores the refusal.
+
+---
+
+### 2026-10-03 — `latest` moves last, after the release is published
+Context: Red-team finding F8 (`design/redteam/2026-09-19-10-design.md`), held as `20-contract.md` U-9. `10-design.md` § Control flow 2 moved `latest` at step 7 with the versioned sinks, before the fallible git-tag creation and release publication at step 8, so a failure there left consumers of `latest` on a version whose claim was still a draft, contradicting I4. `forge/Release/ReleasePipeline.cs` encodes the same order: `ImageLatestTag` is the last member of the sink loop, before `PublishAsync`.
+Chosen: The order is the versioned sinks (image tag, global tool, PowerShell module), then the git tag if absent, then publish the release, then move `latest`. A failure to move `latest` after the release is published leaves a complete release and is fixed by re-running the move, because `latest` is movable. This replaces the order in the 2026-09-17 entry on release existence, which moved `latest` before tagging and publishing; that entry's other terms stand. I4 stands as written; its note on the tension is removed. How the move alone is re-run is `20-contract.md` U-14.
+Rejected: Keep `latest` with the versioned sinks and weaken I4 to allow a draft release behind `latest` — the partial-publish guarantee is the one consumers of `latest` can observe, and it would no longer hold. Move `latest` after the git tag but before publishing the release — publishing is itself fallible, so the contradiction narrows and stays.
+Reversibility: cheap — no code is wired to a workflow yet (#96), and the change is one step's position in `ReleasePipeline`.
+
+### 2026-10-03 — The release claim records each artifact's identity, and a resume skips a sink only on a match
+Context: Red-team finding F4, held as `20-contract.md` U-6. A claim recorded the version, commit, state, notes and manifest, but nothing that showed an artifact already in a sink was produced under it. A resume either trusted any artifact carrying the version, which can assemble one release from artifacts of different commits, or could not tell a legitimate resume from an orphaned or externally published artifact.
+Chosen: At step 5 each artifact's identity — the image digest, the global tool package's SHA-256 and the PowerShell module package's SHA-256 — is recorded, and the claim carries it. At step 7 a sink that already holds the version is skipped only when its artifact's identity matches the claim's. On a mismatch the run fails with a named error, `SinkArtifactMismatch`, naming the sink, and writes nothing; every sink holding the version is compared before any sink is written. How a resume that rebuilds its artifacts compares them is `20-contract.md` U-13.
+Rejected: Per-sink completion flags without identities — a flag says a step ran, not which artifact the sink holds, so an externally published artifact under the version is indistinguishable from this claim's. Relying on feeds rejecting a duplicate — the brief forbids depending on the registry, and the image registry overwrites tags. Refusing every resume where a sink already holds the version — strands every partial publish, because published versions cannot be withdrawn.
+Reversibility: expensive — the identities become part of every claim a published release carries, and a resume of any release cut under this rule depends on them.
+
+### 2026-10-03 — The release claim starts with an atomic git ref
+Context: Red-team finding F5, held as `20-contract.md` U-7. The existence check and the draft creation were separate API calls, and `10-design.md` permitted two drafts in that window, so the claim was called a concurrency backstop it could not be. Two runs that bypassed or misconfigured the CI concurrency group could both reach publication for one version from different commits.
+Chosen: The claim starts by creating the git ref `refs/release-claims/v<version>` at the commit, through the refs API, which refuses a ref that already exists. The draft release follows. A ref at another commit refuses the run; a ref at the same commit is a resume. The CI concurrency group stays as the first guard, and the ref is the second.
+Rejected: The concurrency group alone, dropping the claim as a backstop — a workflow added without the group bypasses it, which is the case the backstop exists for. Creating the draft and then re-listing drafts so the earlier one wins — two runs can each list before the other's draft is visible, so the race moves rather than closes. Claiming with the version tag `refs/tags/v<version>` — the tag-triggered workflow starts from a tag that already exists, and the tag is the public product of step 8, not a lock.
+Reversibility: cheap — the ref lives outside the default fetch refspecs, and removing it from the claim is local to the claim store.
+
+### 2026-10-03 — The Updater owns its webhook notifier and depends on no Build-types code
+Context: Red-team finding F6, held as `20-contract.md` U-8. `10-design.md` § Module boundaries declared the global tool a launcher sharing no code with Build types, and also declared that the Updater inside it depends on Notifications, a service within Build types. Packaging the tool would have to break one of the two. `forge/Update/Update.csproj` has no project references today.
+Chosen: Drop the Updater → Notifications edge. The Updater has its own small webhook sender, which shares only the webhook setting's name with the notifications in Build types, and no code. I44 binds both senders.
+Rejected: Move Notifications into a shared library both depend on — puts a package reference across the launcher boundary for a sender a few dozen lines long, and couples the host tool's release to build-internal changes. Let the tool reference Build types for notifications — breaks the launcher boundary outright and carries the build's dependencies onto both host platforms. Drop notification from the update command — `--notify` is part of the update command's contract.
+Reversibility: cheap — a sender this small can be replaced by a shared one later without changing any public surface.
 
 ---
 
