@@ -59,16 +59,66 @@ public sealed class Updater
     private readonly UpdateLogStore _log;
     private readonly IUpdateClock _clock;
     private readonly UpdaterIdentity _identity;
+    private readonly IUpdateNotifier _notifier;
 
-    public Updater(IDockerRuntime runtime, UpdateLogStore log, IUpdateClock clock, UpdaterIdentity identity)
+    public Updater(IDockerRuntime runtime, UpdateLogStore log, IUpdateClock clock, UpdaterIdentity identity,
+        IUpdateNotifier? notifier = null)
     {
         _runtime = runtime;
         _log = log;
         _clock = clock;
         _identity = identity;
+        _notifier = notifier ?? new WebhookUpdateNotifier();
     }
 
-    public async Task<UpdateOutcome> RunAsync(string containerName, string? imageReference, UpdateOptions options)
+    /// <summary>Runs the update and, when <paramref name="notifyUrl"/> is given (<c>--notify</c>), sends the
+    /// notification after the outcome is logged (design/10-design.md § Control flow 3, step 13). Notification is
+    /// best effort: it never changes the returned outcome, and the URL never appears in any output (I44). A refusal
+    /// throws before any outcome exists and is not notified.</summary>
+    public async Task<UpdateOutcome> RunAsync(string containerName, string? imageReference, UpdateOptions options,
+        string? notifyUrl = null)
+    {
+        var outcome = await RunUpdateAsync(containerName, imageReference, options);
+
+        if (notifyUrl != null)
+        {
+            await NotifyAsync(notifyUrl, new UpdateNotification(containerName, outcome));
+        }
+
+        return outcome;
+    }
+
+    /// <summary>Sends one notification and turns every way it can fail into a warning that carries no URL. Nothing
+    /// here throws, so it cannot change the exit status (I44).</summary>
+    private async Task NotifyAsync(string notifyUrl, UpdateNotification notification)
+    {
+        UpdateNotificationResult result;
+        if (string.IsNullOrWhiteSpace(notifyUrl))
+        {
+            result = UpdateNotificationResult.NotConfigured();
+        }
+        else
+        {
+            try
+            {
+                result = await _notifier.SendAsync(notifyUrl, notification);
+            }
+            catch (Exception ex)
+            {
+                // Only the type: the message of a transport exception can carry the URL.
+                result = UpdateNotificationResult.DeliveryFailed(
+                    $"The webhook could not be reached ({ex.GetType().Name}).");
+            }
+        }
+
+        if (result.Error is { } error)
+        {
+            await Console.Error.WriteLineAsync(
+                $"Warning: the update notification was not sent. {error.Message} ({error.Code})");
+        }
+    }
+
+    private async Task<UpdateOutcome> RunUpdateAsync(string containerName, string? imageReference, UpdateOptions options)
     {
         // Refuses every update on the host until corrected (S2.19) — checked first and unconditionally.
         var initialLogState = _log.ReadState();

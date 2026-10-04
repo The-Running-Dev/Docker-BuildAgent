@@ -80,6 +80,12 @@ public static class UpdateCommandLine
                     notifyUrl = RequireValue(args, ref i, arg);
                     break;
                 default:
+                    if (arg.StartsWith("--notify=", StringComparison.Ordinal))
+                    {
+                        // The rejected text is not echoed: this form carries the webhook URL (I44).
+                        throw new UpdateCommandLineException("Unrecognized option '--notify=...'; use '--notify <url>'.");
+                    }
+
                     if (arg.StartsWith("--", StringComparison.Ordinal))
                     {
                         throw new UpdateCommandLineException($"Unrecognized option '{arg}'.");
@@ -87,7 +93,10 @@ public static class UpdateCommandLine
 
                     if (containerName != null)
                     {
-                        throw new UpdateCommandLineException($"Unexpected extra argument '{arg}'.");
+                        // A URL is not echoed: a stray one may be the webhook URL (I44).
+                        throw new UpdateCommandLineException(arg.Contains("://", StringComparison.Ordinal)
+                            ? "Unexpected extra argument."
+                            : $"Unexpected extra argument '{arg}'.");
                     }
 
                     containerName = arg;

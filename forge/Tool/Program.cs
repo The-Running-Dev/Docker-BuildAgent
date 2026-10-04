@@ -73,7 +73,7 @@ static async Task<int> RunUpdateAsync(IDockerRuntime runtime, UpdateLogStore log
 
     try
     {
-        var outcome = await updater.RunAsync(run.ContainerName, run.ImageReference, options);
+        var outcome = await updater.RunAsync(run.ContainerName, run.ImageReference, options, run.NotifyUrl);
         return UpdateExitCode.ForOutcome(outcome);
     }
     catch (UpdateException ex)

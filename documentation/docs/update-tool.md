@@ -30,7 +30,7 @@ yet.
 | `--image <reference>` | The image to move to. Default: the container's own image reference, looked up again so a moved tag is picked up. |
 | `--health-timeout <duration>` | How long to wait for the replacement to report healthy. A bare number is seconds; `120s`, `2m` and `1h` also work. Default 120 seconds. Must be greater than zero. |
 | `--no-restore` | Leave the replacement in place if it is unhealthy instead of restoring the original. It does not apply when the replacement cannot be created: the original is always restored then. |
-| `--notify <url>` | Accepted, but has no effect yet: the tool does not send a notification today. |
+| `--notify <url>` | After the outcome is logged, post a notification for it to this webhook. A notification that fails, times out (10 seconds) or has no URL prints a warning without the URL and never changes the exit status. A refused update has no outcome and sends none. |
 | `--clear-lock` | Remove the update lock for `<container>` and do nothing else. It accepts no other option. |
 
 If the image already matches the running container, the tool reports success and changes nothing.
