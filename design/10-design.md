@@ -17,17 +17,18 @@ Input: [`00-brief.md`](00-brief.md). Decisions made here are logged in [`90-deci
 The record that settles whether a version exists. It exists so the check does not rest on any single sink enforcing it.
 
 - **Identity:** the version.
-- **Fields:** the version, the commit SHA it was claimed for, state (claimed or published), the assembled release notes, the surface manifest (below), and each artifact's identity: the image digest, the global tool package's SHA-256 and the PowerShell module package's SHA-256.
+- **Fields:** the version, the commit SHA it was claimed for, state (claimed or published), the assembled release notes, the surface manifest (below), and each versioned sink's artifact identity: the image digest, the global tool package's content hash and the PowerShell module package's content hash.
+- **Artifact identity:** recorded for a sink immediately before every write to that sink, so a sink that holds the version always has the identity of the artifact this claim wrote there; a rebuild never replaces the identity of a sink that already holds the version (2026-10-04 decision). A package's content hash is the SHA-256 over its entries in ordinal path order, each taken as its path and content, excluding the repository signature file `.signature.p7s`, so a feed that signs a package on upload serves the same identity it was pushed with.
 - **Persisted as:** a git ref `refs/release-claims/v<version>` pointing at the commit, and a GitHub release. The ref is created first, through the refs API, which refuses a ref that already exists, so of two runs claiming one version only one creates it. The release is a draft while claimed and becomes a normal release when published. Nothing else is persisted, and nothing is held in memory across runs.
 - **Lifecycle:** claimed before any sink is written, then published after every versioned sink holds the version.
   - A ref at the same commit is a resumable claim; a draft for the same SHA, or no draft yet, resumes under it.
-  - A ref at another commit, a draft for another SHA, or a published release means the version exists.
+  - A ref at another commit, a draft for another SHA, or a published release means the version exists. A published release for the run's own commit admits only the completion re-run in Control flow 2, step 2, which moves `latest` and writes nothing else.
 - **Derived:** "the version exists" is true when any of these holds:
   - a published release exists;
   - a claim ref or a draft exists for a different SHA;
   - any sink holds the version without a matching claim.
 
-  Sinks are read, not trusted to refuse. A sink artifact matches the claim only when its identity equals the identity the claim records for that sink.
+  Sinks are read, not trusted to refuse. A sink artifact matches the claim only when its identity equals the identity the claim records for that sink; a sink holding the version with no recorded identity does not match.
 
 ### Surface manifest
 
@@ -163,6 +164,7 @@ Steps 1–5 write nothing. The first write is step 6.
 
 1. Run tests. Compute or validate the version.
 2. **Refuse** if the version exists (derived rule in *Release claim*), if its major is below the current major, or if a version tag already points at a different commit.
+   - **Completion re-run:** when the version's release is already published for this commit, the run does not refuse and does not publish. It checks that the git tag points at this commit and that every versioned sink holds the version with the identity the claim records, then performs step 9 alone and stops (2026-10-04 decision). A sink that does not match fails with `SinkArtifactMismatch`; a version that is not the highest published release is refused as `VersionAlreadyExists`, so a re-run never moves `latest` back to an older release. This writes no versioned sink, so I5 holds.
 3. Derive the surface manifest. Load the baseline, which is the manifest asset of the highest published release below this version.
    - **Fail** on *any* difference from the baseline unless the major increases, except the compatible set: adding an item, marking an existing item deprecated, and adding a supported schema version.
    - **Fail** on removal of an item the baseline did not already mark deprecated, at any major.
@@ -170,13 +172,13 @@ Steps 1–5 write nothing. The first write is step 6.
 
    The rule is a whitelist so that it cannot fall behind the manifest: a list of forbidden differences leaves each field later added to the manifest unchecked, and reports nothing when it does.
 4. Assemble release notes. Mechanically detected breaking changes and deprecations are inserted into their sections. **Fail** if either section heading is missing from the final body. An empty section carries an explicit "none".
-5. Build every artifact with the version stamped in, and record each artifact's identity for the claim: the image digest, the global tool package's SHA-256 and the PowerShell module package's SHA-256. Nothing is pushed yet.
-6. **Claim:** create the ref `refs/release-claims/v<version>` at the commit through the refs API, then the draft release bound to the commit SHA, with notes, manifest and artifact identities attached.
+5. Build every artifact with the version stamped in, and compute each artifact's identity: the image digest and the two packages' content hashes. Nothing is pushed or recorded yet. Builds are not byte-reproducible, so a resume computes new identities here; step 7 uses them only for sinks that do not yet hold the version.
+6. **Claim:** create the ref `refs/release-claims/v<version>` at the commit through the refs API, then the draft release bound to the commit SHA, with notes and manifest attached.
    - **The ref exists at this commit:** this is a resume; continue under it, creating the draft if it is absent.
    - **The ref exists at another commit:** refuse. Another run holds the version.
-7. Publish to the versioned sinks in a fixed order: image versioned tag, global tool, PowerShell module. A sink that already holds this version is skipped, not rebuilt, **only when its artifact's identity matches the one the claim records**; this is what makes a retry resume. Every sink that already holds the version is compared before any sink is written, and a mismatch fails with `SinkArtifactMismatch` naming the sink, with nothing written by this run.
+7. Publish to the versioned sinks in a fixed order: image versioned tag, global tool, PowerShell module. A sink that already holds this version is skipped, not rebuilt, **only when its artifact's identity matches the one the claim records**; this is what makes a retry resume. Every sink that already holds the version is compared before any sink is written, and a mismatch fails with `SinkArtifactMismatch` naming the sink, with nothing written by this run. For each sink that does not hold the version, the run records this build's identity for it in the claim, then writes it.
 8. Create the git tag if absent, then publish the release. The docs-site build dispatch follows.
-9. Move `latest` to this version. It moves last, so a release that is not yet published never moves it (I4). A failure here leaves a complete, published release and a stale `latest`, which is fixed by re-running the move: `latest` is movable.
+9. Move `latest` to this version. It moves last, so a release that is not yet published never moves it (I4). A failure here leaves a complete, published release and a stale `latest`, which is fixed by re-running the release for the same commit: the completion re-run in step 2 performs this step alone.
 
 ### 3. An operator updates a named container (global tool)
 
@@ -338,7 +340,7 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 - **Detection:** the move's exit status.
 - **System response:** fail, naming `latest` as the one sink not moved.
 - **State left behind:** a complete, published release; `latest` still names the previous version.
-- **Retry semantics:** re-run the move. `latest` is movable, so the re-run changes nothing else.
+- **Retry semantics:** re-run the release workflow for the same commit. It finds the release published, checks the git tag and every versioned sink against the claim, and moves `latest` alone (Control flow 2, step 2, completion re-run). It writes no versioned sink, and it refuses when a newer release has been published since.
 
 **GitHub API**
 
@@ -459,14 +461,14 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
   1. existence check;
   2. surface gate;
   3. notes gate;
-  4. build, recording artifact identities;
+  4. build, computing artifact identities;
   5. claim: the ref, then the draft;
-  6. versioned sinks;
+  6. versioned sinks, each recorded in the claim just before it is written;
   7. git tag;
   8. publish the release;
   9. move `latest`.
 
-  This order means a failure before the claim leaves nothing behind, a failure after it is resumable, and a failure moving `latest` leaves a complete release.
+  This order means a failure before the claim leaves nothing behind, a failure after it is resumable, and a failure moving `latest` leaves a complete release that a completion re-run finishes.
 - **Container updates:** updates of **different** containers may run concurrently; each takes its own lock. Updates of the **same** container must not — same meaning the same container *name*, which is the identity the operator supplies and the identity the lock is keyed on, so the lock holds for the whole update even across step 8's rename and re-create. The daemon-side lock enforces this across processes and across machines using the same daemon. The section the lock covers is bounded, because the registry pull sits outside it. A lock is never taken over while it exists, so there is no path by which two processes both believe they hold it; a past-deadline lock is evidence for an operator, not permission for the next update.
 - **Update steps:** strictly sequential within one update. The start entry is flushed before the first change, and the lock is released only after the outcome entry is written.
 - **Launchers and image version:** a launcher pins one image version per invocation. Concurrent invocations with different launcher versions run different images, which is safe because image versions are immutable.

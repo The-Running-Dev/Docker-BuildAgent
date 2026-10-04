@@ -151,8 +151,9 @@ Do not republish it. Pick a new version: push a new commit, or a new tag.
 **A release fails partway**
 
 Do not delete the tag, the release or the images, and do not re-create them. A published version
-is immutable, and no failure path deletes anything. How a partly published version is resumed is
-not yet settled (contract item U-13). Until it is, open an issue describing which of the image,
-the tag and the release were written, and release a new version.
+is immutable, and no failure path deletes anything. Resuming a partly published version from the
+same commit is designed but not yet part of the release workflow (issue #96). Until it is, open an
+issue describing which of the image, the tag and the release were written, and release a new
+version.
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

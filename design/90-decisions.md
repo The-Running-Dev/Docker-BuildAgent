@@ -6,6 +6,8 @@ Append-only. Newest at the top. The rejected alternatives are the point — with
 
 Every entry below, newest first, by date and title. The entries are not edited; this list follows them.
 
+- 2026-10-04 — A sink's identity is recorded just before it is written, and a package is identified by its content without the repository signature
+- 2026-10-04 — A re-run for a published release's own commit moves only `latest`
 - 2026-10-03 — `latest` moves last, after the release is published
 - 2026-10-03 — The release claim records each artifact's identity, and a resume skips a sink only on a match
 - 2026-10-03 — The release claim starts with an atomic git ref
@@ -46,6 +48,20 @@ Every entry below, newest first, by date and title. The entries are not edited; 
 
 ## Open
 _A staging area, not a home. Things noticed mid-slice that were deliberately not acted on. `/track` turns each into a GitHub issue and removes it from here. An item that is a *decision* rather than a *todo* belongs below as an entry, not in an issue._
+
+---
+
+### 2026-10-04 — A sink's identity is recorded just before it is written, and a package is identified by its content without the repository signature
+Context: `20-contract.md` U-13, raised while applying the 2026-10-03 decision on F4. That decision recorded every artifact's identity at build time, but a resume rebuilds, and neither the image nor the packages are built byte-reproducibly, so a resume's identities never matched the ones recorded. Separately, nuget.org adds a repository signature to a package on upload, so the package it serves has a different SHA-256 from the one pushed.
+Chosen: The build computes identities and records none. At the versioned-sink step, every sink that already holds the version is compared against the identity the claim records for it, and a sink with no recorded identity does not match. For each sink that does not hold the version, the run records this build's identity in the claim immediately before writing it. A rebuild therefore never replaces the identity of a sink that holds the version. A package's identity is its content hash: the SHA-256 over its entries in ordinal path order, each taken as its path and content, excluding the repository signature file `.signature.p7s`. The image's identity stays its registry digest. This replaces the step at which the 2026-10-03 decision on F4 records identities; that entry's other terms stand.
+Rejected: Require byte-reproducible builds — the image layers and the package archives carry timestamps from several tools, and the guarantee would rest on every tool in the chain. Compare the SHA-256 of the file as served — it differs from the one pushed on any feed that signs on upload. Trust the hash the feed reports — the feed's hash is of its signed copy, and reading it ties the check to one feed's API.
+Reversibility: expensive — the identities and the hash definition become part of every claim a published release carries.
+
+### 2026-10-04 — A re-run for a published release's own commit moves only `latest`
+Context: `20-contract.md` U-14, raised while applying the 2026-10-03 decision on F8. That decision fixed a failed `latest` move by re-running it, but a re-run of the release pipeline refused a published version as existing (I5), only CI may write (I14), and nothing re-ran the move alone.
+Chosen: A release run that finds the version already published for its own commit takes a completion path instead of refusing. It checks that the git tag points at the commit and that every versioned sink holds the version with the identity the claim records, then moves `latest` and stops. A sink that does not match fails as `SinkArtifactMismatch`. A version that is not the highest published release is refused as `VersionAlreadyExists`, so a re-run never moves `latest` back. The path writes no versioned sink, so I5 holds; it runs in CI like any release, so I14 holds.
+Rejected: A separate workflow or command that moves `latest` to a named version — a second writer of a public surface, with its own permissions and no claim to check against. Treat a stale `latest` as acceptable until the next release — consumers of `latest` stay on the previous version for an unbounded time. Let a maintainer retag by hand — I14 forbids writing a sink outside CI.
+Reversibility: cheap — the completion path is local to the pipeline's existence check, and removing it restores the refusal.
 
 ---
 

@@ -139,6 +139,8 @@ questions live in `design/20-contract.md` under `## Unresolved`.
 | decision/2026-10-03-claim-starts-with-atomic-ref | `unit/document/design-10-design` |
 | decision/2026-10-03-latest-moves-last | `unit/document/design-10-design` |
 | decision/2026-10-03-updater-owns-its-notifier | `unit/document/design-10-design` |
+| decision/2026-10-04-completion-rerun-moves-latest | `unit/document/design-10-design` |
+| decision/2026-10-04-sink-identity-recorded-before-write | `unit/document/design-10-design` |
 <!-- decision-affects:end -->
 
 ## Questions — blocks and answered

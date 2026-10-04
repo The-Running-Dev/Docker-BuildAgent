@@ -39,7 +39,7 @@ overwritten on every regeneration — it is not written by hand.
 | **I2** | **A published versioned image tag is immutable.** From v2.0.0 onward, a versioned tag's content never changes and the tag is never deleted or expired. Owner: Release pipeline. Enforcement: `[instruction]` — the registry does not enforce it, and the design does not rely on the registry to | — | instruction | — |
 | **I3** | **No sink is written before the claim exists.** Version selection, existence checking, the surface gate and notes validation write nothing. The first write of a release is the claim, which records every artifact's identity before any sink is written. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I4** | **A partial release never moves `latest`.** `latest` moves only after every versioned sink holds the version. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
-| **I5** | **A version that exists is never republished.** Existence is the disjunction of: a claim for that version, a versioned image tag for that version, or a git tag for that version. Any one of the three makes the version taken, including when the operator supplies it manually. A sink artifact counts as under a claim only when its identity matches the identity the claim records for that sink. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
+| **I5** | **A version that exists is never republished.** Existence is the disjunction of: a claim for that version, a versioned image tag for that version, or a git tag for that version. Any one of the three makes the version taken, including when the operator supplies it manually. A sink artifact counts as under a claim only when its identity matches the identity the claim records for that sink. A re-run for the commit of a published release republishes nothing: when the version is the highest published release and every versioned sink matches the claim, it moves `latest` alone. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I6** | **Major never decreases.** A candidate whose major is below the highest published major fails before any write. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I7** | **Notes carry both required sections.** Every published release's notes contain a breaking-changes section and a deprecations section, present when empty. A release cannot publish without them. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I8** | **The baseline is what shipped.** The surface gate's baseline is the manifest asset of the highest published release below the candidate. It is never regenerated from source and never read from the working tree. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
@@ -115,11 +115,17 @@ not an implementation detail.
 Semantics: the enum's numeric values are the publication order and are load-bearing —
 `ImageLatestTag` is last, and moves only after the release is published, not with the
 versioned sinks (I4). The claim records each versioned sink's artifact identity — the
-image digest, and the SHA-256 of the global tool package and of the PowerShell module
-package — and a resume skips a sink only when the identity it holds matches (I5). The
-declaration does not carry the identities or the ref yet; they are owed to it by the
-2026-10-03 decisions. How a resume that rebuilds its artifacts compares them is
-`## Unresolved` U-13.
+image digest, and the content hash of the global tool package and of the PowerShell
+module package — immediately before every write to that sink, and never replaces the
+identity of a sink that already holds the version. A package's content hash is the
+SHA-256 over its entries in ordinal path order, each taken as its path and content,
+excluding the repository signature file `.signature.p7s`. A resume skips a sink only
+when the identity it holds matches the recorded one; a sink holding the version with no
+recorded identity does not match (I5). A re-run for the commit of an already published
+release that is the highest published release, with every versioned sink matching,
+moves `ImageLatestTag` and writes nothing else. The declaration does not carry the
+identities, the ref or the completion re-run yet; they are owed to it by the 2026-10-03
+and 2026-10-04 decisions.
 
 ### Surface manifest
 
@@ -466,20 +472,21 @@ All Config errors are accumulated and reported in one pass (I18).
 
 | Code | Raised when | Retryable | Caller does |
 | --- | --- | --- | --- |
-| `VersionAlreadyExists` | A claim (its ref or its draft), image tag or git tag holds the version, including a claim ref the run's own creation finds at another commit | No | Fail before any write (I5, I13) |
+| `VersionAlreadyExists` | A claim (its ref or its draft), image tag or git tag holds the version, including a claim ref the run's own creation finds at another commit; or, on a completion re-run, the version is not the highest published release | No | Fail before any write (I5, I13) |
 | `MajorBelowCurrent` | The candidate major is below the highest published | No | Fail before any write |
 | `TagPointsElsewhere` | A git tag for the version exists on another commit | No | Fail; a human resolves it |
 | `NotesSectionMissing` | Notes lack breaking-changes or deprecations | No | Fail before any write (I7) |
 | `SurfaceGateFailed` | The comparison returned blocking differences | No | Fail before any write |
 | `ClaimCreationFailed` | The draft release cannot be created | Yes | Fail; nothing was written |
 | `SinkPublishFailed` | A sink rejected the write | Yes | Fail naming `Sink`; leave the claim open for a resume |
-| `SinkArtifactMismatch` | On a resume, a sink holds the version with an artifact whose identity differs from the claim's | No | Fail naming `Sink` before this run writes anything; a human resolves it |
+| `SinkArtifactMismatch` | On a resume or a completion re-run, a sink holds the version with an artifact whose identity differs from the claim's, or that the claim records no identity for | No | Fail naming `Sink` before this run writes anything; a human resolves it |
 | `NotPublishedByCi` | The run is not the CI publishing context | No | Fail (I14) |
 
 `SinkPublishFailed` is the only error that leaves state behind. A failure to move
 `latest` after the release is published is reported as `SinkPublishFailed` naming
-`ImageLatestTag`; it leaves a complete release and is fixed by re-running the move
-(`## Unresolved` U-14).
+`ImageLatestTag`; it leaves a complete release and is fixed by re-running the release
+for the same commit, which finds the release published and moves `latest` alone
+(2026-10-04 decision).
 
 ### Updater — `UpdateError(UpdateErrorCode Code, string ContainerName, string Message)`
 
@@ -679,21 +686,7 @@ It was resolved on 2026-09-20 by restating § Invariants as tables keyed on a se
 `I-CFG-n`, `I-BLD-n`, `I-UPD-n`, `I-DOC-n`, `I-SURF-1`) are retired and never reused,
 and the domain is now carried by the subsection heading alone.*
 
-**U-13 — What a resume compares a published artifact against.** The 2026-10-03
-decision on F4 records each artifact's identity at step 5 and skips a sink on a resume
-only when the identities match, but a resume runs step 5 again, and neither the image
-nor the packages are built byte-reproducibly, so the rebuilt artifacts have new
-identities. Two readings follow, and the decision does not choose: keep the recorded
-identities and compare published sinks against them, recording the rebuilt identity
-for a sink only before that sink is first written; or require reproducible builds. A
-second fact bears on the package rows: a feed that adds a repository signature on
-upload, as nuget.org does, serves a package whose SHA-256 differs from the one pushed.
-*Blocks:* the F4 resume check, `SinkArtifactMismatch`, and the `ReleaseClaim`
-identity fields.
-
-**U-14 — How a failed `latest` move is re-run.** The 2026-10-03 decision on F8 fixes a
-failed `latest` move by re-running it, but a re-run of the release pipeline refuses
-the version as existing once its release is published (I5), and only CI may write a
-sink (I14). No path re-runs the move alone.
-*Blocks:* the recovery the F8 decision names, and the `latest` failure mode in
-`10-design.md`.
+*U-13 and U-14 were resolved by the 2026-10-04 decisions and are struck: a sink's
+identity is recorded just before that sink is written and packages compare by a
+content hash that excludes the repository signature, and a re-run for a published
+release's own commit moves only `latest`.*
