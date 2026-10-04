@@ -6,8 +6,9 @@ namespace Release;
 public enum ClaimState { Draft, Published }
 
 /// <summary>
-/// The enum's numeric values are the publication order and are load-bearing — <see cref="ImageLatestTag"/>
-/// is last (I4).
+/// The enum's numeric values are the publication order and are load-bearing. The versioned sinks
+/// are written in this order before the release is published; <see cref="ImageLatestTag"/> is
+/// last and moves only after the release is published (I4).
 /// </summary>
 public enum ReleaseSink
 {

@@ -5,10 +5,11 @@ using System.Threading.Tasks;
 namespace Release;
 
 /// <summary>
-/// Writes one sink's copy of a claimed version. Publishers are run by <see cref="ReleasePipeline"/>
-/// in <see cref="ReleaseSink"/> numeric order, so <see cref="ReleaseSink.ImageLatestTag"/> always
-/// runs last (I4). A publisher throwing surfaces as <see cref="ReleaseErrorCode.SinkPublishFailed"/>
-/// naming <see cref="Sink"/>; the claim is left open for a resume rather than deleted.
+/// Writes one sink's copy of a claimed version. <see cref="ReleasePipeline"/> runs the versioned
+/// publishers in <see cref="ReleaseSink"/> numeric order before the release is published, and the
+/// <see cref="ReleaseSink.ImageLatestTag"/> publisher once, after the release is published (I4).
+/// A publisher throwing surfaces as <see cref="ReleaseErrorCode.SinkPublishFailed"/> naming
+/// <see cref="Sink"/>; nothing already written is deleted.
 /// </summary>
 public interface IReleaseSinkPublisher
 {
