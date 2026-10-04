@@ -68,16 +68,17 @@ public sealed class ReleasePipeline
                 "This run is not the CI publishing context; refusing to publish.");
         }
 
-        // I5 / I3: existence checking writes nothing. Any one of claim, versioned image tag or
-        // git tag makes the version taken.
-        var existingClaim = await _claimStore.FindClaimAsync(version).ConfigureAwait(false);
-        if (existingClaim != null)
+        // I5 / I3: existence checking writes nothing. A claim ref or a draft for another commit, a
+        // published release, a versioned image tag or a git tag makes the version taken. A claim
+        // ref or a draft for this commit is a claim this run resumes.
+        var claimRefCommit = await _claimStore.FindClaimRefAsync(version).ConfigureAwait(false);
+        if (claimRefCommit != null && !string.Equals(claimRefCommit, commitSha, StringComparison.Ordinal))
         {
-            throw new ReleaseException(
-                ReleaseErrorCode.VersionAlreadyExists,
-                null,
-                $"Version {version.ToPackageString()} already has a {existingClaim.State.ToString().ToLowerInvariant()} release claim bound to commit {existingClaim.CommitSha}.");
+            throw ClaimRefElsewhere(version, claimRefCommit);
         }
+
+        var existingClaim = await _claimStore.FindClaimAsync(version).ConfigureAwait(false);
+        var resumedDraft = ResumableDraftOrThrow(existingClaim, version, commitSha);
 
         if (await _imageTagChecker.ExistsAsync(version).ConfigureAwait(false))
         {
@@ -117,11 +118,13 @@ public sealed class ReleasePipeline
         // I7: notes carry both required sections.
         ReleaseNotesValidator.Validate(notes);
 
-        // I3: the claim is the first write of a release.
-        ReleaseClaim claim;
+        // I3 / I13: the claim is the first write of a release, and the claim ref is its first part.
+        // The refs API refuses a ref that exists, so of two runs that both passed the check above
+        // only one creates it; the other finds it and refuses unless it is at this run's commit.
+        ClaimRef claimRef;
         try
         {
-            claim = await _claimStore.CreateDraftAsync(version, commitSha, notes, manifest).ConfigureAwait(false);
+            claimRef = await _claimStore.CreateClaimRefAsync(version, commitSha).ConfigureAwait(false);
         }
         catch (ReleaseException)
         {
@@ -132,8 +135,46 @@ public sealed class ReleasePipeline
             throw new ReleaseException(
                 ReleaseErrorCode.ClaimCreationFailed,
                 null,
-                $"Could not create the draft release for {version.ToPackageString()}: {ex.Message}",
+                $"Could not create the claim ref for {version.ToPackageString()}: {ex.Message}",
                 ex);
+        }
+
+        if (!string.Equals(claimRef.CommitSha, commitSha, StringComparison.Ordinal))
+        {
+            throw ClaimRefElsewhere(version, claimRef.CommitSha);
+        }
+
+        if (resumedDraft == null && !claimRef.Created)
+        {
+            // The ref was already there at this commit: a run for the same commit may have created
+            // the draft since the check, so resume under it rather than add a second one.
+            resumedDraft = ResumableDraftOrThrow(
+                await _claimStore.FindClaimAsync(version).ConfigureAwait(false), version, commitSha);
+        }
+
+        ReleaseClaim claim;
+        if (resumedDraft != null)
+        {
+            claim = resumedDraft;
+        }
+        else
+        {
+            try
+            {
+                claim = await _claimStore.CreateDraftAsync(version, commitSha, notes, manifest).ConfigureAwait(false);
+            }
+            catch (ReleaseException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                throw new ReleaseException(
+                    ReleaseErrorCode.ClaimCreationFailed,
+                    null,
+                    $"Could not create the draft release for {version.ToPackageString()}: {ex.Message}",
+                    ex);
+            }
         }
 
         // The versioned sinks run in ReleaseSink numeric order. ImageLatestTag is not among them.
@@ -177,5 +218,36 @@ public sealed class ReleasePipeline
         }
 
         return published;
+    }
+
+    private static ReleaseException ClaimRefElsewhere(ReleaseVersion version, string claimRefCommit)
+    {
+        return new ReleaseException(
+            ReleaseErrorCode.VersionAlreadyExists,
+            null,
+            $"Version {version.ToPackageString()} is already claimed: claim ref {version.ToTagString()} points at commit {claimRefCommit}.");
+    }
+
+    /// <summary>
+    /// A draft release for this commit is a claim this run resumes. A published release, or a
+    /// draft for another commit, means the version exists (I5).
+    /// </summary>
+    private static ReleaseClaim? ResumableDraftOrThrow(ReleaseClaim? existingClaim, ReleaseVersion version, string commitSha)
+    {
+        if (existingClaim == null)
+        {
+            return null;
+        }
+
+        if (existingClaim.State == ClaimState.Draft
+            && string.Equals(existingClaim.CommitSha, commitSha, StringComparison.Ordinal))
+        {
+            return existingClaim;
+        }
+
+        throw new ReleaseException(
+            ReleaseErrorCode.VersionAlreadyExists,
+            null,
+            $"Version {version.ToPackageString()} already has a {existingClaim.State.ToString().ToLowerInvariant()} release claim bound to commit {existingClaim.CommitSha}.");
     }
 }

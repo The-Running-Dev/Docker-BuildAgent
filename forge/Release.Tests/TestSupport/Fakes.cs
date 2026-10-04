@@ -16,8 +16,46 @@ namespace Release.Tests.TestSupport;
 public sealed class FakeClaimStore : IReleaseClaimStore
 {
     private readonly Dictionary<string, ReleaseClaim> _claims = new();
+    private readonly Dictionary<string, string> _refs = new();
 
     public Func<ReleaseVersion, string, string, SurfaceManifest, Exception?>? FailCreateDraft { get; set; }
+
+    public Exception? FailCreateRef { get; set; }
+
+    /// <summary>Runs inside <see cref="CreateClaimRefAsync"/> before the ref is written, so a test can
+    /// play a second run that claims the version between this run's check and its claim.</summary>
+    public Action<FakeClaimStore>? BeforeCreateRef { get; set; }
+
+    public int DraftsCreated { get; private set; }
+
+    public IReadOnlyDictionary<string, string> Refs => _refs;
+
+    public void SeedRef(ReleaseVersion version, string commitSha) => _refs[version.ToTagString()] = commitSha;
+
+    public Task<string?> FindClaimRefAsync(ReleaseVersion version)
+    {
+        return Task.FromResult(_refs.TryGetValue(version.ToTagString(), out var sha) ? sha : null);
+    }
+
+    public Task<ClaimRef> CreateClaimRefAsync(ReleaseVersion version, string commitSha)
+    {
+        if (FailCreateRef != null)
+        {
+            throw FailCreateRef;
+        }
+
+        var race = BeforeCreateRef;
+        BeforeCreateRef = null;
+        race?.Invoke(this);
+
+        if (_refs.TryGetValue(version.ToTagString(), out var existing))
+        {
+            return Task.FromResult(new ClaimRef(existing, Created: false));
+        }
+
+        _refs[version.ToTagString()] = commitSha;
+        return Task.FromResult(new ClaimRef(commitSha, Created: true));
+    }
 
     public Exception? FailPublish { get; set; }
 
@@ -42,6 +80,7 @@ public sealed class FakeClaimStore : IReleaseClaimStore
 
         var claim = new ReleaseClaim(version, commitSha, ClaimState.Draft, notes, manifest);
         _claims[version.ToTagString()] = claim;
+        DraftsCreated++;
         return Task.FromResult(claim);
     }
 

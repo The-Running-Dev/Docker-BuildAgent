@@ -11,7 +11,9 @@ using Surface;
 namespace Release;
 
 /// <summary>
-/// <see cref="IReleaseClaimStore"/> backed by GitHub draft releases, via Octokit. Deliberately
+/// <see cref="IReleaseClaimStore"/> backed by a git ref and GitHub draft releases, via Octokit.
+/// The claim ref <c>refs/release-claims/v&lt;version&gt;</c> is created through the refs API, which
+/// refuses a ref that exists, so it is the atomic part of the claim (I13). Deliberately
 /// narrower than <c>Services.IGitHubService</c>: it never silently updates an existing release by
 /// tag name, because claim-first semantics (I3) require the caller to see "a claim already
 /// exists" as a distinct outcome from "no claim yet, safe to create one" before any write.
@@ -36,6 +38,70 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
         _owner = owner;
         _repo = repo;
         _client = client ?? new GitHubClient(new ProductHeaderValue("NukeBuild")) { Credentials = new Credentials(token) };
+    }
+
+    public async Task<string?> FindClaimRefAsync(ReleaseVersion version)
+    {
+        try
+        {
+            return await GetClaimRefCommitAsync(version).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            throw new ReleaseException(
+                ReleaseErrorCode.ClaimCreationFailed,
+                null,
+                $"Could not read claim ref '{ClaimRefName(version)}' for {_owner}/{_repo}: {ex.Message}",
+                ex);
+        }
+    }
+
+    public async Task<ClaimRef> CreateClaimRefAsync(ReleaseVersion version, string commitSha)
+    {
+        try
+        {
+            var created = await _client.Git.Reference
+                .Create(_owner, _repo, new NewReference(ClaimRefName(version), commitSha))
+                .ConfigureAwait(false);
+            return new ClaimRef(created.Object?.Sha ?? commitSha, Created: true);
+        }
+        catch (ApiValidationException createRefused)
+        {
+            // The refs API refuses a ref that already exists. Read it to learn which commit holds
+            // the version; any other refusal leaves the ref absent and fails the claim.
+            string? existing;
+            try
+            {
+                existing = await GetClaimRefCommitAsync(version).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                throw new ReleaseException(
+                    ReleaseErrorCode.ClaimCreationFailed,
+                    null,
+                    $"Could not create or read claim ref '{ClaimRefName(version)}' for {_owner}/{_repo}: {ex.Message}",
+                    ex);
+            }
+
+            if (existing == null)
+            {
+                throw new ReleaseException(
+                    ReleaseErrorCode.ClaimCreationFailed,
+                    null,
+                    $"Could not create claim ref '{ClaimRefName(version)}' for {_owner}/{_repo}: {createRefused.Message}",
+                    createRefused);
+            }
+
+            return new ClaimRef(existing, Created: false);
+        }
+        catch (Exception ex)
+        {
+            throw new ReleaseException(
+                ReleaseErrorCode.ClaimCreationFailed,
+                null,
+                $"Could not create claim ref '{ClaimRefName(version)}' for {_owner}/{_repo}: {ex.Message}",
+                ex);
+        }
     }
 
     public async Task<ReleaseClaim?> FindClaimAsync(ReleaseVersion version)
@@ -105,6 +171,29 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
 
         var update = new ReleaseUpdate { Draft = false };
         await _client.Repository.Release.Edit(_owner, _repo, releaseId, update).ConfigureAwait(false);
+    }
+
+    /// <summary>The fully qualified claim ref for a version: <c>refs/release-claims/v&lt;version&gt;</c>.</summary>
+    public static string ClaimRefName(ReleaseVersion version) => $"refs/{ClaimRefNamespace}/{version.ToTagString()}";
+
+    private const string ClaimRefNamespace = "release-claims";
+
+    private async Task<string?> GetClaimRefCommitAsync(ReleaseVersion version)
+    {
+        // Listed and matched exactly: a single-ref read by name falls back to prefix matching when
+        // the ref is absent, so v2.0.0 could otherwise answer with v2.0.0-rc.1's ref.
+        System.Collections.Generic.IReadOnlyList<Reference> references;
+        try
+        {
+            references = await _client.Git.Reference.GetAllForSubNamespace(_owner, _repo, ClaimRefNamespace).ConfigureAwait(false);
+        }
+        catch (NotFoundException)
+        {
+            return null;
+        }
+
+        var name = ClaimRefName(version);
+        return references?.FirstOrDefault(r => string.Equals(r.Ref, name, StringComparison.Ordinal))?.Object?.Sha;
     }
 
     private async Task<System.Collections.Generic.IReadOnlyList<Octokit.Release>> ListAllAsync()
