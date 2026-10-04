@@ -44,6 +44,13 @@ public interface IReleaseClaimStore
     /// </summary>
     Task<ReleaseClaim> CreateDraftAsync(ReleaseVersion version, string commitSha, string notes, SurfaceManifest manifest);
 
+    /// <summary>
+    /// Records <paramref name="identity"/> for <paramref name="sink"/> in the draft claim and returns
+    /// the updated claim. Called just before that sink is written, and never for a sink that already
+    /// holds the version, so a recorded identity is replaced only while its sink is unwritten.
+    /// </summary>
+    Task<ReleaseClaim> RecordIdentityAsync(ReleaseClaim claim, ReleaseSink sink, string identity);
+
     /// <summary>Transitions a claim from Draft to Published. The last write of a successful release.</summary>
     Task PublishAsync(ReleaseClaim claim);
 }

@@ -28,6 +28,11 @@ public sealed class FakeClaimStore : IReleaseClaimStore
 
     public int DraftsCreated { get; private set; }
 
+    public Exception? FailRecordIdentity { get; set; }
+
+    /// <summary>The sinks whose identity was recorded, in order.</summary>
+    public List<ReleaseSink> IdentitiesRecorded { get; } = new();
+
     public IReadOnlyDictionary<string, string> Refs => _refs;
 
     public void SeedRef(ReleaseVersion version, string commitSha) => _refs[version.ToTagString()] = commitSha;
@@ -84,6 +89,19 @@ public sealed class FakeClaimStore : IReleaseClaimStore
         return Task.FromResult(claim);
     }
 
+    public Task<ReleaseClaim> RecordIdentityAsync(ReleaseClaim claim, ReleaseSink sink, string identity)
+    {
+        if (FailRecordIdentity != null)
+        {
+            throw FailRecordIdentity;
+        }
+
+        var updated = claim.WithIdentity(sink, identity);
+        _claims[claim.Version.ToTagString()] = updated;
+        IdentitiesRecorded.Add(sink);
+        return Task.FromResult(updated);
+    }
+
     public Task PublishAsync(ReleaseClaim claim)
     {
         if (FailPublish != null)
@@ -132,13 +150,16 @@ public sealed class FakeCiPublishingContext : ICiPublishingContext
 
 /// <summary>
 /// A sink fake that can be told to fail, and records every version string it was asked to write
-/// so tests can assert byte-identical stamping across sinks (S3.7).
+/// so tests can assert byte-identical stamping across sinks (S3.7). It holds the version once a
+/// write succeeds, with the identity it built; <see cref="HeldIdentity"/> seeds a sink that
+/// already holds it.
 /// </summary>
-public sealed class FakeSinkPublisher : IReleaseSinkPublisher
+public sealed class FakeSinkPublisher : IVersionedSinkPublisher
 {
     public FakeSinkPublisher(ReleaseSink sink)
     {
         Sink = sink;
+        BuiltIdentity = $"sha256:built-{sink}";
     }
 
     public ReleaseSink Sink { get; }
@@ -149,16 +170,38 @@ public sealed class FakeSinkPublisher : IReleaseSinkPublisher
 
     public string? RecordedPackageVersion { get; private set; }
 
+    public string BuiltIdentity { get; set; }
+
+    /// <summary>The identity this sink holds for the version, or null if it does not hold it.</summary>
+    public string? HeldIdentity { get; set; }
+
+    public Exception? FailRead { get; set; }
+
+    /// <summary>The identity the claim recorded for this sink when it was written.</summary>
+    public string? IdentityRecordedAtWrite { get; private set; }
+
+    public Task<string?> FindPublishedIdentityAsync(ReleaseVersion version)
+    {
+        if (FailRead != null)
+        {
+            throw FailRead;
+        }
+
+        return Task.FromResult(HeldIdentity);
+    }
+
     public Task PublishAsync(ReleaseClaim claim)
     {
         WasCalled = true;
         RecordedPackageVersion = claim.Version.ToPackageString();
+        IdentityRecordedAtWrite = claim.IdentityOf(Sink);
 
         if (ShouldFail)
         {
             throw new InvalidOperationException($"{Sink} rejected the write.");
         }
 
+        HeldIdentity = BuiltIdentity;
         return Task.CompletedTask;
     }
 }
