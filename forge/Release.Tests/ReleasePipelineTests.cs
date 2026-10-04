@@ -289,14 +289,14 @@ public sealed class ReleasePipelineTests
         Assert.Equal(ClaimState.Draft, claim.State);
     }
 
-    // Ordering guard for I4: sinks always run in ReleaseSink numeric order (ImageVersionedTag,
-    // GlobalTool, PowerShellModule, ImageLatestTag) regardless of registration order, so
-    // ImageLatestTag is always the last write.
+    // Ordering guard for I4: the versioned sinks run in ReleaseSink numeric order (ImageVersionedTag,
+    // GlobalTool, PowerShellModule) regardless of registration order, then the release is
+    // published, and only then does ImageLatestTag move, as the last write.
     [Fact]
-    public async Task Publish_RunsSinksInReleaseSinkNumericOrder()
+    public async Task Publish_RunsVersionedSinksInOrder_ThenPublishesTheRelease_ThenMovesLatest()
     {
-        var callOrder = new System.Collections.Generic.List<ReleaseSink>();
-        var claimStore = new FakeClaimStore();
+        var callOrder = new System.Collections.Generic.List<string>();
+        var claimStore = new FakeClaimStore { OnPublished = _ => callOrder.Add("ReleasePublished") };
         var imageTagChecker = new FakeImageTagChecker();
         var gitTagChecker = new FakeGitTagChecker();
         var highestPublished = new FakeHighestPublishedVersionSource();
@@ -315,15 +315,89 @@ public sealed class ReleasePipelineTests
         await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
 
         Assert.Equal(
-            new[] { ReleaseSink.ImageVersionedTag, ReleaseSink.GlobalTool, ReleaseSink.PowerShellModule, ReleaseSink.ImageLatestTag },
+            new[]
+            {
+                nameof(ReleaseSink.ImageVersionedTag),
+                nameof(ReleaseSink.GlobalTool),
+                nameof(ReleaseSink.PowerShellModule),
+                "ReleasePublished",
+                nameof(ReleaseSink.ImageLatestTag),
+            },
             callOrder);
+    }
+
+    // I4: a release that is not published never moves latest. Publishing the release fails after
+    // every versioned sink is written; latest stays where it was and the claim stays a draft.
+    [Fact]
+    public async Task Publish_LeavesLatestUnmoved_WhenPublishingTheReleaseFails()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        claimStore.FailPublish = new InvalidOperationException("release publish rejected");
+
+        await Assert.ThrowsAnyAsync<Exception>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.All(
+            sinks.Where(s => s.Sink != ReleaseSink.ImageLatestTag),
+            s => Assert.True(s.WasCalled));
+        Assert.False(Array.Find(sinks, s => s.Sink == ReleaseSink.ImageLatestTag)!.WasCalled);
+        Assert.Equal(ClaimState.Draft, Assert.Single(claimStore.Claims).Value.State);
+    }
+
+    // A versioned sink failing stops before the release is published, so latest is not moved.
+    [Fact]
+    public async Task Publish_LeavesLatestUnmoved_WhenAVersionedSinkFails()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        Array.Find(sinks, s => s.Sink == ReleaseSink.PowerShellModule)!.ShouldFail = true;
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseSink.PowerShellModule, ex.Sink);
+        Assert.False(Array.Find(sinks, s => s.Sink == ReleaseSink.ImageLatestTag)!.WasCalled);
+        Assert.Equal(ClaimState.Draft, Assert.Single(claimStore.Claims).Value.State);
+    }
+
+    // A failure to move latest after the release is published fails as SinkPublishFailed naming
+    // ImageLatestTag, and leaves a complete, published release behind (20-contract.md).
+    [Fact]
+    public async Task Publish_FailsWithSinkPublishFailed_NamingImageLatestTag_AndLeavesTheReleasePublished()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        Array.Find(sinks, s => s.Sink == ReleaseSink.ImageLatestTag)!.ShouldFail = true;
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.SinkPublishFailed, ex.Code);
+        Assert.Equal(ReleaseSink.ImageLatestTag, ex.Sink);
+        Assert.Equal(ClaimState.Published, Assert.Single(claimStore.Claims).Value.State);
+    }
+
+    // The latest publisher is handed the published claim.
+    [Fact]
+    public async Task Publish_HandsTheLatestPublisherAPublishedClaim()
+    {
+        var states = new System.Collections.Generic.List<ClaimState>();
+        var pipeline = new ReleasePipeline(
+            new FakeClaimStore(),
+            new FakeImageTagChecker(),
+            new FakeGitTagChecker(),
+            new FakeHighestPublishedVersionSource(),
+            new FakeCiPublishingContext(),
+            new IReleaseSinkPublisher[] { new StateRecordingSink(ReleaseSink.ImageLatestTag, states) });
+
+        await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(new[] { ClaimState.Published }, states);
     }
 
     private sealed class OrderRecordingSink : IReleaseSinkPublisher
     {
-        private readonly System.Collections.Generic.List<ReleaseSink> _callOrder;
+        private readonly System.Collections.Generic.List<string> _callOrder;
 
-        public OrderRecordingSink(ReleaseSink sink, System.Collections.Generic.List<ReleaseSink> callOrder)
+        public OrderRecordingSink(ReleaseSink sink, System.Collections.Generic.List<string> callOrder)
         {
             Sink = sink;
             _callOrder = callOrder;
@@ -333,7 +407,26 @@ public sealed class ReleasePipelineTests
 
         public Task PublishAsync(ReleaseClaim claim)
         {
-            _callOrder.Add(Sink);
+            _callOrder.Add(Sink.ToString());
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StateRecordingSink : IReleaseSinkPublisher
+    {
+        private readonly System.Collections.Generic.List<ClaimState> _states;
+
+        public StateRecordingSink(ReleaseSink sink, System.Collections.Generic.List<ClaimState> states)
+        {
+            Sink = sink;
+            _states = states;
+        }
+
+        public ReleaseSink Sink { get; }
+
+        public Task PublishAsync(ReleaseClaim claim)
+        {
+            _states.Add(claim.State);
             return Task.CompletedTask;
         }
     }

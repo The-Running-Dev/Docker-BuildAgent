@@ -11,10 +11,11 @@ namespace Release;
 
 /// <summary>
 /// Orchestrates a single publish attempt end to end: existence checks, the major-never-decreases
-/// check and notes validation write nothing (I3); the claim is the first write; every sink is
-/// then written in <see cref="ReleaseSink"/> order, so <see cref="ReleaseSink.ImageLatestTag"/>
-/// always moves last (I4); a sink rejecting the write fails naming that sink and leaves the claim
-/// open rather than deleting anything (I5 is never undone by a failure path).
+/// check and notes validation write nothing (I3); the claim is the first write; the versioned
+/// sinks are then written in <see cref="ReleaseSink"/> order, the release is published, and only
+/// then does <see cref="ReleaseSink.ImageLatestTag"/> move, so a release that is not published
+/// never moves <c>latest</c> (I4); a sink rejecting the write fails naming that sink and leaves
+/// the claim open rather than deleting anything (I5 is never undone by a failure path).
 /// </summary>
 public sealed class ReleasePipeline
 {
@@ -23,7 +24,8 @@ public sealed class ReleasePipeline
     private readonly IGitTagChecker _gitTagChecker;
     private readonly IHighestPublishedVersionSource _highestPublishedSource;
     private readonly ICiPublishingContext _ciContext;
-    private readonly IReadOnlyList<IReleaseSinkPublisher> _sinks;
+    private readonly IReadOnlyList<IReleaseSinkPublisher> _versionedSinks;
+    private readonly IReleaseSinkPublisher? _latestTag;
 
     public ReleasePipeline(
         IReleaseClaimStore claimStore,
@@ -38,9 +40,11 @@ public sealed class ReleasePipeline
         _gitTagChecker = gitTagChecker ?? throw new ArgumentNullException(nameof(gitTagChecker));
         _highestPublishedSource = highestPublishedSource ?? throw new ArgumentNullException(nameof(highestPublishedSource));
         _ciContext = ciContext ?? throw new ArgumentNullException(nameof(ciContext));
-        _sinks = (sinks ?? throw new ArgumentNullException(nameof(sinks)))
+        var ordered = (sinks ?? throw new ArgumentNullException(nameof(sinks)))
             .OrderBy(sink => (int)sink.Sink)
             .ToList();
+        _versionedSinks = ordered.Where(sink => sink.Sink != ReleaseSink.ImageLatestTag).ToList();
+        _latestTag = ordered.SingleOrDefault(sink => sink.Sink == ReleaseSink.ImageLatestTag);
     }
 
     public async Task<ReleaseClaim> PublishAsync(ReleaseVersion version, string commitSha, string notes, SurfaceManifest manifest)
@@ -132,8 +136,8 @@ public sealed class ReleasePipeline
                 ex);
         }
 
-        // I4: sinks run in ReleaseSink numeric order, so ImageLatestTag is always last.
-        foreach (var sink in _sinks)
+        // The versioned sinks run in ReleaseSink numeric order. ImageLatestTag is not among them.
+        foreach (var sink in _versionedSinks)
         {
             try
             {
@@ -152,7 +156,26 @@ public sealed class ReleasePipeline
         }
 
         await _claimStore.PublishAsync(claim).ConfigureAwait(false);
+        var published = claim with { State = ClaimState.Published };
 
-        return claim with { State = ClaimState.Published };
+        // I4: latest moves last, after the release is published. A failure here leaves a complete
+        // release; latest is movable, so nothing is undone.
+        if (_latestTag != null)
+        {
+            try
+            {
+                await _latestTag.PublishAsync(published).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                throw new ReleaseException(
+                    ReleaseErrorCode.SinkPublishFailed,
+                    ReleaseSink.ImageLatestTag,
+                    $"Release {version.ToPackageString()} is published, but moving latest to it failed: {ex.Message}",
+                    ex);
+            }
+        }
+
+        return published;
     }
 }

@@ -19,6 +19,10 @@ public sealed class FakeClaimStore : IReleaseClaimStore
 
     public Func<ReleaseVersion, string, string, SurfaceManifest, Exception?>? FailCreateDraft { get; set; }
 
+    public Exception? FailPublish { get; set; }
+
+    public Action<ReleaseClaim>? OnPublished { get; set; }
+
     public IReadOnlyDictionary<string, ReleaseClaim> Claims => _claims;
 
     public void Seed(ReleaseClaim claim) => _claims[claim.Version.ToTagString()] = claim;
@@ -43,7 +47,13 @@ public sealed class FakeClaimStore : IReleaseClaimStore
 
     public Task PublishAsync(ReleaseClaim claim)
     {
+        if (FailPublish != null)
+        {
+            throw FailPublish;
+        }
+
         _claims[claim.Version.ToTagString()] = claim with { State = ClaimState.Published };
+        OnPublished?.Invoke(claim);
         return Task.CompletedTask;
     }
 }
