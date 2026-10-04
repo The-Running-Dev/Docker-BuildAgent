@@ -10,6 +10,8 @@ using Xunit;
 
 namespace Update.Tests;
 
+// Console.Error is process-wide: the tests that capture it must not run beside each other.
+[Collection("ConsoleOutput")]
 public sealed class UpdaterTests : IDisposable
 {
     private readonly string _logPath;
