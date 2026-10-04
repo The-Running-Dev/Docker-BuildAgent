@@ -50,7 +50,7 @@ public sealed class ReleasePipelineTests
     public async Task Publish_FailsWithVersionAlreadyExists_WhenClaimAlreadyHoldsVersion()
     {
         var (pipeline, claimStore, _, _, _, _, sinks) = Build();
-        claimStore.Seed(new ReleaseClaim(Version, CommitSha, ClaimState.Draft, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+        claimStore.Seed(new ReleaseClaim(Version, CommitSha, ClaimState.Published, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
 
         var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
             pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
@@ -266,6 +266,9 @@ public sealed class ReleasePipelineTests
             (_, _, gitTagChecker, _, _, _) => gitTagChecker.Seed(Version, OtherCommitSha),
             (_, _, _, highestPublished, _, _) => highestPublished.Highest = new ReleaseVersion(99, 0, 0, null),
             (claimStore, _, _, _, _, _) => claimStore.FailCreateDraft = (_, _, _, _) => new InvalidOperationException("boom"),
+            (claimStore, _, _, _, _, _) => claimStore.FailCreateRef = new InvalidOperationException("boom"),
+            (claimStore, _, _, _, _, _) => claimStore.SeedRef(Version, OtherCommitSha),
+            (claimStore, _, _, _, _, _) => claimStore.BeforeCreateRef = store => store.SeedRef(Version, OtherCommitSha),
             (_, _, _, _, _, sinks) => sinks[0].ShouldFail = true,
         };
     }
@@ -287,6 +290,143 @@ public sealed class ReleasePipelineTests
 
         var claim = Assert.Single(claimStore.Claims).Value;
         Assert.Equal(ClaimState.Draft, claim.State);
+    }
+
+    // I3 / I13: the claim ref is the first write, before the draft release.
+    [Fact]
+    public async Task Publish_CreatesTheClaimRefAtTheCommit_BeforeTheDraft()
+    {
+        var (pipeline, claimStore, _, _, _, _, _) = Build();
+        string? refWhenDraftCreated = null;
+        claimStore.FailCreateDraft = (version, _, _, _) =>
+        {
+            refWhenDraftCreated = claimStore.Refs.TryGetValue(version.ToTagString(), out var sha) ? sha : null;
+            return null;
+        };
+
+        await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(CommitSha, refWhenDraftCreated);
+        Assert.Equal(CommitSha, claimStore.Refs[Version.ToTagString()]);
+    }
+
+    // A claim ref at another commit means another run holds the version: refuse before any write.
+    [Fact]
+    public async Task Publish_FailsWithVersionAlreadyExists_WhenTheClaimRefIsAtAnotherCommit()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        claimStore.SeedRef(Version, OtherCommitSha);
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.VersionAlreadyExists, ex.Code);
+        Assert.Contains(OtherCommitSha, ex.Message);
+        Assert.Equal(0, claimStore.DraftsCreated);
+        Assert.Equal(OtherCommitSha, claimStore.Refs[Version.ToTagString()]);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // A claim ref at this commit with no draft is a resume: the run creates the draft under it.
+    [Fact]
+    public async Task Publish_ResumesUnderAClaimRefAtTheSameCommit_CreatingTheMissingDraft()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        claimStore.SeedRef(Version, CommitSha);
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(ClaimState.Published, claim.State);
+        Assert.Equal(1, claimStore.DraftsCreated);
+        Assert.Equal(CommitSha, claimStore.Refs[Version.ToTagString()]);
+        Assert.All(sinks, s => Assert.True(s.WasCalled));
+    }
+
+    // A claim ref and a draft at this commit are a resume under the existing draft: no second draft.
+    [Fact]
+    public async Task Publish_ResumesUnderTheExistingDraft_WhenTheClaimRefAndDraftAreAtTheSameCommit()
+    {
+        var (pipeline, claimStore, _, _, _, _, _) = Build();
+        claimStore.SeedRef(Version, CommitSha);
+        claimStore.Seed(new ReleaseClaim(Version, CommitSha, ClaimState.Draft, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(ClaimState.Published, claim.State);
+        Assert.Equal(0, claimStore.DraftsCreated);
+        Assert.Equal(ClaimState.Published, Assert.Single(claimStore.Claims).Value.State);
+    }
+
+    // The race: both runs pass the check, and the other run creates the claim ref at its commit
+    // first. The refs API refuses this run's ref; this run reads it and refuses, writing nothing.
+    [Fact]
+    public async Task Publish_FailsWithVersionAlreadyExists_WhenAnotherRunClaimsTheVersionFirst()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        claimStore.BeforeCreateRef = store => store.SeedRef(Version, OtherCommitSha);
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.VersionAlreadyExists, ex.Code);
+        Assert.Contains(OtherCommitSha, ex.Message);
+        Assert.Equal(0, claimStore.DraftsCreated);
+        Assert.Empty(claimStore.Claims);
+        Assert.Equal(OtherCommitSha, claimStore.Refs[Version.ToTagString()]);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // The race for the same commit: the other run created the ref and the draft first. This run
+    // resumes under that draft instead of adding a second one.
+    [Fact]
+    public async Task Publish_ResumesUnderTheOtherRunsDraft_WhenARunForTheSameCommitClaimsFirst()
+    {
+        var (pipeline, claimStore, _, _, _, _, _) = Build();
+        claimStore.BeforeCreateRef = store =>
+        {
+            store.SeedRef(Version, CommitSha);
+            store.Seed(new ReleaseClaim(Version, CommitSha, ClaimState.Draft, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+        };
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(ClaimState.Published, claim.State);
+        Assert.Equal(0, claimStore.DraftsCreated);
+    }
+
+    // The race when the other run, for another commit, created a draft but a ref at this commit
+    // exists: the draft for another commit still means the version exists.
+    [Fact]
+    public async Task Publish_FailsWithVersionAlreadyExists_WhenADraftForAnotherCommitAppearsUnderTheRef()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        claimStore.BeforeCreateRef = store =>
+        {
+            store.SeedRef(Version, CommitSha);
+            store.Seed(new ReleaseClaim(Version, OtherCommitSha, ClaimState.Draft, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+        };
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.VersionAlreadyExists, ex.Code);
+        Assert.Contains(OtherCommitSha, ex.Message);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // A claim ref that cannot be created fails as ClaimCreationFailed, and no draft is created.
+    [Fact]
+    public async Task Publish_FailsWithClaimCreationFailed_WhenTheClaimRefCannotBeCreated()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        claimStore.FailCreateRef = new InvalidOperationException("refs API unavailable");
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.ClaimCreationFailed, ex.Code);
+        Assert.Equal(0, claimStore.DraftsCreated);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
     }
 
     // Ordering guard for I4: the versioned sinks run in ReleaseSink numeric order (ImageVersionedTag,
