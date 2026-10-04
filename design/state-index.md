@@ -18,7 +18,9 @@ questions live in `design/20-contract.md` under `## Unresolved`.
 | Id | Kind | Anchor |
 |---|---|---|
 | `unit/document/agent-md` | document | `agent.md` |
+| `unit/document/code-of-conduct-md` | document | `CODE_OF_CONDUCT.md` |
 | `unit/document/codex-profiles` | document | `codex/PROFILES.md` |
+| `unit/document/contributing-md` | document | `CONTRIBUTING.md` |
 | `unit/document/design-00-brief` | document | `design/00-brief.md` |
 | `unit/document/design-10-design` | document | `design/10-design.md` |
 | `unit/document/design-20-contract` | document | `design/20-contract.md` |
@@ -30,6 +32,7 @@ questions live in `design/20-contract.md` under `## Unresolved`.
 | `unit/document/project-agents-md` | document | `AGENTS.md` |
 | `unit/document/psmodule-requirements-md` | document | `PSModule.requirements.md` |
 | `unit/document/readme-md` | document | `README.md` |
+| `unit/document/security-md` | document | `SECURITY.md` |
 <!-- units:end -->
 
 ## Invariants — bound by
@@ -132,6 +135,10 @@ questions live in `design/20-contract.md` under `## Unresolved`.
 | decision/2026-09-28-record-documents-and-decisions | `unit/document/design-90-decisions` |
 | decision/2026-09-28-retire-per-repo-kit-tool-copies | `unit/document/design-20-contract` |
 | decision/2026-09-29-build-path-owes-config-call | `unit/document/design-30-slices` |
+| decision/2026-10-03-claim-records-artifact-identity | `unit/document/design-10-design` |
+| decision/2026-10-03-claim-starts-with-atomic-ref | `unit/document/design-10-design` |
+| decision/2026-10-03-latest-moves-last | `unit/document/design-10-design` |
+| decision/2026-10-03-updater-owns-its-notifier | `unit/document/design-10-design` |
 <!-- decision-affects:end -->
 
 ## Questions — blocks and answered

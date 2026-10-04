@@ -37,9 +37,9 @@ overwritten on every regeneration — it is not written by hand.
 |---|---|---|---|---|
 | **I1** | **One version, three sinks.** A release stamps exactly one version value into the versioned image tag, the global tool package and the PowerShell module manifest. No sink derives, defaults or increments its own version. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I2** | **A published versioned image tag is immutable.** From v2.0.0 onward, a versioned tag's content never changes and the tag is never deleted or expired. Owner: Release pipeline. Enforcement: `[instruction]` — the registry does not enforce it, and the design does not rely on the registry to | — | instruction | — |
-| **I3** | **No sink is written before the claim exists.** Version selection, existence checking, the surface gate and notes validation write nothing. The first write of a release is the claim. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
-| **I4** | **A partial release never moves `latest`.** `latest` moves only after every versioned sink holds the version. **In tension with the step order in `10-design.md` § Control flow 2; see § Unresolved U-9.** Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
-| **I5** | **A version that exists is never republished.** Existence is the disjunction of: a claim for that version, a versioned image tag for that version, or a git tag for that version. Any one of the three makes the version taken, including when the operator supplies it manually. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
+| **I3** | **No sink is written before the claim exists.** Version selection, existence checking, the surface gate and notes validation write nothing. The first write of a release is the claim, which records every artifact's identity before any sink is written. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
+| **I4** | **A partial release never moves `latest`.** `latest` moves only after every versioned sink holds the version. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
+| **I5** | **A version that exists is never republished.** Existence is the disjunction of: a claim for that version, a versioned image tag for that version, or a git tag for that version. Any one of the three makes the version taken, including when the operator supplies it manually. A sink artifact counts as under a claim only when its identity matches the identity the claim records for that sink. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I6** | **Major never decreases.** A candidate whose major is below the highest published major fails before any write. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I7** | **Notes carry both required sections.** Every published release's notes contain a breaking-changes section and a deprecations section, present when empty. A release cannot publish without them. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I8** | **The baseline is what shipped.** The surface gate's baseline is the manifest asset of the highest published release below the candidate. It is never regenerated from source and never read from the working tree. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
@@ -47,7 +47,7 @@ overwritten on every regeneration — it is not written by hand.
 | **I10** | **The manifest holds only comparable values.** An item whose value cannot be recorded as a stable ordinal string is absent from the manifest, and its compatibility is carried by release notes instead. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
 | **I11** | **Once recorded, an item leaves only by the removal rule.** An item present in a published manifest and absent from the candidate is a removal, whatever the reason for its absence. Making a surface unrecordable is not an exit from the gate after its first release. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
 | **I12** | **Every published manifest stays readable.** The manifest reader accepts every `manifestSchemaVersion` ever published, because baselines are immutable release assets and the gate must keep comparing against them for the product's lifespan. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
-| **I13** | **One publisher at a time.** At most one release-pipeline run publishes at any moment, held by a single CI concurrency group spanning every publishing workflow, queued rather than cancelled. Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — the three publishing workflows each declare `concurrency: group: buildagent-publish` with `cancel-in-progress: false` (`.github/workflows/build.yml:76-78`, `.github/workflows/release.yml:45-47`, `.github/workflows/release-tag.yml:32-34`); nothing checks that a future publishing workflow joins the group | — | instruction | — |
+| **I13** | **One publisher at a time.** At most one release-pipeline run publishes at any moment, held by a single CI concurrency group spanning every publishing workflow, queued rather than cancelled. The claim ref is the second guard: the refs API creates it only when it is absent, so of two runs that bypass the group, exactly one claims a given version. Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — the three publishing workflows each declare `concurrency: group: buildagent-publish` with `cancel-in-progress: false` (`.github/workflows/build.yml:76-78`, `.github/workflows/release.yml:45-47`, `.github/workflows/release-tag.yml:32-34`); nothing checks that a future publishing workflow joins the group | — | instruction | — |
 | **I14** | **Only CI publishes.** No sink accepts a write from a developer machine. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I15** | **A push to `main` writes no version.** It moves `latest` and nothing else. No versioned image tag, tool package or module version is written outside a release (2026-09-20 decision). Owner: Release pipeline. Enforcement: `[instruction]` — the main-push workflow has no path to a versioned sink | — | instruction | — |
 | **I16** | **One project configuration file.** A project carries at most one configuration file. Two files differing only in format are an error, reported before anything is built. Owner: Config. Enforcement: `[instruction]` | — | instruction | — |
@@ -104,16 +104,22 @@ else, so a change to either is a change to both.
 
 ### Release claim
 
-The record that settles whether a version exists (I5). A GitHub draft release
-bound to a commit SHA.
+The record that settles whether a version exists (I5). A git ref
+`refs/release-claims/v<version>` at a commit, created first and only when absent, and a
+GitHub draft release bound to that commit SHA.
 
 The binding declaration is [`forge/Release/ReleaseClaim.cs`](../forge/Release/ReleaseClaim.cs)
 (`ClaimState`, `ReleaseSink`, `ReleaseClaim`). Signature drift there is a contract change,
 not an implementation detail.
 
 Semantics: the enum's numeric values are the publication order and are load-bearing —
-`ImageLatestTag` is last (I4). The claim carries no per-sink completion state;
-what that costs, and what a resume may therefore assume, is `## Unresolved` U-6.
+`ImageLatestTag` is last, and moves only after the release is published, not with the
+versioned sinks (I4). The claim records each versioned sink's artifact identity — the
+image digest, and the SHA-256 of the global tool package and of the PowerShell module
+package — and a resume skips a sink only when the identity it holds matches (I5). The
+declaration does not carry the identities or the ref yet; they are owed to it by the
+2026-10-03 decisions. How a resume that rebuilds its artifacts compares them is
+`## Unresolved` U-13.
 
 ### Surface manifest
 
@@ -460,17 +466,20 @@ All Config errors are accumulated and reported in one pass (I18).
 
 | Code | Raised when | Retryable | Caller does |
 | --- | --- | --- | --- |
-| `VersionAlreadyExists` | A claim, image tag or git tag holds the version | No | Fail before any write (I5) |
+| `VersionAlreadyExists` | A claim (its ref or its draft), image tag or git tag holds the version, including a claim ref the run's own creation finds at another commit | No | Fail before any write (I5, I13) |
 | `MajorBelowCurrent` | The candidate major is below the highest published | No | Fail before any write |
 | `TagPointsElsewhere` | A git tag for the version exists on another commit | No | Fail; a human resolves it |
 | `NotesSectionMissing` | Notes lack breaking-changes or deprecations | No | Fail before any write (I7) |
 | `SurfaceGateFailed` | The comparison returned blocking differences | No | Fail before any write |
 | `ClaimCreationFailed` | The draft release cannot be created | Yes | Fail; nothing was written |
 | `SinkPublishFailed` | A sink rejected the write | Yes | Fail naming `Sink`; leave the claim open for a resume |
+| `SinkArtifactMismatch` | On a resume, a sink holds the version with an artifact whose identity differs from the claim's | No | Fail naming `Sink` before this run writes anything; a human resolves it |
 | `NotPublishedByCi` | The run is not the CI publishing context | No | Fail (I14) |
 
-`SinkPublishFailed` is the only error that leaves state behind. What a resume may
-conclude from an existing sink artifact is `## Unresolved` U-6.
+`SinkPublishFailed` is the only error that leaves state behind. A failure to move
+`latest` after the release is published is reported as `SinkPublishFailed` naming
+`ImageLatestTag`; it leaves a complete release and is fixed by re-running the move
+(`## Unresolved` U-14).
 
 ### Updater — `UpdateError(UpdateErrorCode Code, string ContainerName, string Message)`
 
@@ -517,6 +526,10 @@ never becomes a takeover (I31).
 | --- | --- | --- | --- |
 | `DeliveryFailed` | The webhook did not accept the payload | Yes | Warn without the URL; do not change the exit status (I44) |
 | `NotConfigured` | Notification was requested with no URL | No | Warn; do not change the exit status |
+
+The Updater's own webhook sender answers the same two conditions the same way, through
+its own type; it shares the webhook setting's name with Build types and no code
+(2026-10-03 decision).
 
 ---
 
@@ -644,26 +657,9 @@ invocation. Each is a different public surface.
 *Blocks:* Config's public surface, I23's enforcement, and the `node-template`
 slice.
 
-**U-6 — The claim carries no per-sink artifact identity.** Red-team finding F4,
-unadjudicated. Nothing in a claim proves an existing sink artifact was produced by that
-claim, and resume safety depends on exactly that.
-*Blocks:* the resume rule after `SinkPublishFailed`, and the strength of I3 and
-I5.
-
-**U-7 — Claim checking and claim creation are not atomic.** Red-team finding F5,
-unadjudicated. The design permits two drafts in the window between the check and the
-creation, so the claim is not by itself a concurrency backstop.
-*Blocks:* I13's sufficiency, and whether a second backstop is needed.
-
-**U-8 — The global tool hosts the Updater, which depends on Notifications.** Red-team
-finding F6, unadjudicated. The tool is declared to share no Build-types code, yet
-Notifications is declared to live within Build types.
-*Blocks:* the Updater's module boundary and the tool's package references.
-
-**U-9 — `latest` moves before the release is published.** Red-team finding F8,
-unadjudicated. `10-design.md` § Control flow 2 moves `latest` at step 7, before the
-fallible step 8, which contradicts I4.
-*Blocks:* I4, and the `ReleaseSink` ordering that encodes it.
+*U-6, U-7, U-8 and U-9 were resolved by the 2026-10-03 decisions on red-team findings
+F4, F5, F6 and F8 and are struck: the claim records each artifact's identity, the claim
+starts with an atomic ref, the Updater owns its notifier, and `latest` moves last.*
 
 **U-10 — The enumerated set of unsupported container shapes.** `10-design.md` states
 the rule and delegates the list here, but the list cannot be written from the design:
@@ -682,3 +678,22 @@ It was resolved on 2026-09-20 by restating § Invariants as tables keyed on a se
 `I<n>` id, which the reader matches; the former domain-qualified ids (`I-REL-n`,
 `I-CFG-n`, `I-BLD-n`, `I-UPD-n`, `I-DOC-n`, `I-SURF-1`) are retired and never reused,
 and the domain is now carried by the subsection heading alone.*
+
+**U-13 — What a resume compares a published artifact against.** The 2026-10-03
+decision on F4 records each artifact's identity at step 5 and skips a sink on a resume
+only when the identities match, but a resume runs step 5 again, and neither the image
+nor the packages are built byte-reproducibly, so the rebuilt artifacts have new
+identities. Two readings follow, and the decision does not choose: keep the recorded
+identities and compare published sinks against them, recording the rebuilt identity
+for a sink only before that sink is first written; or require reproducible builds. A
+second fact bears on the package rows: a feed that adds a repository signature on
+upload, as nuget.org does, serves a package whose SHA-256 differs from the one pushed.
+*Blocks:* the F4 resume check, `SinkArtifactMismatch`, and the `ReleaseClaim`
+identity fields.
+
+**U-14 — How a failed `latest` move is re-run.** The 2026-10-03 decision on F8 fixes a
+failed `latest` move by re-running it, but a re-run of the release pipeline refuses
+the version as existing once its release is published (I5), and only CI may write a
+sink (I14). No path re-runs the move alone.
+*Blocks:* the recovery the F8 decision names, and the `latest` failure mode in
+`10-design.md`.
