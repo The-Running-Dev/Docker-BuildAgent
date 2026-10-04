@@ -14,12 +14,13 @@ public enum ReleaseErrorCode
     ClaimCreationFailed,
     SinkPublishFailed,
     NotPublishedByCi,
+    SinkArtifactMismatch,
 }
 
 /// <summary>
 /// ReleaseError(ReleaseErrorCode Code, ReleaseSink? Sink, string Message) — see
 /// design/20-contract.md, "Release pipeline". <see cref="Sink"/> is populated only for
-/// <see cref="ReleaseErrorCode.SinkPublishFailed"/>.
+/// <see cref="ReleaseErrorCode.SinkPublishFailed"/> and <see cref="ReleaseErrorCode.SinkArtifactMismatch"/>.
 /// </summary>
 public sealed class ReleaseException : Exception
 {

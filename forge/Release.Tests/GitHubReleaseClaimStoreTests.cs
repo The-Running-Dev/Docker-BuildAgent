@@ -157,4 +157,98 @@ public sealed class GitHubReleaseClaimStoreTests
 
         Assert.Equal(ReleaseErrorCode.ClaimCreationFailed, ex.Code);
     }
+
+    private static (GitHubReleaseClaimStore Store, Mock<IReleasesClient> Releases) BuildWithReleases()
+    {
+        var releases = new Mock<IReleasesClient>(MockBehavior.Strict);
+        var repository = new Mock<IRepositoriesClient>();
+        repository.SetupGet(r => r.Release).Returns(releases.Object);
+        var client = new Mock<IGitHubClient>();
+        client.SetupGet(c => c.Repository).Returns(repository.Object);
+        return (new GitHubReleaseClaimStore(Owner, Repo, "token", client.Object), releases);
+    }
+
+    private static Octokit.Release GitHubRelease(long id, string commitSha, bool draft, string body) =>
+        new("url", "html", "assets", "upload", id, "node", Version.ToTagString(), commitSha, Version.ToTagString(), body,
+            draft, false, DateTimeOffset.UnixEpoch, null, null, "tarball", "zipball", Array.Empty<ReleaseAsset>());
+
+    private static ReleaseClaim DraftClaim() =>
+        new(Version, CommitSha, ClaimState.Draft, "Notes", TestSupport.TestManifest.Empty(Version.ToPackageString()));
+
+    // F4: the identity is written into the draft's body, and a later read of the release returns it
+    // with the identities already recorded. The draft for this commit is edited, not a stale one.
+    [Fact]
+    public async Task RecordIdentity_WritesTheIdentityIntoTheDraft_AndFindClaimReadsItBack()
+    {
+        var (store, releases) = BuildWithReleases();
+        releases
+            .Setup(r => r.GetAll(Owner, Repo))
+            .ReturnsAsync(new[]
+            {
+                GitHubRelease(6, OtherCommitSha, draft: true, "stale"),
+                GitHubRelease(7, CommitSha, draft: true, "Notes"),
+            });
+        string? editedBody = null;
+        releases
+            .Setup(r => r.Edit(Owner, Repo, 7, It.IsAny<ReleaseUpdate>()))
+            .Callback<string, string, long, ReleaseUpdate>((_, _, _, update) => editedBody = update.Body)
+            .ReturnsAsync(GitHubRelease(7, CommitSha, draft: true, "Notes"));
+
+        var claim = DraftClaim().WithIdentity(ReleaseSink.ImageVersionedTag, "sha256:image");
+        var updated = await store.RecordIdentityAsync(claim, ReleaseSink.GlobalTool, "sha256:tool");
+
+        Assert.Equal("sha256:tool", updated.IdentityOf(ReleaseSink.GlobalTool));
+        Assert.NotNull(editedBody);
+        Assert.Contains("release-claim:artifact-identities", editedBody);
+
+        releases
+            .Setup(r => r.GetAll(Owner, Repo))
+            .ReturnsAsync(new[] { GitHubRelease(7, CommitSha, draft: true, editedBody!) });
+
+        var read = await store.FindClaimAsync(Version);
+
+        Assert.NotNull(read);
+        Assert.Equal("Notes", read!.Notes);
+        Assert.Equal(Version.ToPackageString(), read.CandidateManifest.ProductVersion);
+        Assert.Equal(
+            new Dictionary<ReleaseSink, string>
+            {
+                [ReleaseSink.ImageVersionedTag] = "sha256:image",
+                [ReleaseSink.GlobalTool] = "sha256:tool",
+            },
+            read.ArtifactIdentities);
+    }
+
+    // An identities marker that cannot be read yields no identities, so a held sink fails closed.
+    [Theory]
+    [InlineData("Notes")]
+    [InlineData("Notes\n\n<!-- release-claim:artifact-identities\n{not json\nrelease-claim:artifact-identities -->\n")]
+    [InlineData("Notes\n\n<!-- release-claim:artifact-identities\n{\"NoSuchSink\":\"sha256:x\",\"GlobalTool\":\"\"}\nrelease-claim:artifact-identities -->\n")]
+    [InlineData("Notes\n\n<!-- release-claim:artifact-identities\n[\"GlobalTool\"]\nrelease-claim:artifact-identities -->\n")]
+    public async Task FindClaim_ReadsNoIdentities_WhenTheMarkerIsAbsentOrUnreadable(string body)
+    {
+        var (store, releases) = BuildWithReleases();
+        releases
+            .Setup(r => r.GetAll(Owner, Repo))
+            .ReturnsAsync(new[] { GitHubRelease(7, CommitSha, draft: true, body) });
+
+        var read = await store.FindClaimAsync(Version);
+
+        Assert.NotNull(read);
+        Assert.Empty(read!.ArtifactIdentities);
+    }
+
+    [Fact]
+    public async Task RecordIdentity_FailsWithClaimCreationFailed_WhenNoDraftExistsForTheCommit()
+    {
+        var (store, releases) = BuildWithReleases();
+        releases
+            .Setup(r => r.GetAll(Owner, Repo))
+            .ReturnsAsync(new[] { GitHubRelease(6, OtherCommitSha, draft: true, "stale") });
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            store.RecordIdentityAsync(DraftClaim(), ReleaseSink.GlobalTool, "sha256:tool"));
+
+        Assert.Equal(ReleaseErrorCode.ClaimCreationFailed, ex.Code);
+    }
 }

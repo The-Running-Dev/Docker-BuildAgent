@@ -44,19 +44,42 @@ public sealed class ReleasePipelineTests
         return (pipeline, claimStore, imageTagChecker, gitTagChecker, highestPublished, ciContext, sinks);
     }
 
+    private static FakeSinkPublisher SinkFor(FakeSinkPublisher[] sinks, ReleaseSink sink) => Array.Find(sinks, s => s.Sink == sink)!;
+
+    private static ReleaseClaim Claim(string commitSha, ClaimState state) =>
+        new(Version, commitSha, state, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+    /// <summary>A release published for this commit, every versioned sink holding its recorded artifact.</summary>
+    private static ReleaseClaim SeedCompleteRelease(FakeClaimStore claimStore, FakeGitTagChecker gitTagChecker, FakeHighestPublishedVersionSource highestPublished, FakeSinkPublisher[] sinks)
+    {
+        var claim = Claim(CommitSha, ClaimState.Published);
+        foreach (var sink in sinks.Where(s => s.Sink != ReleaseSink.ImageLatestTag))
+        {
+            claim = claim.WithIdentity(sink.Sink, sink.BuiltIdentity);
+            sink.HeldIdentity = sink.BuiltIdentity;
+        }
+
+        claimStore.SeedRef(Version, CommitSha);
+        claimStore.Seed(claim);
+        gitTagChecker.Seed(Version, CommitSha);
+        highestPublished.Highest = Version;
+        return claim;
+    }
+
     // S3.1: A version already held by a claim, a versioned image tag or a git tag fails with
-    // VersionAlreadyExists before any write, naming which of the three held it (I5).
+    // VersionAlreadyExists before any write, naming which of the three held it (I5). A release
+    // published for this run's own commit is a completion re-run instead, covered below.
     [Fact]
     public async Task Publish_FailsWithVersionAlreadyExists_WhenClaimAlreadyHoldsVersion()
     {
         var (pipeline, claimStore, _, _, _, _, sinks) = Build();
-        claimStore.Seed(new ReleaseClaim(Version, CommitSha, ClaimState.Published, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+        claimStore.Seed(Claim(OtherCommitSha, ClaimState.Published));
 
         var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
             pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
 
         Assert.Equal(ReleaseErrorCode.VersionAlreadyExists, ex.Code);
-        Assert.Contains(CommitSha, ex.Message);
+        Assert.Contains(OtherCommitSha, ex.Message);
         Assert.All(sinks, s => Assert.False(s.WasCalled));
     }
 
@@ -270,6 +293,19 @@ public sealed class ReleasePipelineTests
             (claimStore, _, _, _, _, _) => claimStore.SeedRef(Version, OtherCommitSha),
             (claimStore, _, _, _, _, _) => claimStore.BeforeCreateRef = store => store.SeedRef(Version, OtherCommitSha),
             (_, _, _, _, _, sinks) => sinks[0].ShouldFail = true,
+            (_, _, _, _, _, sinks) => sinks[2].ShouldFail = true,
+            (claimStore, _, _, _, _, _) => claimStore.FailRecordIdentity = new InvalidOperationException("boom"),
+            (_, _, _, _, _, sinks) => sinks[1].HeldIdentity = "sha256:someone-else",
+            (claimStore, _, _, _, _, sinks) =>
+            {
+                claimStore.SeedRef(Version, CommitSha);
+                sinks[2].HeldIdentity = "sha256:unrecorded";
+            },
+            (claimStore, _, _, _, _, sinks) =>
+            {
+                claimStore.Seed(Claim(CommitSha, ClaimState.Draft).WithIdentity(sinks[3].Sink, "sha256:recorded"));
+                sinks[3].HeldIdentity = "sha256:different";
+            },
         };
     }
 
@@ -533,7 +569,319 @@ public sealed class ReleasePipelineTests
         Assert.Equal(new[] { ClaimState.Published }, states);
     }
 
-    private sealed class OrderRecordingSink : IReleaseSinkPublisher
+    // A versioned sink must report its artifact identity, so the pipeline refuses one that cannot.
+    [Fact]
+    public void Constructor_RejectsAVersionedSinkThatReportsNoIdentity()
+    {
+        var ex = Assert.Throws<ArgumentException>(() => new ReleasePipeline(
+            new FakeClaimStore(),
+            new FakeImageTagChecker(),
+            new FakeGitTagChecker(),
+            new FakeHighestPublishedVersionSource(),
+            new FakeCiPublishingContext(),
+            new IReleaseSinkPublisher[] { new StateRecordingSink(ReleaseSink.GlobalTool, new()) }));
+
+        Assert.Contains(nameof(ReleaseSink.GlobalTool), ex.Message);
+    }
+
+    // F4: each versioned sink's identity is recorded in the claim just before that sink is
+    // written; latest records none.
+    [Fact]
+    public async Task Publish_RecordsEachSinksIdentity_JustBeforeWritingIt()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(
+            new[] { ReleaseSink.ImageVersionedTag, ReleaseSink.GlobalTool, ReleaseSink.PowerShellModule },
+            claimStore.IdentitiesRecorded);
+        foreach (var sink in sinks.Where(s => s.Sink != ReleaseSink.ImageLatestTag))
+        {
+            Assert.Equal(sink.BuiltIdentity, sink.IdentityRecordedAtWrite);
+            Assert.Equal(sink.BuiltIdentity, claim.IdentityOf(sink.Sink));
+        }
+
+        Assert.Null(claim.IdentityOf(ReleaseSink.ImageLatestTag));
+        Assert.Equal(3, claimStore.Claims[Version.ToTagString()].ArtifactIdentities.Count);
+    }
+
+    // F4: a resume skips a sink that holds the version with the identity the claim records, and
+    // leaves that identity as it was; the unwritten sinks are written.
+    [Fact]
+    public async Task Publish_ResumeSkipsASinkHoldingTheClaimsArtifact_AndKeepsItsIdentity()
+    {
+        var (pipeline, claimStore, imageTagChecker, _, _, _, sinks) = Build();
+        var image = SinkFor(sinks, ReleaseSink.ImageVersionedTag);
+        image.HeldIdentity = "sha256:first-run";
+        image.BuiltIdentity = "sha256:rebuilt";
+        imageTagChecker.SeedExisting(Version);
+        claimStore.SeedRef(Version, CommitSha);
+        claimStore.Seed(Claim(CommitSha, ClaimState.Draft).WithIdentity(ReleaseSink.ImageVersionedTag, "sha256:first-run"));
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(ClaimState.Published, claim.State);
+        Assert.False(image.WasCalled);
+        Assert.Equal("sha256:first-run", claim.IdentityOf(ReleaseSink.ImageVersionedTag));
+        Assert.DoesNotContain(ReleaseSink.ImageVersionedTag, claimStore.IdentitiesRecorded);
+        Assert.True(SinkFor(sinks, ReleaseSink.GlobalTool).WasCalled);
+        Assert.True(SinkFor(sinks, ReleaseSink.PowerShellModule).WasCalled);
+        Assert.True(SinkFor(sinks, ReleaseSink.ImageLatestTag).WasCalled);
+    }
+
+    // F4: a sink holding a different artifact than the claim records fails naming that sink, and
+    // nothing is written or recorded.
+    [Fact]
+    public async Task Publish_FailsWithSinkArtifactMismatch_WhenAHeldSinkDiffersFromTheClaim()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        SinkFor(sinks, ReleaseSink.GlobalTool).HeldIdentity = "sha256:other-build";
+        claimStore.SeedRef(Version, CommitSha);
+        claimStore.Seed(Claim(CommitSha, ClaimState.Draft).WithIdentity(ReleaseSink.GlobalTool, "sha256:recorded"));
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.SinkArtifactMismatch, ex.Code);
+        Assert.Equal(ReleaseSink.GlobalTool, ex.Sink);
+        Assert.Contains("sha256:other-build", ex.Message);
+        Assert.Contains("sha256:recorded", ex.Message);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+        Assert.Empty(claimStore.IdentitiesRecorded);
+        Assert.Equal(ClaimState.Draft, Assert.Single(claimStore.Claims).Value.State);
+    }
+
+    // F4: a sink holding the version with no identity recorded for it does not match.
+    [Fact]
+    public async Task Publish_FailsWithSinkArtifactMismatch_WhenTheClaimRecordsNoIdentityForAHeldSink()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        SinkFor(sinks, ReleaseSink.PowerShellModule).HeldIdentity = "sha256:unknown";
+        claimStore.Seed(Claim(CommitSha, ClaimState.Draft));
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.SinkArtifactMismatch, ex.Code);
+        Assert.Equal(ReleaseSink.PowerShellModule, ex.Sink);
+        Assert.Contains("records no identity", ex.Message);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+        Assert.Empty(claimStore.IdentitiesRecorded);
+    }
+
+    // F4: under a claim ref with no draft there is no recorded identity, so a held sink fails and
+    // no draft is created.
+    [Fact]
+    public async Task Publish_FailsWithSinkArtifactMismatch_WhenASinkIsHeldUnderAClaimRefWithNoDraft()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        SinkFor(sinks, ReleaseSink.ImageVersionedTag).HeldIdentity = "sha256:orphan";
+        claimStore.SeedRef(Version, CommitSha);
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.SinkArtifactMismatch, ex.Code);
+        Assert.Equal(ReleaseSink.ImageVersionedTag, ex.Sink);
+        Assert.Equal(0, claimStore.DraftsCreated);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // F4: every held sink is compared before any write, so a mismatch on a later sink is found
+    // before the first sink is written.
+    [Fact]
+    public async Task Publish_FindsALaterSinksMismatch_BeforeWritingTheFirstSink()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        SinkFor(sinks, ReleaseSink.PowerShellModule).HeldIdentity = "sha256:other-build";
+        claimStore.SeedRef(Version, CommitSha);
+        claimStore.Seed(Claim(CommitSha, ClaimState.Draft).WithIdentity(ReleaseSink.PowerShellModule, "sha256:recorded"));
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseSink.PowerShellModule, ex.Sink);
+        Assert.False(SinkFor(sinks, ReleaseSink.ImageVersionedTag).WasCalled);
+        Assert.False(SinkFor(sinks, ReleaseSink.GlobalTool).WasCalled);
+    }
+
+    // F4: a recorded identity for a sink that does not hold the version is replaced with this
+    // build's identity before the sink is written.
+    [Fact]
+    public async Task Publish_RecordsThisBuildsIdentity_ForAnUnwrittenSinkWithAnOldRecord()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        claimStore.SeedRef(Version, CommitSha);
+        claimStore.Seed(Claim(CommitSha, ClaimState.Draft).WithIdentity(ReleaseSink.GlobalTool, "sha256:failed-write"));
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        var tool = SinkFor(sinks, ReleaseSink.GlobalTool);
+        Assert.Equal(tool.BuiltIdentity, tool.IdentityRecordedAtWrite);
+        Assert.Equal(tool.BuiltIdentity, claim.IdentityOf(ReleaseSink.GlobalTool));
+    }
+
+    // A fresh run finding a sink that already holds the version with no claim at all refuses
+    // before claiming anything.
+    [Fact]
+    public async Task Publish_FailsWithVersionAlreadyExists_WhenAnUnclaimedSinkHoldsTheVersion()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        SinkFor(sinks, ReleaseSink.GlobalTool).HeldIdentity = "sha256:someone-else";
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.VersionAlreadyExists, ex.Code);
+        Assert.Contains(nameof(ReleaseSink.GlobalTool), ex.Message);
+        Assert.Empty(claimStore.Refs);
+        Assert.Equal(0, claimStore.DraftsCreated);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // A failure to record a sink's identity fails naming the sink, and the sink is not written.
+    [Fact]
+    public async Task Publish_FailsWithSinkPublishFailed_WhenTheIdentityCannotBeRecorded()
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        claimStore.FailRecordIdentity = new InvalidOperationException("release edit rejected");
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.SinkPublishFailed, ex.Code);
+        Assert.Equal(ReleaseSink.ImageVersionedTag, ex.Sink);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+        Assert.Equal(ClaimState.Draft, Assert.Single(claimStore.Claims).Value.State);
+    }
+
+    // A resume whose earlier attempt already created the git tag at this commit continues.
+    [Fact]
+    public async Task Publish_ResumesWhenTheGitTagIsAlreadyAtTheCommit()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, _, _, _) = Build();
+        gitTagChecker.Seed(Version, CommitSha);
+        claimStore.SeedRef(Version, CommitSha);
+        claimStore.Seed(Claim(CommitSha, ClaimState.Draft));
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(ClaimState.Published, claim.State);
+    }
+
+    // Completion re-run: the release is published for this commit and complete, so only latest
+    // moves; nothing else is written.
+    [Fact]
+    public async Task Publish_CompletionRerun_MovesOnlyLatest()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, highestPublished, _, sinks) = Build();
+        var seeded = SeedCompleteRelease(claimStore, gitTagChecker, highestPublished, sinks);
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Same(seeded, claim);
+        Assert.True(SinkFor(sinks, ReleaseSink.ImageLatestTag).WasCalled);
+        Assert.All(sinks.Where(s => s.Sink != ReleaseSink.ImageLatestTag), s => Assert.False(s.WasCalled));
+        Assert.Equal(0, claimStore.DraftsCreated);
+        Assert.Empty(claimStore.IdentitiesRecorded);
+    }
+
+    // Completion re-run: latest is never moved back to a release that is no longer the highest.
+    [Fact]
+    public async Task Publish_CompletionRerun_FailsWithVersionAlreadyExists_WhenNotTheHighestRelease()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, highestPublished, _, sinks) = Build();
+        SeedCompleteRelease(claimStore, gitTagChecker, highestPublished, sinks);
+        highestPublished.Highest = new ReleaseVersion(2, 1, 0, null);
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.VersionAlreadyExists, ex.Code);
+        Assert.Contains("2.1.0", ex.Message);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // Completion re-run: a sink holding another artifact than the claim records fails naming it.
+    [Fact]
+    public async Task Publish_CompletionRerun_FailsWithSinkArtifactMismatch_WhenASinkDiffers()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, highestPublished, _, sinks) = Build();
+        SeedCompleteRelease(claimStore, gitTagChecker, highestPublished, sinks);
+        SinkFor(sinks, ReleaseSink.GlobalTool).HeldIdentity = "sha256:replaced";
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.SinkArtifactMismatch, ex.Code);
+        Assert.Equal(ReleaseSink.GlobalTool, ex.Sink);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // Completion re-run: a published release missing from a versioned sink fails naming it.
+    [Fact]
+    public async Task Publish_CompletionRerun_FailsWithSinkArtifactMismatch_WhenASinkDoesNotHoldTheVersion()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, highestPublished, _, sinks) = Build();
+        SeedCompleteRelease(claimStore, gitTagChecker, highestPublished, sinks);
+        SinkFor(sinks, ReleaseSink.PowerShellModule).HeldIdentity = null;
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.SinkArtifactMismatch, ex.Code);
+        Assert.Equal(ReleaseSink.PowerShellModule, ex.Sink);
+        Assert.Contains("does not hold", ex.Message);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // Completion re-run: the git tag must point at the release's commit.
+    [Fact]
+    public async Task Publish_CompletionRerun_FailsWithTagPointsElsewhere_WhenTheTagIsAtAnotherCommit()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, highestPublished, _, sinks) = Build();
+        SeedCompleteRelease(claimStore, gitTagChecker, highestPublished, sinks);
+        gitTagChecker.Seed(Version, OtherCommitSha);
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.TagPointsElsewhere, ex.Code);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // Completion re-run: a published release with no git tag is not completed.
+    [Fact]
+    public async Task Publish_CompletionRerun_FailsWithVersionAlreadyExists_WhenTheTagIsAbsent()
+    {
+        var (pipeline, claimStore, _, _, highestPublished, _, sinks) = Build();
+        SeedCompleteRelease(claimStore, new FakeGitTagChecker(), highestPublished, sinks);
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.VersionAlreadyExists, ex.Code);
+        Assert.Contains("git tag", ex.Message);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // Completion re-run: a failure to move latest fails naming ImageLatestTag.
+    [Fact]
+    public async Task Publish_CompletionRerun_FailsWithSinkPublishFailed_WhenLatestCannotMove()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, highestPublished, _, sinks) = Build();
+        SeedCompleteRelease(claimStore, gitTagChecker, highestPublished, sinks);
+        SinkFor(sinks, ReleaseSink.ImageLatestTag).ShouldFail = true;
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.SinkPublishFailed, ex.Code);
+        Assert.Equal(ReleaseSink.ImageLatestTag, ex.Sink);
+    }
+
+    private sealed class OrderRecordingSink : IVersionedSinkPublisher
     {
         private readonly System.Collections.Generic.List<string> _callOrder;
 
@@ -544,6 +892,10 @@ public sealed class ReleasePipelineTests
         }
 
         public ReleaseSink Sink { get; }
+
+        public string BuiltIdentity => $"sha256:{Sink}";
+
+        public Task<string?> FindPublishedIdentityAsync(ReleaseVersion version) => Task.FromResult<string?>(null);
 
         public Task PublishAsync(ReleaseClaim claim)
         {
