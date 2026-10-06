@@ -1,6 +1,7 @@
 # PowerShell Module Tests
 #
-# Runs the Docker-BuildAgent module's Pester tests on Windows PowerShell 5.1 and PowerShell 7.
+# Runs the Docker-BuildAgent module's Pester tests, and those of the local build scripts in
+# scripts/nuke, on Windows PowerShell 5.1 and PowerShell 7.
 # Both are gates, not best effort: CI and both release workflows call this and depend on it.
 # `docker` is mocked, so a Windows runner (which cannot run Linux containers) is sufficient.
 
@@ -31,4 +32,4 @@ jobs:
       - name: Run Module Tests
         run: |
           Import-Module Pester -MinimumVersion 5.0
-          Invoke-Pester -Path scripts/powershell-module/Docker-BuildAgent.Tests.ps1 -CI -Output Detailed
+          Invoke-Pester -Path scripts/powershell-module/Docker-BuildAgent.Tests.ps1, scripts/nuke/nuke-helpers.Tests.ps1 -CI -Output Detailed

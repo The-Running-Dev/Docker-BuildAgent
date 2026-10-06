@@ -348,7 +348,6 @@ function Invoke-DotNetBuild {
 .NOTES
     Development builds use:
     - Debug configuration
-    - --no-restore flag for faster builds
     - Minimal verbosity
     - Disabled node reuse and shared compilation for isolation
     
@@ -376,7 +375,8 @@ function Invoke-DotNetBuild {
         Write-Host "   $ProjectOrSolution -o $OutputDirectory" -ForegroundColor Yellow
 
         Invoke-SafeCommand {
-            & $env:DOTNET_EXE build $ProjectOrSolution -o $OutputDirectory -c Debug --no-restore /m:1 /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity minimal | Out-Null
+            $output = & $env:DOTNET_EXE build $ProjectOrSolution -o $OutputDirectory -c Debug /m:1 /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity minimal
+            Write-BuildOutputOnFailure $output
         }
         
         Write-Host "[OK] Development Build Completed" -ForegroundColor Green
@@ -386,7 +386,8 @@ function Invoke-DotNetBuild {
         Write-Host "   $ProjectOrSolution -o $OutputDirectory" -ForegroundColor Yellow
 
         Invoke-SafeCommand {
-            & $env:DOTNET_EXE build $ProjectOrSolution -o $OutputDirectory -c Release /m:1 /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet | Out-Null
+            $output = & $env:DOTNET_EXE build $ProjectOrSolution -o $OutputDirectory -c Release /m:1 /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet
+            Write-BuildOutputOnFailure $output
         }
         
         Write-Host "[OK] Production Build Completed" -ForegroundColor Green
@@ -711,6 +712,27 @@ function Get-PackageManager {
     Write-Host "[DETECT] Detected Package Manager: $pm"
     
     return $pm
+}
+
+function Write-BuildOutputOnFailure {
+<#
+.SYNOPSIS
+    Print captured build output only when the build failed.
+.DESCRIPTION
+    A successful build stays quiet. A failed build's output holds the compiler errors, which are the
+    only way to tell what went wrong, so it is written to the host. Reads $LASTEXITCODE and leaves it
+    unchanged for Invoke-SafeCommand.
+.PARAMETER Output
+    The lines the build wrote.
+#>
+    param(
+        [Parameter(Mandatory = $false)]
+        [object[]]$Output
+    )
+
+    if ($LASTEXITCODE -and $LASTEXITCODE -ne 0 -and $Output) {
+        $Output | ForEach-Object { Write-Host $_ }
+    }
 }
 
 function Invoke-SafeCommand {
