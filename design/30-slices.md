@@ -40,7 +40,7 @@ named in the lines below. Where a slice landed with a stated gap, the gap is in 
 #28, PRs #50 and #51, merged 2026-09-24. The Updater is in `forge/Update`. S2.14 and S2.15 could not be honored as worded (2026-09-21 entry in `90-decisions.md`). Live-daemon behaviour on Windows is the stated gap of S2.23.
 
 ### S3 — A version publishes exactly once
-#29, PR #52, merged 2026-09-25. The `Release` namespace is in `forge/Release`, proved against fakes; nothing outside it calls `ReleasePipeline`, and the live `PublishToGitHub` target is unchanged (2026-09-25 entry in `90-decisions.md`). `concurrency: group: buildagent-publish` is on all three publishing workflows. S3.8 and S3.9 are withdrawn.
+#29, PR #52, merged 2026-09-25. The `Release` namespace is in `forge/Release`, proved against fakes; the release workflows call `ReleasePipeline` through `forge/Publish` (2026-10-06 decision on the release entry point, which closes the 2026-09-25 gap); the `PublishToGitHub` target remains for consuming repositories' own releases. `concurrency: group: buildagent-publish` is on all three publishing workflows. S3.8 and S3.9 are withdrawn.
 
 ### S4 — When the new image does not come up, the old one comes back
 #30, PR #53, merged 2026-09-25. Health wait, restore and exit statuses `10` to `12` are in `forge/Update`. S4.13 is withdrawn.
@@ -101,6 +101,10 @@ withdrawn until the boundary is settled.
 **The unsupported container shape list (U-10).** Resolved by the 2026-10-06 decision on
 unreproduced settings: beyond anonymous volumes and legacy container links, the update refuses
 every setting the replacement does not carry over, and carries the logging configuration over.
+
+**The wrapper's and NUKE's own parameters on the surface (U-15).** The build wrapper's
+parameters and the `ChangeLogSource` field are documented but derived into no manifest item, so
+no slice can protect them or clear the docs check's ten recorded findings until U-15 is decided.
 
 **Recovering prior-container residue.** The contract's tool surface has `update --clear-lock` and no
 command that returns a prior container left behind by an interrupted update. An operator can

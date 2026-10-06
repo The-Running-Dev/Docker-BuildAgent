@@ -9,10 +9,11 @@ using Octokit;
 namespace Release;
 
 /// <summary>
-/// The highest published major (I6), read from GitHub releases the same way
-/// <c>Surface.GitHubReleaseManifestSource</c> finds the baseline release — published (non-draft),
-/// highest by <see cref="ReleaseVersion"/> ordering rather than by publish date, since a
-/// back-published older version must not raise the bar.
+/// The highest published stable release (I6, and the release <c>latest</c> names), read from
+/// GitHub releases the same way <c>Surface.GitHubReleaseManifestSource</c> finds the baseline
+/// release — published (non-draft), highest by <see cref="ReleaseVersion"/> precedence rather than
+/// by publish date, since a back-published older version must not raise the bar. Pre-releases are
+/// left out: a 3.0.0-rc1 does not stop a 2.x patch, and never becomes <c>latest</c>.
 /// </summary>
 public sealed class GitHubHighestPublishedVersionSource : IHighestPublishedVersionSource
 {
@@ -34,10 +35,8 @@ public sealed class GitHubHighestPublishedVersionSource : IHighestPublishedVersi
         return releases
             .Where(r => !r.Draft && r.PublishedAt.HasValue)
             .Select(r => TryParse(r.TagName))
-            .Where(v => v != null)
-            .OrderByDescending(v => v!.Major)
-            .ThenByDescending(v => v!.Minor)
-            .ThenByDescending(v => v!.Patch)
+            .Where(v => v is { IsPreRelease: false })
+            .OrderByDescending(v => v)
             .FirstOrDefault();
     }
 

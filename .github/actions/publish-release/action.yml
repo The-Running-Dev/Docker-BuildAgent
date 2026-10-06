@@ -1,0 +1,72 @@
+# .github/actions/publish-release/action.yml (composite action)
+#
+# Publishes one release through forge/Publish (design/10-design.md, control flow 2): the surface
+# gate, the release notes, the image, global tool and PowerShell module builds, the claim, the three
+# versioned sinks, the GitHub release and, for the highest stable release, the image's `latest`.
+#
+# The version is the pushed tag when `tag` is given; otherwise it is GitVersion's MajorMinorPatch for
+# the checked-out commit, with `label` as its pre-release label. A pre-release never moves `latest`.
+#
+# Usage (after checkout with full history and submodules, and ./.github/actions/common):
+#   - uses: ./.github/actions/publish-release
+#     with:
+#       tag: ${{ github.ref_name }}        # or label: rc1, or neither
+#       github-token: ${{ secrets.GITHUB_TOKEN }}
+#       registry-token: ${{ secrets.REGISTRY_TOKEN }}
+#       nuget-api-key: ${{ secrets.NUGET_API_KEY }}
+#       psgallery-api-key: ${{ secrets.PSGALLERY_API_KEY }}
+
+name: Publish Release
+description: Publishes a release to the image registry, NuGet, the PowerShell Gallery and GitHub
+
+inputs:
+  tag:
+    description: The pushed release tag (v<version>); leave empty to take the version from GitVersion
+    required: false
+    default: ''
+  label:
+    description: The pre-release label (letters and digits, e.g. rc1) when the version comes from GitVersion
+    required: false
+    default: ''
+  github-token:
+    description: Token for the claim ref, the draft and the GitHub release
+    required: true
+  registry-token:
+    description: Token that can push to ghcr.io
+    required: true
+  nuget-api-key:
+    description: nuget.org API key for BuildAgent.Tool
+    required: true
+  psgallery-api-key:
+    description: PowerShell Gallery API key for Docker-BuildAgent
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Log in to the Registry
+      shell: bash
+      env:
+        REGISTRY_TOKEN: ${{ inputs.registry-token }}
+        REGISTRY_USER: ${{ github.repository_owner }}
+      run: echo "$REGISTRY_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
+
+    - name: Publish
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        NUGET_API_KEY: ${{ inputs.nuget-api-key }}
+        PSGALLERY_API_KEY: ${{ inputs.psgallery-api-key }}
+        RELEASE_TAG: ${{ inputs.tag }}
+        RELEASE_LABEL: ${{ inputs.label }}
+      run: |
+        if [ -n "$RELEASE_TAG" ]; then
+          set -- --tag "$RELEASE_TAG"
+        else
+          core="$(dotnet-gitversion /showvariable MajorMinorPatch)"
+          set -- --core "$core"
+          if [ -n "$RELEASE_LABEL" ]; then
+            set -- "$@" --label "$RELEASE_LABEL"
+          fi
+        fi
+        dotnet run --project forge/Publish --configuration Release -- "$@"

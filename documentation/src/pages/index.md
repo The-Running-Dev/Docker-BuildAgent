@@ -26,6 +26,7 @@ The documentation site at [build-agent.subzerodev.com](https://build-agent.subze
 - [Docker Templates](https://build-agent.subzerodev.com/docs/docker-templates)
 - [GitHub Actions](https://build-agent.subzerodev.com/docs/ci-cd): example workflows and this repository's own
 - [Release Management](https://build-agent.subzerodev.com/docs/releases) and [Compatibility and Support](https://build-agent.subzerodev.com/docs/compatibility)
+- [Security Model](https://build-agent.subzerodev.com/docs/security)
 - [PowerShell Module](https://build-agent.subzerodev.com/docs/powershell-module) and [Update and Rollback Tool](https://build-agent.subzerodev.com/docs/update-tool)
 - [Development Guide](https://build-agent.subzerodev.com/docs/architecture/development-guide)
 - [Troubleshooting & FAQ](https://build-agent.subzerodev.com/docs/troubleshooting) and [Project Status](https://build-agent.subzerodev.com/docs/status)
@@ -33,10 +34,11 @@ The documentation site at [build-agent.subzerodev.com](https://build-agent.subze
 ## What the image contains
 
 - Base image `mcr.microsoft.com/devcontainers/javascript-node:22-bookworm` (Node.js 22 and npm), overridable with the `BASE_IMAGE` build argument
-- TypeScript, tsx and the Angular CLI
+- TypeScript, tsx, the Angular CLI and `angular-cli-ghpages`
 - PowerShell, which is the default shell
 - The Docker CLI with the Buildx and Compose plugins
 - .NET SDKs 8, 9 and 10, Git, GitVersion and the NUKE global tool
+- The QNAP QDK (`qbuild`), for building QNAP packages
 - The `build` command, which takes one of five build types: `docker`, `node`, `node-in-docker`, `node-template` and `forge`
 
 The working directory is `/workspace`. The image is published as `ghcr.io/the-running-dev/build-agent`. `latest` moves on every push to `main` and on every release; a versioned tag is written only by a release.

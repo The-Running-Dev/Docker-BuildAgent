@@ -39,7 +39,8 @@ The parameters of each type are listed in `documentation/docs/parameters.md`, an
 | `NodeInDocker` | The `node-in-docker` build type; it references `Node` and `Docker` | `NodeInDocker.Tests` | `build <type>` inside the image |
 | `Forge` | The `forge` build type (change log generation) | `Forge.Tests` | `build <type>` inside the image |
 | `Surface` | Derives, validates, serializes and compares the surface manifest | `Surface.Tests` | Types (Surface manifest); Persisted schemas (Surface manifest asset); Error semantics (Surface model) |
-| `Release` | Release version, release claim and release notes validation; the release pipeline types | `Release.Tests` | Types (Release version, Release claim); Error semantics (Release pipeline) |
+| `Release` | Release version, release claim, release notes composition and validation; the release pipeline, its sink publishers and packagers | `Release.Tests` | Types (Release version, Release claim); Error semantics (Release pipeline) |
+| `Publish` | The release entry point the release workflows run through `.github/actions/publish-release`; it refuses to run outside CI | none (its parts are tested in `Release.Tests`) | Types (Release version); Error semantics (Release pipeline) |
 | `Update` | The container updater: health check, rollback, lock and update log | `Update.Tests` | Types (Container update, Prior image pin and prior container); Persisted schemas (Update log); Error semantics (Updater) |
 | `Tool` | The global tool `BuildAgent.Tool`, command `build-agent`; today it handles the `update` command and calls `Update`. Packing needs `-p:ReleaseVersion=<version>` | none | Global tool |
 | `DocsCheck` | Checks that the documentation names real paths, commands, parameters and build types, and the canonical-contract rules | `DocsCheck.Tests` | Error semantics (Docs check) |
@@ -48,8 +49,8 @@ How the projects relate:
 
 - `Docker`, `Node`, `NodeInDocker` and `Forge` are the executables that implement build types. They reference `Common` and `Config`.
 - `Surface` references `Common`. `Release` references `Common` and `Surface`. `DocsCheck` references `Surface`.
-- `Tool` references `Update`.
-- `Release` and `Surface` are not run by any workflow as a build step. They are exercised by their tests and, for `Surface`, by `DocsCheck`.
+- `Tool` references `Update`. `Publish` references `Release` and `Surface`.
+- `Release` and `Surface` run in a workflow only through `Publish`, in the release workflows. They are exercised by their tests and, for `Surface`, by `DocsCheck`.
 
 ## Core Architecture
 
@@ -134,7 +135,7 @@ dist/
 package.json
 ```
 
-The Node package manager is detected from lock files in the project root: `pnpm-lock.yaml` selects pnpm, `yarn.lock` selects yarn, anything else selects npm. `NodeService` and the static `Node` utility check them in a different order, so a project with both lock files gets different answers.
+The Node package manager is detected from lock files in the project root: `pnpm-lock.yaml` selects pnpm, `yarn.lock` selects yarn, anything else selects npm.
 
 ## Which command runs what
 

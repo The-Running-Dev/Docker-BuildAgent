@@ -21,9 +21,10 @@ namespace Release;
 /// The candidate manifest and the artifact identities are round-tripped through the release body
 /// as hidden HTML comments (<c>manifest-json</c> and <c>artifact-identities</c> markers) after the
 /// human-readable notes, since GitHub releases have no separate structured-metadata field; the
-/// surface-manifest.json asset (S1) is the canonical, durable copy of the manifest. A body whose
-/// identities cannot be read yields none, so a sink holding the version does not match (fails
-/// closed).
+/// surface-manifest.json asset (S1) is the canonical, durable copy of the manifest, and the next
+/// release's baseline. Publishing uploads that asset first when the draft lacks it, so no release
+/// is published without it. A body whose identities cannot be read yields none, so a sink holding
+/// the version does not match (fails closed).
 /// </summary>
 public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
 {
@@ -31,6 +32,8 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
     private const string ManifestMarkerEnd = "release-claim:manifest-json -->";
     private const string IdentitiesMarkerStart = "<!-- release-claim:artifact-identities";
     private const string IdentitiesMarkerEnd = "release-claim:artifact-identities -->";
+
+    private const string ManifestAssetName = GitHubReleaseManifestSource.ManifestAssetName;
 
     private readonly string _owner;
     private readonly string _repo;
@@ -161,9 +164,38 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
     public async Task PublishAsync(ReleaseClaim claim)
     {
         var releaseId = await FindDraftIdAsync(claim, "publish").ConfigureAwait(false);
+        await EnsureManifestAssetAsync(claim, releaseId).ConfigureAwait(false);
 
         var update = new ReleaseUpdate { Draft = false };
         await _client.Repository.Release.Edit(_owner, _repo, releaseId, update).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Uploads the claim's candidate manifest as <see cref="ManifestAssetName"/> unless the draft
+    /// already carries it, as a resumed draft may. A claim whose manifest could not be read back
+    /// from the draft is refused rather than published with a placeholder baseline.
+    /// </summary>
+    private async Task EnsureManifestAssetAsync(ReleaseClaim claim, long releaseId)
+    {
+        var release = await _client.Repository.Release.Get(_owner, _repo, releaseId).ConfigureAwait(false);
+        if (release.Assets?.Any(a => string.Equals(a.Name, ManifestAssetName, StringComparison.Ordinal)) == true)
+        {
+            return;
+        }
+
+        if (claim.CandidateManifest.ManifestSchemaVersion < 1)
+        {
+            throw new ReleaseException(
+                ReleaseErrorCode.ClaimCreationFailed,
+                null,
+                $"The draft for '{claim.Version.ToTagString()}' has no readable surface manifest to publish as {ManifestAssetName}.");
+        }
+
+        var json = SurfaceManifestSerializer.Serialize(claim.CandidateManifest);
+        using var stream = new System.IO.MemoryStream(SurfaceManifestSerializer.Utf8NoBom.GetBytes(json));
+        await _client.Repository.Release
+            .UploadAsset(release, new ReleaseAssetUpload(ManifestAssetName, "application/json", stream, null))
+            .ConfigureAwait(false);
     }
 
     /// <summary>

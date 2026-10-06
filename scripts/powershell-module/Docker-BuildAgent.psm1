@@ -4,7 +4,13 @@ param()
 
 # --- Module Configuration ---
 # The default image is pinned to this module's own version (never `latest`); an override is used verbatim.
-$script:ModuleVersion = [regex]::Match((Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Docker-BuildAgent.psd1') -Raw), "(?m)^\s*ModuleVersion\s*=\s*'([^']+)'").Groups[1].Value
+# A pre-release module (PSData Prerelease = 'rc1') pins the image of the same pre-release, 2.1.0-rc1.
+$script:ModuleManifestText = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'Docker-BuildAgent.psd1') -Raw
+$script:ModuleVersion = [regex]::Match($script:ModuleManifestText, "(?m)^\s*ModuleVersion\s*=\s*'([^']+)'").Groups[1].Value
+$script:ModulePrerelease = [regex]::Match($script:ModuleManifestText, "(?m)^\s*Prerelease\s*=\s*'([^']+)'").Groups[1].Value
+if ($script:ModulePrerelease) {
+    $script:ModuleVersion = "$script:ModuleVersion-$script:ModulePrerelease"
+}
 
 $script:BuildAgentConfig = @{
     DockerImage   = "ghcr.io/the-running-dev/build-agent:$script:ModuleVersion"

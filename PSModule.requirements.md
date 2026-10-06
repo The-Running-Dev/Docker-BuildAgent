@@ -42,7 +42,7 @@ Define a reusable requirements specification for the Docker-BuildAgent PowerShel
 ### R-CONFIG-002: Default values
 
 - Defaults must include:
-  - DockerImage = ghcr.io/the-running-dev/build-agent:<module version>, the module's own `ModuleVersion` from the manifest (for example `2.0.0`), never `latest`
+  - DockerImage = ghcr.io/the-running-dev/build-agent:<module version>, the module's own `ModuleVersion` from the manifest (for example `2.0.0`), followed by `-<label>` when the manifest's `PSData` carries a `Prerelease` label (for example `2.1.0-rc1`), never `latest`
   - DockerHost = tcp://host.docker.internal:2375
   - WorkspacePath = module path
   - ArtifactsDir = artifacts

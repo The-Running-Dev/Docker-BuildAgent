@@ -38,16 +38,16 @@ overwritten on every regeneration — it is not written by hand.
 | **I1** | **One version, three sinks.** A release stamps exactly one version value into the versioned image tag, the global tool package and the PowerShell module manifest. No sink derives, defaults or increments its own version. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I2** | **A published versioned image tag is immutable.** From v2.0.0 onward, a versioned tag's content never changes and the tag is never deleted or expired. Owner: Release pipeline. Enforcement: `[instruction]` — the registry does not enforce it, and the design does not rely on the registry to | — | instruction | — |
 | **I3** | **No sink is written before the claim exists.** Version selection, existence checking, the surface gate and notes validation write nothing. The first write of a release is the claim, which records every artifact's identity before any sink is written. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
-| **I4** | **A partial release never moves `latest`.** `latest` moves only after every versioned sink holds the version. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
-| **I5** | **A version that exists is never republished.** Existence is the disjunction of: a claim for that version, a versioned image tag for that version, or a git tag for that version. Any one of the three makes the version taken, including when the operator supplies it manually. A sink artifact counts as under a claim only when its identity matches the identity the claim records for that sink. A re-run for the commit of a published release republishes nothing: when the version is the highest published release and every versioned sink matches the claim, it moves `latest` alone. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
+| **I4** | **A partial release never moves `latest`.** `latest` moves only after every versioned sink holds the version. `latest` names the highest published stable release: a pre-release never moves it (2026-10-06 decision on the release entry point). Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
+| **I5** | **A version that exists is never republished.** Existence is the disjunction of: a claim for that version, a versioned image tag for that version, or a git tag for that version. Any one of the three makes the version taken, including when the operator supplies it manually. A git tag for the version that points at the run's own commit, while no claim and no versioned sink holds the version, does not make it taken: it is the release being made from that tag (2026-10-06 decision on the release entry point). A sink artifact counts as under a claim only when its identity matches the identity the claim records for that sink. A re-run for the commit of a published release republishes nothing: when the version is the highest published release and every versioned sink matches the claim, it moves `latest` alone. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I6** | **Major never decreases.** A candidate whose major is below the highest published major fails before any write. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I7** | **Notes carry both required sections.** Every published release's notes contain a breaking-changes section and a deprecations section, present when empty. A release cannot publish without them. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
-| **I8** | **The baseline is what shipped.** The surface gate's baseline is the manifest asset of the highest published release below the candidate. It is never regenerated from source and never read from the working tree. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
+| **I8** | **The baseline is what shipped.** The surface gate's baseline is the manifest asset of the highest published stable release below the candidate; a pre-release is never a baseline (2026-10-06 decision on the release entry point). It is never regenerated from source and never read from the working tree. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I9** | **The gate is a whitelist.** Any manifest difference outside the enumerated compatible set fails the release when the major does not increase. An unrecognised difference kind fails; it does not pass by default. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
 | **I10** | **The manifest holds only comparable values.** An item whose value cannot be recorded as a stable ordinal string is absent from the manifest, and its compatibility is carried by release notes instead. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
 | **I11** | **Once recorded, an item leaves only by the removal rule.** An item present in a published manifest and absent from the candidate is a removal, whatever the reason for its absence. Making a surface unrecordable is not an exit from the gate after its first release. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
 | **I12** | **Every published manifest stays readable.** The manifest reader accepts every `manifestSchemaVersion` ever published, because baselines are immutable release assets and the gate must keep comparing against them for the product's lifespan. Owner: Surface model. Enforcement: `[instruction]` | — | instruction | — |
-| **I13** | **One publisher at a time.** At most one release-pipeline run publishes at any moment, held by a single CI concurrency group spanning every publishing workflow, queued rather than cancelled. The claim ref is the second guard: the refs API creates it only when it is absent, so of two runs that bypass the group, exactly one claims a given version. Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — the three publishing workflows each declare `concurrency: group: buildagent-publish` with `cancel-in-progress: false` (`.github/workflows/build.yml:76-78`, `.github/workflows/release.yml:45-47`, `.github/workflows/release-tag.yml:32-34`); nothing checks that a future publishing workflow joins the group | — | instruction | — |
+| **I13** | **One publisher at a time.** At most one release-pipeline run publishes at any moment, held by a single CI concurrency group spanning every publishing workflow, queued rather than cancelled. The claim ref is the second guard: the refs API creates it only when it is absent, so of two runs that bypass the group, exactly one claims a given version. Owner: Release pipeline (CI configuration). Enforcement: `[instruction]` — the three publishing workflows each declare `concurrency: group: buildagent-publish` with `cancel-in-progress: false` (`.github/workflows/build.yml:49-51`, `.github/workflows/release.yml:49-51`, `.github/workflows/release-tag.yml:38-40`); nothing checks that a future publishing workflow joins the group | — | instruction | — |
 | **I14** | **Only CI publishes.** No sink accepts a write from a developer machine. Owner: Release pipeline. Enforcement: `[instruction]` | — | instruction | — |
 | **I15** | **A push to `main` writes no version.** It moves `latest` and nothing else. No versioned image tag, tool package or module version is written outside a release (2026-09-20 decision). Owner: Release pipeline. Enforcement: `[instruction]` — the main-push workflow has no path to a versioned sink | — | instruction | — |
 | **I16** | **One project configuration file.** A project carries at most one configuration file. Two files differing only in format are an error, reported before anything is built. Owner: Config. Enforcement: `[instruction]` | — | instruction | — |
@@ -101,6 +101,14 @@ Semantics a declaration cannot carry: `ToTagString` produces the git tag and the
 GitHub release tag; `ToPackageString` produces the image tag, the tool package version
 and the module manifest version. The two forms differ by the `v` prefix and by nothing
 else, so a change to either is a change to both.
+
+A pre-release carries one label of ASCII letters and digits (`2.1.0-rc1`); a dotted or
+hyphenated label fails with `PreReleaseLabelUnsupported`, because the PowerShell Gallery cannot
+hold it. A release takes its version from the pushed tag, or from GitVersion's
+`MajorMinorPatch` with the dispatch's label; it never takes a version typed by hand. A
+pre-release is published to every versioned sink and as a GitHub pre-release, and it never
+moves `latest` (I4). Precedence is semantic-versioning precedence, and the highest published
+release, the surface baseline and `latest` consider stable releases only (2026-10-06 decision on the release entry point).
 
 ### Release claim
 
@@ -464,7 +472,7 @@ All Config errors are accumulated and reported in one pass (I18).
 
 | Code | Raised when | Retryable | Caller does |
 | --- | --- | --- | --- |
-| `BaselineMissing` | The baseline release has no manifest asset | No | Fail the release; a human decides whether this is the first gated release |
+| `BaselineMissing` | No stable release below the candidate exists, or the baseline release has no manifest asset | No | Fail the release, except for 2.0.0 and its pre-releases, the first gated release, which is judged by the migration guide (2026-10-06 decision on the release entry point) |
 | `BaselineUnreadable` | The asset cannot be downloaded or parsed | Yes | Fail the release |
 | `ManifestSchemaUnsupported` | A manifest's `manifestSchemaVersion` is unknown to the reader | No | Fail the release (I12); never treat as empty |
 | `DerivationFailed` | The candidate manifest cannot be derived from the tree | No | Fail the release |
@@ -479,7 +487,8 @@ All Config errors are accumulated and reported in one pass (I18).
 | `MajorBelowCurrent` | The candidate major is below the highest published | No | Fail before any write |
 | `TagPointsElsewhere` | A git tag for the version exists on another commit | No | Fail; a human resolves it |
 | `NotesSectionMissing` | Notes lack breaking-changes or deprecations | No | Fail before any write (I7) |
-| `SurfaceGateFailed` | The comparison returned blocking differences | No | Fail before any write |
+| `SurfaceGateFailed` | The surface gate failed: a blocking difference, or any other `SurfaceError` the release does not accept | No | Fail before any write, naming the gate's code |
+| `PreReleaseLabelUnsupported` | The pre-release label is not one identifier of ASCII letters and digits | No | Fail before any write |
 | `ClaimCreationFailed` | The draft release cannot be created | Yes | Fail; nothing was written |
 | `SinkPublishFailed` | A sink rejected the write | Yes | Fail naming `Sink`; leave the claim open for a resume |
 | `SinkArtifactMismatch` | On a resume or a completion re-run, a sink holds the version with an artifact whose identity differs from the claim's, or that the claim records no identity for | No | Fail naming `Sink` before this run writes anything; a human resolves it |
@@ -686,3 +695,15 @@ and the domain is now carried by the subsection heading alone.*
 identity is recorded just before that sink is written and packages compare by a
 content hash that excludes the repository signature, and a re-run for a published
 release's own commit moves only `latest`.*
+
+**U-15 — Whether the build wrapper's parameters and NUKE's own parameters are protected
+surface.** The manifest derives `BuildParameter` items from the public properties of the
+`*Params` classes alone (§ Build parameters). The parameters of `scripts/nuke/build.ps1`
+(`AppDir`, `PackageManager`, `SkipInstall`, `IsProduction`, `NodeTemplateRepositoryUrl`)
+and the `[Parameter]` field `ChangeLogSource` on `Forge` (`--change-log-source`) are
+documented and real, but no manifest item names them, so the surface gate cannot see a
+change to them and the docs check reports each documented use as `UnknownName`. Deriving
+them adds items to the manifest, and so to every later release's baseline; leaving them
+out makes them unprotected names the documentation still teaches.
+*Blocks:* the ten findings recorded in `design/docs-check-recorded.txt`, and the
+compatibility promise for those names.

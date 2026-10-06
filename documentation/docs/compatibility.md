@@ -41,11 +41,14 @@ release.
   reproduce.
 
 To select a versioned image, put the version in the tag. 2.0.0 is the first version this
-promise covers and it is not published yet, so until it is, use a version that exists:
+promise covers and it is not published yet, so until it is, replace `<version>` with a version
+listed on the [releases page](https://github.com/The-Running-Dev/Docker-BuildAgent/releases):
 
 ```bash
-docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:2.0.0 build docker
+docker run --rm -v ./:/workspace ghcr.io/the-running-dev/build-agent:<version> build docker
 ```
+
+Once 2.0.0 is published, `ghcr.io/the-running-dev/build-agent:2.0.0` selects it.
 
 The PowerShell module runs the image that matches its own version unless you set
 `-DockerImage` explicitly. See the [migration guide](./migration.md) for moving from `latest`
@@ -88,6 +91,7 @@ verified, and this page does not claim it is.
 
 Some builds need the host Docker socket. Mounting it into the build container assumes a trusted
 host and trusted code. A host compromised through the mounted socket is not a defect in the
-product. Do not mount the socket for code you do not trust.
+product. Do not mount the socket for code you do not trust. The
+[security model](./security.md) states the rest of what the image trusts.
 
 Canonical contract: [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
