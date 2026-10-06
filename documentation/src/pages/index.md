@@ -170,7 +170,6 @@ PSModule.requirements.md   the PowerShell module contract
 .github/                   workflows and shared actions
 changelog.ps1              regenerates CHANGELOG.md from the Git history
 scripts/build-docs-local.ps1   previews the documentation site with hot reload
-docs.ps1, docs-image.ps1   older preview helpers, not the supported flow
 ```
 
 ## Contributing

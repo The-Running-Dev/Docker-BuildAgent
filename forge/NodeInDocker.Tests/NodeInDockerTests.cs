@@ -35,38 +35,45 @@ public sealed class NodeInDockerBuildTests : IDisposable
     }
 
     [Fact]
-    public void Parameters_InitializesWithDefaults()
+    public void Configure_ResolvesRelativeDirectoryFields_UnderTheRoot()
     {
         var build = new NodeInDockerBuild();
-        var parameters = CreateParameters();
-        build.SetParameters(parameters);
+        build.SetParameters(CreateParameters());
+        SetField(build, "ArtifactsDir", "out");
+        SetField(build, "TemplatesDir", "tpl");
 
-        Assert.NotNull(build.Parameters);
-        Assert.NotNull(build.Parameters.ArtifactsDir);
-        Assert.NotNull(build.Parameters.TemplatesDir);
+        build.ConfigureForTest();
+
+        Assert.Equal(Path.Combine(_rootDir, "out"), build.Parameters.ArtifactsDir);
+        Assert.Equal(Path.Combine(_rootDir, "tpl"), build.Parameters.TemplatesDir);
     }
 
     [Fact]
-    public void Parameters_SetsBothNodeAndDockerDirs()
+    public void Configure_FieldsOverrideTheParameterRegistryAndImageTag()
+    {
+        var parameters = CreateParameters();
+        parameters.RegistryUrl = "registry.example.com/old";
+        var build = new NodeInDockerBuild();
+        build.SetParameters(parameters);
+        SetField(build, "RegistryUrl", "ghcr.io/acme");
+        SetField(build, "ImageTag", "renamed");
+
+        build.ConfigureForTest();
+
+        Assert.Equal(["ghcr.io/acme/renamed:latest"], build.Parameters.Tags);
+    }
+
+    [Fact]
+    public void Configure_UnsetFields_KeepTheParameterValues_AndAnEmptyRegistryAddsNoPrefix()
     {
         var build = new NodeInDockerBuild();
-        var parameters = CreateParameters();
-        build.SetParameters(parameters);
+        build.SetParameters(CreateParameters());
+
+        build.ConfigureForTest();
 
         Assert.Equal(_artifactsDir, build.Parameters.ArtifactsDir);
         Assert.Equal(_templatesDir, build.Parameters.TemplatesDir);
-    }
-
-    [Fact]
-    public void Parameters_SetsVersionAndImageTag()
-    {
-        var build = new NodeInDockerBuild();
-        var parameters = CreateParameters();
-        build.SetParameters(parameters);
-
-        Assert.NotNull(build.Parameters.Version);
-        Assert.Equal("3.0.0", build.Parameters.Version.Version);
-        Assert.NotNull(build.Parameters.ImageTag);
+        Assert.Equal(["node-docker-app:latest"], build.Parameters.Tags);
     }
 
     // S3.12/I15: a push to `main` (CreateGitHubRelease false) moves `latest` only and writes no
