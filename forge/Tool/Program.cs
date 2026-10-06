@@ -1,7 +1,10 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Update;
 
@@ -71,21 +74,60 @@ static async Task<int> RunUpdateAsync(IDockerRuntime runtime, UpdateLogStore log
     var updater = new Updater(runtime, log, new SystemUpdateClock(), UpdaterIdentity.Current());
     var options = new UpdateOptions(run.HealthTimeout, run.RestoreOnFailure);
 
+    // design/10-design.md § Process interruption: the first SIGINT/SIGTERM is turned into cancellation so the
+    // Updater can release its lock (before the target changes) or restore (after); a second one terminates as
+    // the platform default does, for an operator who will not wait.
+    using var interrupted = new CancellationTokenSource();
+    var registrations = new List<PosixSignalRegistration>();
+    foreach (var signal in new[] { PosixSignal.SIGINT, PosixSignal.SIGTERM })
+    {
+        try
+        {
+            registrations.Add(PosixSignalRegistration.Create(signal, context =>
+            {
+                if (interrupted.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                context.Cancel = true;
+                Console.Error.WriteLine($"Interrupted ({context.Signal}); stopping the update safely. Signal again to terminate now.");
+                interrupted.Cancel();
+            }));
+        }
+        catch (PlatformNotSupportedException)
+        {
+        }
+    }
+
     try
     {
-        var outcome = await updater.RunAsync(run.ContainerName, run.ImageReference, options, run.NotifyUrl);
+        var outcome = await updater.RunAsync(run.ContainerName, run.ImageReference, options, run.NotifyUrl, interrupted.Token);
         return UpdateExitCode.ForOutcome(outcome);
+    }
+    catch (OperationCanceledException)
+    {
+        Console.Error.WriteLine($"The update of '{run.ContainerName}' was interrupted before it changed anything; the lock it took was released.");
+        return 1;
     }
     catch (UpdateException ex)
     {
         Console.Error.WriteLine(ex.Message);
         return UpdateExitCode.ForError(ex.Code);
     }
-    catch (Exception ex) when (ex is DockerRuntimeException or System.IO.IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+    catch (Exception ex)
     {
         // "Any other failure" (contract § Global tool, Exit statuses): a daemon error outside a mapped step, an
-        // update log that cannot be read or appended to after the swap, or no `docker` on PATH.
+        // update log that cannot be read, no `docker` on PATH, or a fault of any other kind — all exit 1, never
+        // the runtime's own crash status.
         Console.Error.WriteLine(ex.Message);
         return 1;
+    }
+    finally
+    {
+        foreach (var registration in registrations)
+        {
+            registration.Dispose();
+        }
     }
 }

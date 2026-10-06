@@ -100,10 +100,9 @@ that is an adjudication, not a slice.
 code while Notifications is declared to live inside Build types. S4's notification criterion is
 withdrawn until the boundary is settled.
 
-**The unsupported container shape list (U-10).** Beyond anonymous volumes and legacy container
-links, the list is whatever the Docker API fails to reproduce from inspect output — a verified fact
-about the daemon. S2 runs the probe and records the results; extending the refusal list is a
-separate adjudication.
+**The unsupported container shape list (U-10).** Resolved by the 2026-10-06 decision on
+unreproduced settings: beyond anonymous volumes and legacy container links, the update refuses
+every setting the replacement does not carry over, and carries the logging configuration over.
 
 **Recovering prior-container residue.** The contract's tool surface has `update --clear-lock` and no
 command that returns a prior container left behind by an interrupted update. An operator can

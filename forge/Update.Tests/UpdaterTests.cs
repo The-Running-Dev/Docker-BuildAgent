@@ -837,4 +837,204 @@ public sealed class UpdaterTests : IDisposable
         Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
         Assert.Empty(_log.ReadState().OpenRecords);
     }
+
+    // A failed poll of any exception type, not only a daemon error, is no verdict on the replacement.
+    [Fact]
+    public async Task HealthPollNonDockerFault_KeepsWaiting_ThenSucceeds()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var polls = 0;
+        _runtime.HealthProbe = name =>
+        {
+            if (name != "web" || _runtime.Get(UpdateNaming.PriorContainerName("web")) == null)
+            {
+                return null;
+            }
+
+            return ++polls == 1 ? throw new InvalidOperationException("simulated parse fault") : (true, "healthy");
+        };
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.Succeeded, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.Empty(_log.ReadState().OpenRecords);
+    }
+
+    // A fault outside Docker's own error reporting during the swap must still reach the restore path: the target
+    // is back on its own image, the outcome is written and the lock released, rather than the exception
+    // escaping with the target stopped and renamed.
+    [Fact]
+    public async Task NonDockerFaultDuringSwap_RestoresAndReleasesLock()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.Fault = (operation, name) =>
+            operation == "create" && name == "web" ? new InvalidOperationException("simulated fault") : null;
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.RestoredAfterUnhealthy, outcome);
+        var restored = _runtime.Get("web");
+        Assert.NotNull(restored);
+        Assert.True(restored!.Running);
+        Assert.Equal(target.Id, restored.Id);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.Empty(_log.ReadState().OpenRecords);
+    }
+
+    // I41: a fault of any type before the target's first change releases the lock this attempt took.
+    [Fact]
+    public async Task NonDockerFaultBeforeTheSwap_ReleasesTheLock()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var priorName = UpdateNaming.PriorContainerName("web");
+        _runtime.Fault = (operation, name) =>
+            operation == "inspect" && name == priorName ? new InvalidOperationException("simulated fault") : null;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true)));
+
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.Equal("sha256:old", _runtime.Get("web")!.ImageId);
+        Assert.True(_runtime.Get("web")!.Running);
+    }
+
+    // The target is re-read under the lock: one moved to the requested image between the first inspection and
+    // the lock is already current, and the update stops there without pinning, logging or touching it.
+    [Fact]
+    public async Task TargetUpdatedBeforeTheLockWasTaken_IsAlreadyCurrent()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.AfterCreateMarker = _ => _runtime.SeedContainer(target with { ImageId = "sha256:new" });
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.AlreadyCurrent, outcome);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.False(_runtime.HasImageTag(UpdateNaming.PriorImageTag("web")));
+        Assert.False(File.Exists(_logPath) && File.ReadAllText(_logPath).Length > 0);
+    }
+
+    [Fact]
+    public async Task TargetRemovedBeforeTheLockWasTaken_ThrowsTargetNotFound_AndReleasesTheLock()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.AfterCreateMarker = _ => _runtime.RemoveAsync("web", force: true).GetAwaiter().GetResult();
+
+        var ex = await Assert.ThrowsAsync<UpdateException>(
+            () => _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true)));
+
+        Assert.Equal(UpdateErrorCode.TargetNotFound, ex.Code);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+    }
+
+    // Process interruption before the target's first change: the lock (and the pin, once taken) is released
+    // and the target is untouched.
+    [Fact]
+    public async Task InterruptedAfterTheLock_ReleasesTheLock_AndLeavesTheTargetUntouched()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        using var interrupt = new System.Threading.CancellationTokenSource();
+        _runtime.AfterCreateMarker = _ => interrupt.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true), null, interrupt.Token));
+
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        var untouched = _runtime.Get("web");
+        Assert.Equal(target.Id, untouched!.Id);
+        Assert.True(untouched.Running);
+        Assert.False(_runtime.HasImageTag(UpdateNaming.PriorImageTag("web")));
+    }
+
+    [Fact]
+    public async Task InterruptedAfterThePin_RemovesThePinAndTheLock()
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        using var interrupt = new System.Threading.CancellationTokenSource();
+        _runtime.Fault = (operation, _) =>
+        {
+            if (operation == "tag")
+            {
+                interrupt.Cancel();
+            }
+
+            return null;
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true), null, interrupt.Token));
+
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.False(_runtime.HasImageTag(UpdateNaming.PriorImageTag("web")));
+        Assert.True(_runtime.Get("web")!.Running);
+    }
+
+    // Process interruption after the target's first change: the prior container is restored — with or without
+    // --no-restore — and the outcome records Interrupted.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task InterruptedDuringTheHealthWait_RestoresThePriorContainer(bool restoreOnFailure)
+    {
+        var target = Target("web", "sha256:old", "web:1.0");
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.HealthProbe = name => name == "web" ? (true, "starting") : null;
+        using var interrupt = new System.Threading.CancellationTokenSource();
+        var updater = new Updater(_runtime, _log, new ClockWithFirstDelayHook(interrupt.Cancel), _identity);
+
+        var outcome = await updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromMinutes(5), restoreOnFailure),
+            null, interrupt.Token);
+
+        Assert.Equal(UpdateOutcome.RestoredAfterUnhealthy, outcome);
+        var restored = _runtime.Get("web");
+        Assert.Equal(target.Id, restored!.Id);
+        Assert.True(restored.Running);
+        Assert.Null(_runtime.Get(UpdateNaming.LockContainerName("web")));
+        Assert.Contains("\"Interrupted\"", File.ReadAllLines(_logPath).Last());
+    }
+
+    // I34: a setting the replacement would not carry refuses the update by name, before any lock is taken.
+    [Fact]
+    public async Task UnreproducedSettings_RefuseWithTargetShapeUnsupported_NamingThem()
+    {
+        var target = Target("web", "sha256:old", "web:1.0") with
+        {
+            UnreproducedSettings = new[] { "HostConfig.Privileged", "HostConfig.Memory" },
+        };
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        var locksTaken = 0;
+        _runtime.AfterCreateMarker = _ => locksTaken++;
+
+        var ex = await Assert.ThrowsAsync<UpdateException>(
+            () => _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true)));
+
+        Assert.Equal(UpdateErrorCode.TargetShapeUnsupported, ex.Code);
+        Assert.Contains("HostConfig.Privileged", ex.Message);
+        Assert.Contains("HostConfig.Memory", ex.Message);
+        Assert.Equal(0, locksTaken);
+    }
+
+    [Fact]
+    public async Task LogConfiguration_IsCarriedToTheReplacement()
+    {
+        var log = new LogSpec("json-file", new Dictionary<string, string> { ["max-size"] = "1m" });
+        var target = Target("web", "sha256:old", "web:1.0") with { Log = log };
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.Succeeded, outcome);
+        var replacement = _runtime.Get("web")!;
+        Assert.Equal("sha256:new", replacement.ImageId);
+        Assert.Equal("json-file", replacement.Log!.Driver);
+        Assert.Equal("1m", replacement.Log.Options["max-size"]);
+    }
 }

@@ -38,9 +38,13 @@ If the image already matches the running container, the tool reports success and
 ## What an update does
 
 1. Refuses if a lock for the container exists, or if the target cannot be reproduced safely.
-2. Resolves the target image, pulling it if it is not present locally. If it is the image
-   already running, stops here with success.
-3. Takes a lock, checks for leftovers of an earlier update, keeps the current image under a
+2. Resolves the target image, always pulling it first so a tag that moved in the registry is
+   picked up. If the pull fails but an image with that reference is already present, the tool
+   prints a warning that the local image may be out of date and uses it; if there is none, it
+   stops with exit 30. A reference that is an image ID is never pulled. If the resolved image is
+   the one already running, stops here with success.
+3. Takes a lock, then inspects the container again so a change made before the lock was taken is
+   seen, checks for leftovers of an earlier update, keeps the current image under a
    `buildagent-prior` tag, and writes a start entry to the update log.
 4. Stops the container, renames it to a `buildagent-prior-…` name, creates the replacement with the
    same settings on the new image, and starts it.
@@ -59,6 +63,14 @@ A container is refused (exit 20) when it:
 - carries an orchestrator ownership label, because the orchestrator owns its updates
 - uses a legacy container link
 - has an anonymous volume
+- has a setting the replacement would not carry over. The refusal names each one. They include
+  privileged mode, added or dropped capabilities, devices, security options, resource limits
+  (memory, CPU, PIDs, ulimits), DNS and extra hosts, tmpfs mounts, a custom hostname or domain
+  name, network aliases or fixed addresses, a non-default runtime, IPC or PID mode, a TTY or open
+  stdin, a stop timeout, mount propagation, and a user, working directory, stop signal or health
+  check that differs from the image's own.
+
+The logging driver and its options are carried over to the replacement.
 
 ### Health checks
 
@@ -66,6 +78,14 @@ The replacement is judged by its own declared health check. A container that dec
 cannot be verified: the update treats the replacement as failed and restores the original (exit
 10), or leaves it with `--no-restore` (exit 11). A replacement that stops running before it
 reports healthy is treated the same way.
+
+### Interruption
+
+Pressing Ctrl+C, or sending SIGTERM, stops the update safely; a second signal ends the tool at
+once. Before the container is stopped, the tool removes the `buildagent-prior` tag and the lock it
+took and exits with status 1, leaving the target untouched. Once the container has been stopped,
+the tool restores the original whatever `--no-restore` says, records the outcome as interrupted,
+releases the lock, and exits with the restore's status (10, or 12 if the restore failed).
 
 ### The lock and the update log
 

@@ -22,9 +22,10 @@ namespace Update.Tests;
 /// Windows dev checkouts — skips by returning early rather than failing; that is the stated, unverified gap
 /// S2.23 names for Windows, not a defect here.
 ///
-/// Per S2.22, a shape found not to round-trip is recorded here (as a failing assertion naming what differed),
-/// not folded into `Updater.RefuseUnsupportedShape`'s refusal list — widening that list is a separate,
-/// deliberate decision this slice does not make on the strength of this probe alone.
+/// Per S2.22, a shape found not to round-trip is recorded here (as a failing assertion naming what differed).
+/// Settings the mapping deliberately does not reproduce are refused by name instead (I34, decision
+/// 2026-10-06-update-refuses-unreproduced-settings); the probes below confirm that a default container reports
+/// none of them and that a run-only setting is detected as the live daemon reports it.
 /// </summary>
 public sealed class RoundTripProbeTests : IAsyncLifetime
 {
@@ -190,6 +191,44 @@ public sealed class RoundTripProbeTests : IAsyncLifetime
         Assert.Contains(networkName, replacement.Networks);
     }
 
+    [Fact]
+    public async Task DefaultContainer_HasNoUnreproducedSettings()
+    {
+        if (!DaemonAvailable) return;
+
+        await CreateSource();
+
+        var source = await _runtime.InspectAsync($"{_prefix}-src");
+        Assert.Empty(source!.UnreproducedSettings!);
+    }
+
+    [Fact]
+    public async Task RunOnlySettings_AreDetected()
+    {
+        if (!DaemonAvailable) return;
+
+        await CreateSource("--privileged", "--user", "1000", "--memory", "64m", "--hostname", "probe-host");
+
+        var source = await _runtime.InspectAsync($"{_prefix}-src");
+        Assert.Contains("HostConfig.Privileged", source!.UnreproducedSettings!);
+        Assert.Contains("HostConfig.Memory", source.UnreproducedSettings!);
+        Assert.Contains("Config.Hostname", source.UnreproducedSettings!);
+        Assert.Contains("Config.User", source.UnreproducedSettings!);
+    }
+
+    [Fact]
+    public async Task LogConfiguration_RoundTrips()
+    {
+        if (!DaemonAvailable) return;
+
+        await CreateSource("--log-driver", "json-file", "--log-opt", "max-size=1m");
+
+        var replacement = await RoundTrip();
+
+        Assert.Equal("json-file", replacement.Log!.Driver);
+        Assert.Equal("1m", replacement.Log.Options["max-size"]);
+    }
+
     private async Task CreateSource(params string[] extraArgs)
     {
         var args = new[] { "create", "--name", $"{_prefix}-src" }
@@ -206,6 +245,9 @@ public sealed class RoundTripProbeTests : IAsyncLifetime
     {
         var source = await _runtime.InspectAsync($"{_prefix}-src")
             ?? throw new InvalidOperationException("Probe setup did not create the source container.");
+
+        // Every shape that round-trips is one the Updater accepts: none of them may trip the I34 refusal.
+        Assert.Empty(source.UnreproducedSettings!);
 
         var spec = Updater.BuildReplacementSpec($"{_prefix}-dst", source, source.ImageId);
         if (replacementCommand.Length > 0)
