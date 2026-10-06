@@ -46,7 +46,7 @@ jobs:
     steps:
       # Checkout with full history and submodules (the Dockerfile copies docs-template/)
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           submodules: recursive
@@ -62,8 +62,10 @@ jobs:
       # Determine if this is a prerelease
       - name: Check if Pre-Release
         id: prerelease
+        env:
+          TAG_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "${{ github.ref_name }}" =~ -[a-zA-Z] ]]; then
+          if [[ "$TAG_NAME" =~ -[a-zA-Z] ]]; then
             echo "prerelease=true" >> $GITHUB_OUTPUT
           else
             echo "prerelease=false" >> $GITHUB_OUTPUT
@@ -79,7 +81,7 @@ jobs:
 
       # Trigger documentation build
       - name: Trigger Documentation Build
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: Update-Documentation

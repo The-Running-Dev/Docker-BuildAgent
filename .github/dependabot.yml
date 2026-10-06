@@ -1,0 +1,32 @@
+# Dependabot — weekly, grouped update pull requests.
+#
+#   - github-actions: the SHA pins in .github/workflows and the composite actions in
+#     .github/actions (Dependabot keeps the trailing version comment in step).
+#   - nuget: the forge solution's package references.
+#
+# The Docker base image is not tracked here: it is passed as a build argument, not a FROM literal.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: nuget
+    directory: /forge
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    groups:
+      nuget:
+        patterns:
+          - "*"

@@ -37,7 +37,12 @@ CI has three jobs:
 - **Build & Validate** runs after Module Tests. It runs every test project in `forge/Forge.sln` with
   coverage (test results appear as a check run, and a coverage summary is posted on the pull
   request), makes a dry run of the Docker build with `nuke --type docker --dry-run true`, and
-  builds the documentation site from `docs-template`.
+  builds the documentation site from `docs-template`. The dry run builds the image without pushing
+  it; Build & Validate then scans that image with Grype (`anchore/scan-action`) and lists the
+  high and critical vulnerabilities that have a fix available in the job log. The scan reports;
+  it does not fail the pull request yet.
+
+A newer CI run for the same pull request cancels the one in progress.
 
 ### Build
 
@@ -79,6 +84,15 @@ out the repository with submodules, builds the site from `docs-template`
 The workflows and the Dockerfile use the same tool versions: pnpm 10.16.0 (`ci.yml`, `docs.yml`,
 `ARG PNPM_VERSION`), GitVersion 6.5.1 and Nuke 10.1.0 (`.github/actions/common`,
 `ARG GITVERSION_VERSION`, `ARG NUKE_VERSION`). Change them together.
+
+Every action a workflow or composite action uses is pinned to a full commit SHA, with the version
+it was taken from in a trailing comment. Dependabot (`.github/dependabot.yml`) proposes updates
+to those pins and to the forge NuGet packages once a week, grouped into one pull request per
+ecosystem.
+
+Each workflow grants its token only the permissions it needs: CI reads contents and writes check
+runs and the coverage comment; only the publishing workflows (Build, Release, Release-from-Tag)
+write packages and contents.
 
 ---
 
