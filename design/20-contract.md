@@ -149,6 +149,8 @@ Semantics a declaration cannot carry:
 - The compatible set — the only differences that pass without a major increase — is
   `ItemAdded` and `DeprecationAdded`. Everything else is blocking (I9), including
   a `SurfaceDifferenceKind` a future reader does not recognise.
+- An `ItemRemoved` whose baseline item has no `DeprecatedSince` is blocking at any
+  major: a major increase does not waive the deprecation that must come first.
 - `DeprecatedSince` and `RemoveIn` are `ToPackageString()` forms. `RemoveIn` is never
   below the next major.
 
@@ -466,7 +468,7 @@ All Config errors are accumulated and reported in one pass (I18).
 | `ManifestSchemaUnsupported` | A manifest's `manifestSchemaVersion` is unknown to the reader | No | Fail the release (I12); never treat as empty |
 | `DerivationFailed` | The candidate manifest cannot be derived from the tree | No | Fail the release |
 | `DuplicateItem` | Two items share `(Kind, Name)` | No | Fail the release |
-| `BlockingDifference` | A difference outside the compatible set with no major increase | No | Fail the release, listing every blocking difference (I9) |
+| `BlockingDifference` | A difference outside the compatible set with no major increase, or the removal of an item the baseline did not mark deprecated | No | Fail the release, listing every blocking difference (I9) |
 
 ### Release pipeline — `ReleaseError(ReleaseErrorCode Code, ReleaseSink? Sink, string Message)`
 

@@ -12,7 +12,9 @@ namespace Surface;
 /// blocking) only when it is ItemAdded or DeprecationAdded, or when the candidate's major
 /// version is greater than the baseline's (SurfaceErrorCode.BlockingDifference: "outside the
 /// compatible set with no major increase") — an intentional major bump can carry breaking
-/// changes that would otherwise block.
+/// changes that would otherwise block. The exception is the removal of an item the baseline did
+/// not already mark deprecated, which blocks at any major (design/10-design.md, step 3): a major
+/// bump does not waive the deprecation that must come first.
 /// </summary>
 public static class SurfaceComparer
 {
@@ -70,9 +72,17 @@ public static class SurfaceComparer
         }
 
         var majorIncreased = HasMajorIncrease(baseline.ProductVersion, candidate.ProductVersion);
-        var blocking = all.Where(d => !CompatibleKinds.Contains(d.Kind) && !majorIncreased).ToList();
+        var blocking = all
+            .Where(d => IsUndeprecatedRemoval(d, baselineByKey) || (!CompatibleKinds.Contains(d.Kind) && !majorIncreased))
+            .ToList();
 
         return new SurfaceComparison(all, blocking);
+    }
+
+    private static bool IsUndeprecatedRemoval(SurfaceDifference difference, Dictionary<(SurfaceItemKind, string), SurfaceItem> baselineByKey)
+    {
+        return difference.Kind == SurfaceDifferenceKind.ItemRemoved
+            && baselineByKey[(difference.ItemKind, difference.Name)].DeprecatedSince == null;
     }
 
     internal static bool HasMajorIncrease(string baselineVersion, string candidateVersion)
