@@ -21,7 +21,8 @@ namespace Surface;
 /// </summary>
 public sealed class GitHubReleaseManifestSource : IBaselineManifestSource
 {
-    private const string ManifestAssetName = "surface-manifest.json";
+    /// <summary>The release asset that carries a release's surface manifest (S1).</summary>
+    public const string ManifestAssetName = "surface-manifest.json";
 
     private readonly string _owner;
     private readonly string _repo;

@@ -168,9 +168,11 @@ public sealed class GitHubReleaseClaimStoreTests
         return (new GitHubReleaseClaimStore(Owner, Repo, "token", client.Object), releases);
     }
 
-    private static Octokit.Release GitHubRelease(long id, string commitSha, bool draft, string body) =>
+    private static Octokit.Release GitHubRelease(long id, string commitSha, bool draft, string body, params string[] assetNames) =>
         new("url", "html", "assets", "upload", id, "node", Version.ToTagString(), commitSha, Version.ToTagString(), body,
-            draft, false, DateTimeOffset.UnixEpoch, null, null, "tarball", "zipball", Array.Empty<ReleaseAsset>());
+            draft, false, DateTimeOffset.UnixEpoch, null, null, "tarball", "zipball",
+            Array.ConvertAll(assetNames, name => new ReleaseAsset(
+                "url", 1, "node", name, null, "uploaded", "application/json", 1, 0, DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, "download", null)));
 
     private static ReleaseClaim DraftClaim() =>
         new(Version, CommitSha, ClaimState.Draft, "Notes", TestSupport.TestManifest.Empty(Version.ToPackageString()));
@@ -236,6 +238,70 @@ public sealed class GitHubReleaseClaimStoreTests
 
         Assert.NotNull(read);
         Assert.Empty(read!.ArtifactIdentities);
+    }
+
+    // S1: no release is published without its surface-manifest.json asset, the next release's
+    // baseline. The asset holds the claim's candidate manifest and is uploaded before the draft is
+    // published.
+    [Fact]
+    public async Task Publish_UploadsTheManifestAsset_BeforePublishingTheDraft()
+    {
+        var (store, releases) = BuildWithReleases();
+        var draft = GitHubRelease(7, CommitSha, draft: true, "Notes");
+        var steps = new List<string>();
+        string? uploaded = null;
+        releases.Setup(r => r.GetAll(Owner, Repo)).ReturnsAsync(new[] { draft });
+        releases.Setup(r => r.Get(Owner, Repo, 7L)).ReturnsAsync(draft);
+        releases
+            .Setup(r => r.UploadAsset(draft, It.IsAny<ReleaseAssetUpload>(), It.IsAny<System.Threading.CancellationToken>()))
+            .Callback<Octokit.Release, ReleaseAssetUpload, System.Threading.CancellationToken>((_, upload, _) =>
+            {
+                steps.Add($"upload {upload.FileName} {upload.ContentType}");
+                uploaded = new System.IO.StreamReader(upload.RawData).ReadToEnd();
+            })
+            .ReturnsAsync((ReleaseAsset)null!);
+        releases
+            .Setup(r => r.Edit(Owner, Repo, 7, It.Is<ReleaseUpdate>(u => u.Draft == false)))
+            .Callback(() => steps.Add("publish"))
+            .ReturnsAsync(draft);
+
+        var manifest = new Surface.SurfaceManifest(1, "2.0.0", new[] { new Surface.SurfaceItem(Surface.SurfaceItemKind.BuildType, "docker", "docker", null, null) });
+        await store.PublishAsync(DraftClaim() with { CandidateManifest = manifest });
+
+        Assert.Equal(new[] { "upload surface-manifest.json application/json", "publish" }, steps);
+        Assert.Equal(Surface.SurfaceManifestSerializer.Serialize(manifest), uploaded);
+    }
+
+    // A resumed draft that already carries the asset is published without a second upload.
+    [Fact]
+    public async Task Publish_KeepsTheManifestAsset_WhenTheDraftAlreadyHasIt()
+    {
+        var (store, releases) = BuildWithReleases();
+        var draft = GitHubRelease(7, CommitSha, draft: true, "Notes", "surface-manifest.json");
+        releases.Setup(r => r.GetAll(Owner, Repo)).ReturnsAsync(new[] { draft });
+        releases.Setup(r => r.Get(Owner, Repo, 7L)).ReturnsAsync(draft);
+        releases.Setup(r => r.Edit(Owner, Repo, 7, It.Is<ReleaseUpdate>(u => u.Draft == false))).ReturnsAsync(draft);
+
+        await store.PublishAsync(DraftClaim());
+
+        releases.Verify(r => r.Edit(Owner, Repo, 7, It.IsAny<ReleaseUpdate>()), Times.Once);
+    }
+
+    // A claim whose manifest could not be read back from the draft is not published with a
+    // placeholder baseline.
+    [Fact]
+    public async Task Publish_FailsWithClaimCreationFailed_WhenTheClaimHasNoReadableManifest()
+    {
+        var (store, releases) = BuildWithReleases();
+        var draft = GitHubRelease(7, CommitSha, draft: true, "Notes");
+        releases.Setup(r => r.GetAll(Owner, Repo)).ReturnsAsync(new[] { draft });
+        releases.Setup(r => r.Get(Owner, Repo, 7L)).ReturnsAsync(draft);
+
+        var unreadable = DraftClaim() with { CandidateManifest = new Surface.SurfaceManifest(0, "2.0.0", Array.Empty<Surface.SurfaceItem>()) };
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() => store.PublishAsync(unreadable));
+
+        Assert.Equal(ReleaseErrorCode.ClaimCreationFailed, ex.Code);
+        Assert.Contains("surface-manifest.json", ex.Message);
     }
 
     [Fact]
