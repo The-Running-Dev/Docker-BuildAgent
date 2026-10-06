@@ -15,6 +15,7 @@ namespace Common.Tests.Services;
 /// Comprehensive unit tests for the DockerService class methods.
 /// Tests cover Docker login, build, tag, and push operations.
 /// </summary>
+[Collection(nameof(Common.Tests.Build.BuildFailureStateCollection))]
 public class DockerServiceTests : IDisposable
 {
     private readonly string _testRootDirectory;
@@ -25,6 +26,8 @@ public class DockerServiceTests : IDisposable
     
     private readonly Mock<INodeService> _mockNodeService;
     
+    private readonly FakeDockerCli _docker = new();
+
     private readonly DockerService _dockerService;
 
     public DockerServiceTests()
@@ -54,7 +57,7 @@ public class DockerServiceTests : IDisposable
 
         _mockLogger = new Mock<ILogger<DockerService>>();
         _mockNodeService = new Mock<INodeService>();
-        _dockerService = new DockerService(_mockLogger.Object, _mockNodeService.Object);
+        _dockerService = new DockerService(_mockLogger.Object, _mockNodeService.Object, _docker);
     }
 
     [Fact]
@@ -174,11 +177,9 @@ public class DockerServiceTests : IDisposable
         VerifyLoggerWarning("Dockerfile not Found, Using a Template...");
         VerifyLoggerInfo($"Found template in: {gitHubTemplatesDir}");
         
-        // Verify template was copied
-        var dockerfilePath = Path.Combine(_testParams.RootDirectory, _testParams.DockerFile);
-        Assert.True(File.Exists(dockerfilePath));
-        var content = File.ReadAllText(dockerfilePath);
-        Assert.Contains("FROM node:18 # GitHub Template", content);
+        // The template was the build input, and the copy is gone afterwards (#10)
+        Assert.Contains("FROM node:18 # GitHub Template", _docker.BuiltDockerFileContent);
+        Assert.False(File.Exists(Path.Combine(_testParams.RootDirectory, _testParams.DockerFile)));
     }
 
     [Fact]
@@ -196,11 +197,9 @@ public class DockerServiceTests : IDisposable
         VerifyLoggerWarning("Dockerfile not Found, Using a Template...");
         VerifyLoggerInfo($"Found template in: {projectTemplatesDir}");
         
-        // Verify template was copied
-        var dockerfilePath = Path.Combine(_testParams.RootDirectory, _testParams.DockerFile);
-        Assert.True(File.Exists(dockerfilePath));
-        var content = File.ReadAllText(dockerfilePath);
-        Assert.Contains("FROM node:18 # Project Template", content);
+        // The template was the build input, and the copy is gone afterwards (#10)
+        Assert.Contains("FROM node:18 # Project Template", _docker.BuiltDockerFileContent);
+        Assert.False(File.Exists(Path.Combine(_testParams.RootDirectory, _testParams.DockerFile)));
     }
 
     [Fact]
@@ -228,11 +227,9 @@ public class DockerServiceTests : IDisposable
         VerifyLoggerWarning("Dockerfile not Found, Using a Template...");
         VerifyLoggerInfo($"Found template in: {userTemplatesDir}");
         
-        // Verify the highest priority template was used
-        var dockerfilePath = Path.Combine(_testParams.RootDirectory, _testParams.DockerFile);
-        Assert.True(File.Exists(dockerfilePath));
-        var content = File.ReadAllText(dockerfilePath);
-        Assert.Contains("FROM node:18 # User Template", content);
+        // The template was the build input, and the copy is gone afterwards (#10)
+        Assert.Contains("FROM node:18 # User Template", _docker.BuiltDockerFileContent);
+        Assert.False(File.Exists(Path.Combine(_testParams.RootDirectory, _testParams.DockerFile)));
     }
 
     [Fact]
@@ -253,11 +250,9 @@ public class DockerServiceTests : IDisposable
         VerifyLoggerWarning("Dockerfile not Found, Using a Template...");
         VerifyLoggerInfo($"Found template in: {gitHubTemplatesDir}");
         
-        // Verify template was copied
-        var dockerfilePath = Path.Combine(_testParams.RootDirectory, _testParams.DockerFile);
-        Assert.True(File.Exists(dockerfilePath));
-        var content = File.ReadAllText(dockerfilePath);
-        Assert.Contains("FROM node:18 # GitHub Template", content);
+        // The template was the build input, and the copy is gone afterwards (#10)
+        Assert.Contains("FROM node:18 # GitHub Template", _docker.BuiltDockerFileContent);
+        Assert.False(File.Exists(Path.Combine(_testParams.RootDirectory, _testParams.DockerFile)));
     }
 
     [Fact]
@@ -313,6 +308,141 @@ public class DockerServiceTests : IDisposable
         
         // Should handle the case where there's no version tag gracefully
         Assert.True(exception == null || !(exception is ArgumentNullException));
+    }
+
+    [Fact]
+    public void Login_WhenTheLoginFails_ThrowsWithTheRegistryStatusAndNoToken()
+    {
+        _docker.FailOn = nameof(FakeDockerCli.Login);
+
+        var exception = Assert.Throws<BuildFailureException>(() => _dockerService.Login(_testParams));
+
+        Assert.Equal(BuildFailure.Registry, exception.ExitStatus);
+        Assert.DoesNotContain(_testParams.RegistryToken, exception.ToString());
+    }
+
+    [Fact]
+    public void Login_PassesTheRegistryHostOnly()
+    {
+        _dockerService.Login(_testParams);
+
+        Assert.Equal("registry.example.com", _docker.LoginServer);
+    }
+
+    [Fact]
+    public void Push_WhenThePushFails_ThrowsWithTheRegistryStatus()
+    {
+        _docker.FailOn = nameof(FakeDockerCli.Push);
+
+        var exception = Assert.Throws<BuildFailureException>(() => _dockerService.Push(_testParams));
+
+        Assert.Equal(BuildFailure.Registry, exception.ExitStatus);
+        VerifyLoggerNotCalled(LogLevel.Information, "[PUSH]");
+    }
+
+    [Fact]
+    public void Push_WhenTheLoginFails_PushesNothing()
+    {
+        _docker.FailOn = nameof(FakeDockerCli.Login);
+
+        var exception = Assert.Throws<BuildFailureException>(() => _dockerService.Push(_testParams));
+
+        Assert.Equal(BuildFailure.Registry, exception.ExitStatus);
+        Assert.Empty(_docker.Pushed);
+    }
+
+    [Fact]
+    public void Push_PushesLatestThenTheVersion()
+    {
+        _dockerService.Push(_testParams);
+
+        Assert.Equal(new[] { "registry.example.com/myapp:latest", "registry.example.com/myapp:1.0.0" }, _docker.Pushed);
+    }
+
+    [Fact]
+    public void Push_WithOnlyLatest_PushesLatestOnly()
+    {
+        _testParams.Tags = new List<string> { "registry.example.com/myapp:latest" };
+
+        _dockerService.Push(_testParams);
+
+        Assert.Equal(new[] { "registry.example.com/myapp:latest" }, _docker.Pushed);
+    }
+
+    [Fact]
+    public void Tag_WhenTheDaemonRefuses_ThrowsWithTheDaemonStatus()
+    {
+        _docker.FailOn = nameof(FakeDockerCli.Tag);
+
+        var exception = Assert.Throws<BuildFailureException>(() => _dockerService.Tag(_testParams));
+
+        Assert.Equal(BuildFailure.DockerDaemon, exception.ExitStatus);
+        VerifyLoggerNotCalled(LogLevel.Information, "[TAG]");
+    }
+
+    [Fact]
+    public void Build_WhenTheBuildFailsOnACopiedTemplate_StillRemovesTheCopy()
+    {
+        Directory.CreateDirectory(_testParams.TemplatesDir);
+        CreateTemplateDockerfile("node", "FROM node:18");
+        _mockNodeService.Setup(x => x.DetectApplicationType(_testParams.RootDirectory)).Returns("node");
+        _docker.FailOn = nameof(FakeDockerCli.Build);
+
+        Assert.ThrowsAny<Exception>(() => _dockerService.Build(_testParams));
+
+        Assert.False(File.Exists(Path.Combine(_testParams.RootDirectory, _testParams.DockerFile)));
+    }
+
+    [Fact]
+    public void Build_WithTheProjectsOwnDockerfile_LeavesItInPlace()
+    {
+        CreateDockerfile("FROM node:18");
+
+        _dockerService.Build(_testParams);
+
+        Assert.True(File.Exists(Path.Combine(_testParams.RootDirectory, _testParams.DockerFile)));
+    }
+
+    private sealed class FakeDockerCli : IDockerCli
+    {
+        public string? FailOn { get; set; }
+
+        public string? LoginServer { get; private set; }
+
+        public string? BuiltDockerFileContent { get; private set; }
+
+        public List<string> Pushed { get; } = [];
+
+        public void Login(string server, string username, string password)
+        {
+            Fail(nameof(Login), $"docker login -u {username} -p {password} {server}");
+            LoginServer = server;
+        }
+
+        public void Build(string path, string dockerFile, string tag, Action<string> output)
+        {
+            BuiltDockerFileContent = File.ReadAllText(dockerFile);
+            Fail(nameof(Build), "docker build failed");
+        }
+
+        public void Push(string name)
+        {
+            Fail(nameof(Push), $"docker push {name} denied");
+            Pushed.Add(name);
+        }
+
+        public void Tag(string source, string target)
+        {
+            Fail(nameof(Tag), $"docker tag {source} {target} failed");
+        }
+
+        private void Fail(string operation, string message)
+        {
+            if (FailOn == operation)
+            {
+                throw new InvalidOperationException(message);
+            }
+        }
     }
 
     private void CreateDockerfile(string content)

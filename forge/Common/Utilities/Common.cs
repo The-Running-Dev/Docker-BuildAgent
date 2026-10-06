@@ -18,17 +18,23 @@ public static class Common
     /// <summary>
     /// Retrieves the version information for a project located in the specified root directory.
     /// </summary>
-    /// <param name="rootDirectory">The root directory of the project for which to retrieve version information. This directory must contain a .git
-    /// folder.</param>
-    /// <returns>A <see cref="VersionInfo"/> object containing the version details of the project.  If the .git directory is not
-    /// found, returns a default <see cref="VersionInfo"/> with version set to "0.0.0".</returns>
-    public static VersionInfo GetVersion(string rootDirectory)
-    {
-        var gitDir = Path.Combine(rootDirectory, ".git");
+    /// <param name="rootDirectory">The root directory of the project for which to retrieve version information.</param>
+    /// <returns>A <see cref="VersionInfo"/> object containing the version details of the project. When the directory is
+    /// not a Git repository at all, returns a default <see cref="VersionInfo"/> with version set to "0.0.0" and logs a
+    /// warning.</returns>
+    /// <exception cref="Exception">GitVersion failed or returned no version. The build fails rather than publish a
+    /// substituted version (I1: one version value goes to every sink).</exception>
+    public static VersionInfo GetVersion(string rootDirectory) => GetVersion(rootDirectory, RunGitVersion);
 
-        if (!Directory.Exists(gitDir))
+    internal static VersionInfo GetVersion(string rootDirectory, Func<string, string> runGitVersion)
+    {
+        // A worktree or a submodule has a `.git` file pointing at the real repository, not a directory.
+        var gitPath = Path.Combine(rootDirectory, ".git");
+
+        if (!Directory.Exists(gitPath) && !File.Exists(gitPath))
         {
-            // Return a default VersionInfo if .git is missing
+            Log.Warning("[WARN] {RootDirectory} is not a Git Repository. Using Version 0.0.0.", rootDirectory);
+
             return new VersionInfo
             {
                 Version = "0.0.0",
@@ -38,44 +44,21 @@ public static class Common
             };
         }
 
-        try
+        var versionInfo = JsonConvert.DeserializeObject<VersionInfo>(runGitVersion(rootDirectory));
+
+        if (string.IsNullOrWhiteSpace(versionInfo?.Version))
         {
-            var process = ProcessTasks.StartProcess("dotnet-gitversion", "/output json", rootDirectory, logOutput: false, logInvocation: false);
-            process.AssertZeroExitCode();
-
-            var output = process.Output.StdToText();
-            var versionInfo = JsonConvert.DeserializeObject<VersionInfo>(output);
-
-            if (string.IsNullOrWhiteSpace(versionInfo?.Version))
-            {
-                Assert.Fail("[ERROR] Failed to Get Version from GitVersion.");
-            }
-
-            return versionInfo;
+            Assert.Fail("[ERROR] Failed to Get Version from GitVersion.");
         }
-        catch (Exception ex)
-        {
-            // Check if the error is related to GitVersion failing due to no commits
-            var errorMessage = ex.Message?.ToLower() ?? "";
 
-            if (errorMessage.Contains("no commits found") || 
-                errorMessage.Contains("process 'dotnet-gitversion") || 
-                errorMessage.Contains("exited with code 1"))
-            {
-                Log.Warning("[WARN] GitVersion Failed (Likely no Commits Yet). Using Default Version 0.1.0-alpha.");
-                
-                // Return a default VersionInfo for repositories with no commits
-                return new VersionInfo
-                {
-                    Version = "0.1.0-alpha",
-                    FullVersion = "0.1.0-alpha.1+0",
-                    Date = DateTime.UtcNow.ToString("yyyy-MM-dd"),
-                    Hash = "0000000"
-                };
-            }
-            
-            // Re-throw if it's not a GitVersion no-commits issue
-            throw;
-        }
+        return versionInfo;
+    }
+
+    private static string RunGitVersion(string rootDirectory)
+    {
+        var process = ProcessTasks.StartProcess("dotnet-gitversion", "/output json", rootDirectory, logOutput: false, logInvocation: false);
+        process.AssertZeroExitCode();
+
+        return process.Output.StdToText();
     }
 }

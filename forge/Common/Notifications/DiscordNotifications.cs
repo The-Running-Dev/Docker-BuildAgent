@@ -19,6 +19,21 @@ namespace Notifications;
 /// build duration, and sends it to the specified Discord webhook URL.</remarks>
 public class DiscordNotifications : INotifications
 {
+    /// <summary>How long a notification may take before it is abandoned (I44: a slow notification never holds the build).</summary>
+    public static readonly TimeSpan SendTimeout = TimeSpan.FromSeconds(10);
+
+    private readonly HttpMessageHandler _handler;
+
+    private readonly Func<string> _commitMessage;
+
+    public DiscordNotifications() : this(new HttpClientHandler(), ReadLastCommitMessage) { }
+
+    internal DiscordNotifications(HttpMessageHandler handler, Func<string> commitMessage)
+    {
+        _handler = handler ?? throw new ArgumentNullException(nameof(handler));
+        _commitMessage = commitMessage ?? throw new ArgumentNullException(nameof(commitMessage));
+    }
+
     /// <summary>
     /// Sends a build notification to a specified webhook URL.
     /// </summary>
@@ -27,8 +42,22 @@ public class DiscordNotifications : INotifications
     /// without sending a notification.</remarks>
     /// <param name="p">The parameters for the notification, including the webhook URL, build status, branch, commit, version, and build
     /// duration.</param>
-    /// <returns></returns>
+    /// <returns>A task that completes when the notification was delivered, rejected or abandoned. It never faults:
+    /// a failed notification is a warning and never changes the build's outcome (I44). The webhook URL is never
+    /// written to any output.</returns>
     public async Task Send(NotificationParams p)
+    {
+        try
+        {
+            await SendCore(p);
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Failed to Send Notification: {Error}", ex.GetType().Name);
+        }
+    }
+
+    private async Task SendCore(NotificationParams p)
     {
         if (string.IsNullOrWhiteSpace(p.WebHookUrl))
         {
@@ -40,16 +69,16 @@ public class DiscordNotifications : INotifications
         var title = p.BuildSucceeded ? "✅ Build Succeeded" : "❌ Build Failed";
         var color = p.BuildSucceeded ? 0x57F287 : 0xED4245;
 
-        var commitMessage = ProcessTasks
-            .StartProcess("git", "log -1 --pretty=%B", logOutput: false, logInvocation: false)
-            .AssertZeroExitCode()
-            .Output
-            .Select(o => o.Text.Trim())
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Take(20)
-            .ToList();
+        var formattedCommitMessage = string.Empty;
+        try
+        {
+            formattedCommitMessage = _commitMessage();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Could not Read the Commit Message for the Notification: {Error}", ex.Message);
+        }
 
-        var formattedCommitMessage = string.Join("\n", commitMessage);
         var durationText = p.BuildDuration.TotalMinutes >= 1
             ? $"{p.BuildDuration.TotalMinutes:N1}m"
             : $"{p.BuildDuration.TotalSeconds:N0}s";
@@ -79,16 +108,29 @@ public class DiscordNotifications : INotifications
             }
         };
 
-        Log.Information($"Sending Notification...{p.WebHookUrl.Substring(10)}");
+        // The URL carries the webhook token: only the host is ever logged.
+        var host = Uri.TryCreate(p.WebHookUrl, UriKind.Absolute, out var uri) ? uri.Host : "(invalid URL)";
+        Log.Information("Sending Notification to {Host}...", host);
 
-        using var client = new HttpClient();
-        var response = await client.PostAsJsonAsync(p.WebHookUrl, payload);
+        using var client = new HttpClient(_handler, disposeHandler: false) { Timeout = SendTimeout };
+        using var response = await client.PostAsJsonAsync(p.WebHookUrl, payload);
 
         if (!response.IsSuccessStatusCode)
         {
-            var error = await response.Content.ReadAsStringAsync();
-
-            Log.Error($"❌ Failed to Send Notification: {response.StatusCode}\n{error}");
+            Log.Warning("Failed to Send Notification: {StatusCode}", (int)response.StatusCode);
         }
+    }
+
+    private static string ReadLastCommitMessage()
+    {
+        var lines = ProcessTasks
+            .StartProcess("git", "log -1 --pretty=%B", logOutput: false, logInvocation: false)
+            .AssertZeroExitCode()
+            .Output
+            .Select(o => o.Text.Trim())
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Take(20);
+
+        return string.Join("\n", lines);
     }
 }

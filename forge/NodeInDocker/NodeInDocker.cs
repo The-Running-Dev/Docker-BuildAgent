@@ -122,13 +122,21 @@ public class NodeInDocker : Base<NodeInDockerParams, DiscordNotifications>, ICle
 
         var registryUrl = !string.IsNullOrEmpty(Parameters.RegistryUrl) ? $"{Parameters.RegistryUrl}/" : string.Empty;
 
-        Parameters.Tags =
-        [
-            $"{registryUrl}{Parameters.ImageTag}:latest",
-            $"{registryUrl}{Parameters.ImageTag}:{Parameters.Version}"
-        ];
+        // S3.12/I15: a push to main (CreateGitHubRelease false) moves `latest` only and writes no
+        // versioned sink at all — the versioned tag is added only when actually publishing a release.
+        Parameters.Tags = CreateGitHubRelease
+            ?
+            [
+                $"{registryUrl}{Parameters.ImageTag}:latest",
+                $"{registryUrl}{Parameters.ImageTag}:{Parameters.Version}"
+            ]
+            :
+            [
+                $"{registryUrl}{Parameters.ImageTag}:latest"
+            ];
 
         Parameters.ReleaseTag = $"v{Parameters.Version}"; // Add "v" prefix to match Git tag format
+        Parameters.CreateGitHubRelease = CreateGitHubRelease;
     }
 
     /// <summary>

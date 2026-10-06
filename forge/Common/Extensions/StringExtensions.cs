@@ -59,6 +59,24 @@ public static class StringExtensions
     }
 
     /// <summary>
+    /// Removes a trailing <c>.git</c> from a repository URL or name, leaving any other <c>.git</c> in it,
+    /// so <c>owner/foo.github.io.git</c> becomes <c>owner/foo.github.io</c>.
+    /// </summary>
+    /// <param name="value">Repository URL or name.</param>
+    /// <returns>The value without a trailing <c>.git</c>.</returns>
+    public static string TrimGitSuffix(this string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        var trimmed = value.TrimEnd('/');
+
+        return trimmed.EndsWith(".git", StringComparison.OrdinalIgnoreCase) ? trimmed[..^4] : trimmed;
+    }
+
+    /// <summary>
     /// Normalizes a GitHub repository URL into an owner/repo slug.
     /// </summary>
     /// <param name="repositoryUrl">Repository URL or slug.</param>
@@ -71,11 +89,10 @@ public static class StringExtensions
         }
 
         var repoPath = Regex.Replace(repositoryUrl, @"(https?:\/\/)?(www\.)?(ghcr\.io|github\.com)\/", "")
-            .Trim('/')
-            .Replace(".git", "");
+            .Trim('/');
 
         var repoParts = repoPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        return repoParts.Length >= 2 ? $"{repoParts[0]}/{repoParts[1]}" : repoPath;
+        return repoParts.Length >= 2 ? $"{repoParts[0]}/{repoParts[1].TrimGitSuffix()}" : repoPath.TrimGitSuffix();
     }
 
     /// <summary>

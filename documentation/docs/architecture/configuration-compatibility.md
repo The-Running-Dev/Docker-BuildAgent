@@ -159,7 +159,9 @@ Node version, not the `engines` field of its `package.json`.
 
 The build asks GitVersion for the version by running `dotnet-gitversion /output json` in the
 project root, and reads `GitVersion.yml` from there. The image ships GitVersion 6.5.1, so the file
-uses the version 6 syntax. If the project has no `.git` directory the version is `0.0.0`.
+uses the version 6 syntax. If the project root has no `.git` directory or `.git` file (a worktree
+or submodule has a file) the build logs a warning and uses version `0.0.0`. In a Git repository a
+GitVersion failure, such as a repository with no commits, fails the build.
 This repository's [`GitVersion.yml`](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/GitVersion.yml) is an example; this page does not copy it, because a copy goes stale.
 A file written for GitVersion 5 needs migrating, because version 6 renamed some keys and values
 (for example the branch `tag` is now `label`, and the `Mainline` mode is now `TrunkBased`). See

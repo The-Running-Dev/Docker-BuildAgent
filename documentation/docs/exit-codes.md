@@ -19,12 +19,12 @@ but nothing returns them yet, so do not write a script that waits for one.
 |---|---|---|---|
 | 0 | Every target that had to run succeeded. | Nothing. | Implemented |
 | 2 | The project configuration file is invalid. No target ran. | Read the `Configuration error:` lines in the output. Each names the file, the key and the rule. Correct the file as [Project Configuration File](./project-configuration.md#invalid-configuration) describes, then run again. | Implemented |
-| 255 | A target failed, or a variable in `.build/.build.env.map` has no value. The build returns `-1`, which a shell shows as 255. | Find the target marked `Failed` in the summary table at the end of the output and read the error above it. For a missing variable the output says `Build Env Incomplete`. Set the variable or remove it from the map. See [Troubleshooting](./troubleshooting.md). | Implemented |
+| 255 | A target failed for a reason the build does not classify, or a variable in `.build/.build.env.map` has no value. The build returns `-1`, which a shell shows as 255. | Find the target marked `Failed` in the summary table at the end of the output and read the error above it. For a missing variable the output says `Build Env Incomplete`. Set the variable or remove it from the map. See [Troubleshooting](./troubleshooting.md). | Implemented |
 | 1 | The `build` wrapper got no status from the build program, or a step of `build node-template` threw an exception, such as a failed template clone. | Read the `[ERROR]` line above the exit. | Implemented |
 | 3 | A required discovery target was not found. | Not applicable yet. Today the same failure ends the build with 255. | Contract only |
 | 4 | An external template could not be fetched. | Not applicable yet. Today a failed template clone in `build node-template` ends with status 1. | Contract only |
-| 5 | The Docker daemon was unavailable or rejected the request. | Not applicable yet. Today a failed Docker step ends the build with 255. | Contract only |
-| 6 | A registry operation failed. | Not applicable yet. Today a failed push ends the build with 255. | Contract only |
+| 5 | The Docker daemon rejected a request. Today this is a failed `docker tag`. | Check that the daemon is running and the image exists. A failed `docker build` still ends the build with 255. | Implemented |
+| 6 | A registry operation failed: `docker login` or `docker push`. | Check `RegistryUrl`, `RegistryUser` and the token, and that the account may push to the repository. The output names the registry host, never the token. | Implemented |
 
 The contract lists `1` for any other failure. The build does not do that: a failed target returns `-1`
 (255), and `1` comes only from the wrapper. A script that must treat every failure alike should test for

@@ -9,7 +9,7 @@ using Utilities;
 namespace Common.Tests.Services;
 
 /// <summary>
-/// Comprehensive unit tests for the Git        Assert.Contains("Directory Cannot Be Empty or White Space", exception.Message);ervice class.
+/// Comprehensive unit tests for the GitService class.
 /// Tests cover changelog generation, commit retrieval, tag operations, URL generation, and error handling.
 /// </summary>
 public class GitServiceTests
@@ -18,10 +18,78 @@ public class GitServiceTests
 
     private readonly GitService _gitService;
 
+    private readonly List<string> _gitCalls = [];
+
+    private readonly HashSet<string> _remoteTags = [];
+
+    private readonly HashSet<string> _localTags = [];
+
     public GitServiceTests()
     {
         _mockLogger = new Mock<ILogger<GitService>>();
-        _gitService = new GitService(_mockLogger.Object);
+        _gitService = new GitService(_mockLogger.Object, FakeGit);
+    }
+
+    /// <summary>Answers the git commands CreateTag runs, from in-memory local and remote tag sets.</summary>
+    private IReadOnlyList<string> FakeGit(string arguments)
+    {
+        _gitCalls.Add(arguments);
+
+        var tag = arguments.Split(' ').Last().Replace("refs/tags/", "");
+
+        if (arguments.StartsWith("ls-remote"))
+        {
+            return _remoteTags.Contains(tag) ? [$"4d51a42	refs/tags/{tag}"] : [];
+        }
+
+        if (arguments.StartsWith("tag --list"))
+        {
+            return _localTags.Contains(tag) ? [tag] : [];
+        }
+
+        if (arguments.StartsWith("tag "))
+        {
+            _localTags.Add(tag);
+        }
+        else if (arguments.StartsWith("push "))
+        {
+            _remoteTags.Add(tag);
+        }
+
+        return [];
+    }
+
+    [Fact]
+    public void CreateTag_WhenTheTagIsNew_CreatesAndPushesItWithoutForce()
+    {
+        _gitService.CreateTag("v1.2.3");
+
+        Assert.Contains("v1.2.3", _remoteTags);
+        Assert.Contains("tag v1.2.3", _gitCalls);
+        Assert.Contains("push origin refs/tags/v1.2.3", _gitCalls);
+        Assert.DoesNotContain(_gitCalls, c => c.Contains("-f") || c.Contains("--force"));
+    }
+
+    [Fact]
+    public void CreateTag_WhenTheTagIsAlreadyOnOrigin_ChangesNothing()
+    {
+        _remoteTags.Add("v1.2.3");
+
+        _gitService.CreateTag("v1.2.3");
+
+        Assert.Equal(["ls-remote --tags origin refs/tags/v1.2.3"], _gitCalls);
+    }
+
+    [Fact]
+    public void CreateTag_WhenTheTagIsOnlyLocal_PushesItWithoutRecreatingIt()
+    {
+        _localTags.Add("v1.2.3");
+
+        _gitService.CreateTag("v1.2.3");
+
+        Assert.DoesNotContain("tag v1.2.3", _gitCalls);
+        Assert.Contains("push origin refs/tags/v1.2.3", _gitCalls);
+        Assert.DoesNotContain(_gitCalls, c => c.Contains("-f") || c.Contains("--force"));
     }
 
     [Fact]

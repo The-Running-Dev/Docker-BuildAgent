@@ -100,15 +100,23 @@ public class GitService : IGitService
 {
     private readonly ILogger<GitService> _logger;
 
+    private readonly Func<string, IReadOnlyList<string>> _git;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="GitService"/> class.
     /// </summary>
     /// <param name="logger">The logger instance for logging operations.</param>
     /// <exception cref="ArgumentNullException">Thrown when logger is null.</exception>
-    public GitService(ILogger<GitService> logger)
+    public GitService(ILogger<GitService> logger) : this(logger, RunGit) { }
+
+    internal GitService(ILogger<GitService> logger, Func<string, IReadOnlyList<string>> git)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _git = git ?? throw new ArgumentNullException(nameof(git));
     }
+
+    private static IReadOnlyList<string> RunGit(string arguments) =>
+        GitTasks.Git(arguments).Select(o => o.Text).ToList();
 
     /// <summary>
     /// Generates a change log based on the provided configuration.
@@ -290,7 +298,8 @@ public class GitService : IGitService
     }
 
     /// <summary>
-    /// Creates and pushes a new Git tag.
+    /// Creates and pushes a new Git tag. A tag already on <c>origin</c> is left as it is, and nothing is ever
+    /// forced: a published version is never moved.
     /// </summary>
     /// <param name="tag">The tag name to create.</param>
     /// <exception cref="ArgumentNullException">Thrown when tag is null.</exception>
@@ -308,19 +317,22 @@ public class GitService : IGitService
         
         try
         {
-            var existingTags = GitTasks.Git("tag");
-
-            if (existingTags.All(l => l.Text != tag))
+            // The remote is the record of what was published; a local-only check misses tags made elsewhere.
+            if (_git($"ls-remote --tags origin refs/tags/{tag}").Any(l => !string.IsNullOrWhiteSpace(l)))
             {
-                GitTasks.Git($"tag -f {tag}");
-                GitTasks.Git($"push origin -f {tag}");
+                _logger.Ok("Tag {Tag} Already Exists on Origin", tag);
 
-                _logger.Tag("Created and Pushed Tag: {Tag}", tag);
+                return;
             }
-            else
+
+            if (_git($"tag --list {tag}").All(l => l.Trim() != tag))
             {
-                _logger.Ok("Tag {Tag} Already Exists", tag);
+                _git($"tag {tag}");
             }
+
+            _git($"push origin refs/tags/{tag}");
+
+            _logger.Tag("Created and Pushed Tag: {Tag}", tag);
         }
         catch (Exception ex)
         {
@@ -359,11 +371,11 @@ public class GitService : IGitService
                 if (remoteUrl.StartsWith("git@"))
                 {
                     // git@github.com:owner/repo.git => https://github.com/owner/repo
-                    repoUrl = "https://" + remoteUrl.Substring(4).Replace(":", "/").Replace(".git", "");
+                    repoUrl = "https://" + remoteUrl.Substring(4).Replace(":", "/").TrimGitSuffix();
                 }
                 else if (remoteUrl.StartsWith("https://"))
                 {
-                    repoUrl = remoteUrl.Replace(".git", "");
+                    repoUrl = remoteUrl.TrimGitSuffix();
                 }
 
                 _logger.LogDebug("Repository URL: {RepoUrl}", repoUrl);

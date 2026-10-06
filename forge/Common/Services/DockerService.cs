@@ -68,6 +68,50 @@ public interface IDockerService
 }
 
 /// <summary>
+/// The Docker commands <see cref="DockerService"/> runs. The default runs the Docker CLI through NUKE; tests
+/// substitute one that never reaches a daemon.
+/// </summary>
+internal interface IDockerCli
+{
+    void Login(string server, string username, string password);
+
+    void Build(string path, string dockerFile, string tag, Action<string> output);
+
+    void Push(string name);
+
+    void Tag(string source, string target);
+}
+
+internal sealed class NukeDockerCli : IDockerCli
+{
+    public void Login(string server, string username, string password) =>
+        DockerTasks.DockerLogin(s => s
+            .DisableProcessInvocationLogging()
+            .SetServer(server)
+            .SetUsername(username)
+            .SetPassword(password));
+
+    public void Build(string path, string dockerFile, string tag, Action<string> output) =>
+        DockerTasks.DockerBuild(s => s
+            .SetPath(path)
+            .SetProcessLogger((_, text) => output(text))
+            .DisableProcessInvocationLogging()
+            .SetFile(dockerFile)
+            .SetTag(tag));
+
+    public void Push(string name) =>
+        DockerTasks.DockerPush(s => s
+            .DisableProcessInvocationLogging()
+            .SetName(name));
+
+    public void Tag(string source, string target) =>
+        DockerTasks.DockerTag(s => s
+            .DisableProcessInvocationLogging()
+            .SetSourceImage(source)
+            .SetTargetImage(target));
+}
+
+/// <summary>
 /// Provides methods for managing Docker operations such as login, build, tag, and push.
 /// </summary>
 /// <remarks>
@@ -81,15 +125,21 @@ public class DockerService : IDockerService
     
     private readonly INodeService _nodeService;
 
+    private readonly IDockerCli _docker;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="DockerService"/> class.
     /// </summary>
     /// <param name="logger">The logger instance for logging operations.</param>
     /// <param name="nodeService">The Node service for detecting application types.</param>
     public DockerService(ILogger<DockerService> logger, INodeService nodeService)
+        : this(logger, nodeService, new NukeDockerCli()) { }
+
+    internal DockerService(ILogger<DockerService> logger, INodeService nodeService, IDockerCli docker)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _nodeService = nodeService ?? throw new ArgumentNullException(nameof(nodeService));
+        _docker = docker ?? throw new ArgumentNullException(nameof(docker));
     }
 
     /// <summary>
@@ -101,6 +151,7 @@ public class DockerService : IDockerService
     /// components.
     /// </remarks>
     /// <param name="parameters">The parameters required for logging into the Docker registry, including the repository, user, and token.</param>
+    /// <exception cref="BuildFailureException">The login failed; the build ends with status 6.</exception>
     public void Login(DockerParams parameters)
     {
         if (parameters == null)
@@ -108,17 +159,16 @@ public class DockerService : IDockerService
             throw new ArgumentNullException(nameof(parameters));
         }
 
+        var server = Regex.Replace(parameters.RegistryUrl, @"/.*$", "");
+
         try
         {
-            DockerTasks.DockerLogin(s => s
-                .DisableProcessInvocationLogging()
-                .SetServer(Regex.Replace(parameters.RegistryUrl, @"/.*$", ""))
-                .SetUsername(parameters.RegistryUser)
-                .SetPassword(parameters.RegistryToken));
+            _docker.Login(server, parameters.RegistryUser, parameters.RegistryToken);
         }
-        catch
+        catch (Exception)
         {
-            // Ignore Docker task failures in test environment
+            // The inner exception is left off: its text can carry the command line, and with it the token.
+            throw new BuildFailureException(BuildFailure.Registry, $"Docker Login to {server} Failed");
         }
     }
 
@@ -197,27 +247,35 @@ public class DockerService : IDockerService
 
         var dockerFile = Path.Combine(parameters.RootDirectory, parameters.DockerFile);
         var latestTag = parameters.Tags.FirstOrDefault(x => x.Contains("latest"));
+        var copiedTemplate = false;
 
         if (!File.Exists(dockerFile))
         {
             var templateDockerFile = FindTemplateDockerFile(parameters);
-            
+
             _logger.LogWarning("Dockerfile not Found, Using a Template...");
             _logger.LogWarning("Using Dockerfile Template: {TemplateDockerFile}...", templateDockerFile);
             File.Copy(templateDockerFile, dockerFile);
+            copiedTemplate = true;
         }
 
         _logger.LogInformation("Building {DockerFile}...", dockerFile);
 
-        DockerTasks.DockerBuild(s => s
-            .SetPath(parameters.RootDirectory)
-            .SetProcessLogger((type, text) =>
+        try
+        {
+            _docker.Build(parameters.RootDirectory, dockerFile, $"{latestTag}", text =>
             {
                 if (parameters.Verbosity == Verbosity.Verbose) _logger.LogInformation(text);
-            })
-            .DisableProcessInvocationLogging()
-            .SetFile(dockerFile)
-            .SetTag($"{latestTag}"));
+            });
+        }
+        finally
+        {
+            // The template copy is build input only: never leave it in the consumer's working tree.
+            if (copiedTemplate)
+            {
+                File.Delete(dockerFile);
+            }
+        }
 
         _logger.Tag("{LatestTag}", latestTag);
 
@@ -233,6 +291,7 @@ public class DockerService : IDockerService
     /// succeed.
     /// </remarks>
     /// <param name="parameters">The parameters used for the Docker push operation, including tags and version information.</param>
+    /// <exception cref="BuildFailureException">The login or a push failed; the build ends with status 6.</exception>
     public void Push(DockerParams parameters)
     {
         if (parameters == null)
@@ -245,23 +304,12 @@ public class DockerService : IDockerService
         var latestTag = parameters.Tags.FirstOrDefault(x => x.Contains("latest"));
         var versionTag = parameters.Tags.FirstOrDefault(x => !x.Contains("latest"));
 
-        try
-        {
-            DockerTasks.DockerPush(s => s
-                .DisableProcessInvocationLogging()
-                .SetName($"{latestTag}"));
+        PushImage($"{latestTag}");
 
-            // No versioned tag means a main push (I15): only `latest` moves.
-            if (!string.IsNullOrEmpty(versionTag))
-            {
-                DockerTasks.DockerPush(s => s
-                    .DisableProcessInvocationLogging()
-                    .SetName($"{versionTag}"));
-            }
-        }
-        catch
+        // No versioned tag means a main push (I15): only `latest` moves.
+        if (!string.IsNullOrEmpty(versionTag))
         {
-            // Ignore Docker task failures in test environment
+            PushImage(versionTag);
         }
 
         if (string.IsNullOrEmpty(versionTag))
@@ -283,6 +331,7 @@ public class DockerService : IDockerService
     /// operation is logged upon completion.
     /// </remarks>
     /// <param name="parameters">The parameters containing the list of tags to be used for tagging the Docker image.</param>
+    /// <exception cref="BuildFailureException">The daemon refused the tag; the build ends with status 5.</exception>
     public void Tag(DockerParams parameters)
     {
         if (parameters == null)
@@ -301,16 +350,25 @@ public class DockerService : IDockerService
 
         try
         {
-            DockerTasks.DockerTag(s => s
-                .DisableProcessInvocationLogging()
-                .SetSourceImage($"{latestTag}")
-                .SetTargetImage($"{versionTag}"));
+            _docker.Tag($"{latestTag}", versionTag);
         }
-        catch
+        catch (Exception ex)
         {
-            // Ignore Docker task failures in test environment
+            throw new BuildFailureException(BuildFailure.DockerDaemon, $"Docker Tag {versionTag} Failed", ex);
         }
 
         _logger.Tag("{VersionTag}", versionTag);
+    }
+
+    private void PushImage(string name)
+    {
+        try
+        {
+            _docker.Push(name);
+        }
+        catch (Exception ex)
+        {
+            throw new BuildFailureException(BuildFailure.Registry, $"Docker Push {name} Failed", ex);
+        }
     }
 }

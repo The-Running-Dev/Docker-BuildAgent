@@ -1,5 +1,6 @@
 extern alias NodeInDockerAssembly;
 
+using System.Reflection;
 using Xunit;
 
 using Entities;
@@ -68,6 +69,47 @@ public sealed class NodeInDockerBuildTests : IDisposable
         Assert.NotNull(build.Parameters.ImageTag);
     }
 
+    // S3.12/I15: a push to `main` (CreateGitHubRelease false) moves `latest` only and writes no
+    // versioned tag; the same rule the Docker build follows.
+    [Fact]
+    public void Configure_OmitsVersionedTag_WhenCreateGitHubReleaseIsFalse()
+    {
+        var build = new NodeInDockerBuild();
+        build.SetParameters(CreateParameters());
+        SetField(build, "RegistryUrl", "ghcr.io/acme");
+        SetField(build, "ImageTag", "node-docker-app");
+        SetField(build, "CreateGitHubRelease", false);
+
+        build.ConfigureForTest();
+
+        Assert.Equal(["ghcr.io/acme/node-docker-app:latest"], build.Parameters.Tags);
+        Assert.False(build.Parameters.CreateGitHubRelease);
+    }
+
+    [Fact]
+    public void Configure_AddsVersionedTag_WhenCreateGitHubReleaseIsTrue()
+    {
+        var build = new NodeInDockerBuild();
+        build.SetParameters(CreateParameters());
+        SetField(build, "RegistryUrl", "ghcr.io/acme");
+        SetField(build, "ImageTag", "node-docker-app");
+        SetField(build, "CreateGitHubRelease", true);
+
+        build.ConfigureForTest();
+
+        Assert.Equal(["ghcr.io/acme/node-docker-app:latest", "ghcr.io/acme/node-docker-app:3.0.0"], build.Parameters.Tags);
+        Assert.Equal("v3.0.0", build.Parameters.ReleaseTag);
+        Assert.True(build.Parameters.CreateGitHubRelease);
+    }
+
+    private static void SetField<T>(object target, string fieldName, T value)
+    {
+        var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Field '{fieldName}' not found.");
+
+        field.SetValue(target, value);
+    }
+
     private NodeInDockerParams CreateParameters()
     {
         return new NodeInDockerParams
@@ -82,6 +124,8 @@ public sealed class NodeInDockerBuildTests : IDisposable
 
     private sealed class NodeInDockerBuild : NodeInDockerAssembly::NodeInDocker
     {
+        public void ConfigureForTest() => Configure();
+
         public void SetParameters(NodeInDockerParams parameters) => Parameters = parameters;
     }
 }
