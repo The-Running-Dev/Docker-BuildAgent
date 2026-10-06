@@ -59,6 +59,7 @@ Define a reusable requirements specification for the Docker-BuildAgent PowerShel
     - unix:///path
     - npipe:////./pipe/name
   - WorkspacePath is required and must exist as a directory; otherwise it must fail with WorkspaceInvalid (exit status 3)
+  - A relative WorkspacePath must be resolved against the current directory and stored absolute, so the mount never reaches docker as a bare name it would read as a named volume
   - Environment must be one of development or production
 - AdditionalParameters must be optional and default to empty hashtable.
 

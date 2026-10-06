@@ -165,6 +165,91 @@ Describe 'Invoke-Build' {
             { Invoke-Build -type docker } | Should -Not -Throw
         }
     }
+
+    Context 'Argument translation (R-INVOKE-003)' {
+        BeforeEach {
+            $script:RunArgs = $null
+            Mock Invoke-Docker -ModuleName $script:ModuleName -ParameterFilter { $Arguments[0] -eq 'run' } -MockWith {
+                $script:RunArgs = $Arguments
+                [pscustomobject]@{ ExitCode = 0; Output = @() }
+            }
+        }
+
+        It 'turns <Key> into --<Flag>' -ForEach @(
+            @{ Key = 'imageTag'; Flag = 'image-tag' }
+            @{ Key = 'ImageTag'; Flag = 'image-tag' }
+            @{ Key = 'registryUrl'; Flag = 'registry-url' }
+            @{ Key = 'dryRun'; Flag = 'dry-run' }
+            @{ Key = 'tags'; Flag = 'tags' }
+        ) {
+            Set-BuildAgentConfig -DockerImage 'a/b:1' -DockerHost 'tcp://localhost:2375' -WorkspacePath $script:Workspace
+            Invoke-Build -type docker -buildArgs @{ $Key = 'v' }
+
+            $index = [array]::IndexOf($script:RunArgs, "--$Flag")
+            $index | Should -BeGreaterThan 0
+            $script:RunArgs[$index + 1] | Should -BeExactly 'v'
+        }
+
+        It 'repeats the option once per list item' {
+            Set-BuildAgentConfig -DockerImage 'a/b:1' -DockerHost 'tcp://localhost:2375' -WorkspacePath $script:Workspace
+            Invoke-Build -type docker -buildArgs @{ tags = @('a', 'b') }
+
+            ($script:RunArgs -join ' ') | Should -BeLike '*--tags a --tags b*'
+        }
+
+        It 'lets buildArgs win over AdditionalParameters' {
+            Set-BuildAgentConfig -DockerImage 'a/b:1' -DockerHost 'tcp://localhost:2375' -WorkspacePath $script:Workspace -AdditionalParameters @{ imageTag = 'from-config'; registryUrl = 'ghcr.io/kept' }
+            Invoke-Build -type docker -buildArgs @{ imageTag = 'from-call' }
+
+            $joined = $script:RunArgs -join ' '
+            $joined | Should -BeLike '*--image-tag from-call*'
+            $joined | Should -Not -BeLike '*from-config*'
+            $joined | Should -BeLike '*--registry-url ghcr.io/kept*'
+        }
+
+        It 'mounts a relative workspace by its absolute path' {
+            Push-Location (Split-Path $script:Workspace -Parent)
+            try {
+                Set-BuildAgentConfig -DockerImage 'a/b:1' -DockerHost 'tcp://localhost:2375' -WorkspacePath (Split-Path $script:Workspace -Leaf)
+            }
+            finally { Pop-Location }
+            Invoke-Build -type docker
+
+            $BuildAgentConfig.WorkspacePath | Should -Be (Resolve-Path -LiteralPath $script:Workspace).ProviderPath
+            $script:RunArgs | Should -Contain "$((Resolve-Path -LiteralPath $script:Workspace).ProviderPath):/workspace"
+        }
+    }
+
+    Context 'validateArgs (R-VALIDATE-001)' {
+        BeforeEach {
+            $script:ParametersJson = Join-Path (Split-Path (Get-Module $script:ModuleName).Path -Parent) 'parameters.json'
+            $script:SavedParametersJson = "$script:ParametersJson.saved"
+            if (Test-Path -LiteralPath $script:ParametersJson) {
+                Move-Item -LiteralPath $script:ParametersJson -Destination $script:SavedParametersJson -Force
+            }
+            '[{"Name":"Docker","Parameters":[{"Name":"imageTag"},{"Name":"registryUrl"}]}]' |
+                Set-Content -LiteralPath $script:ParametersJson -Encoding UTF8
+            Set-BuildAgentConfig -DockerImage 'a/b:1' -DockerHost 'tcp://localhost:2375' -WorkspacePath $script:Workspace
+        }
+
+        AfterEach {
+            Remove-Item -LiteralPath $script:ParametersJson -Force
+            if (Test-Path -LiteralPath $script:SavedParametersJson) {
+                Move-Item -LiteralPath $script:SavedParametersJson -Destination $script:ParametersJson -Force
+            }
+        }
+
+        It 'rejects an unknown key before docker runs' {
+            $failure = Get-Failure { Invoke-Build -type docker -buildArgs @{ notAParameter = 'x' } -validateArgs }
+
+            "$failure" | Should -BeLike '*notAParameter*'
+            Should -Invoke Invoke-Docker -ModuleName $script:ModuleName -Times 0 -Exactly
+        }
+
+        It 'accepts known keys' {
+            { Invoke-Build -type docker -buildArgs @{ imageTag = 'x' } -validateArgs } | Should -Not -Throw
+        }
+    }
 }
 
 Describe 'Exported surface (S9.9)' {
