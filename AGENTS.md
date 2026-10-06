@@ -4,7 +4,7 @@ This file holds the project rules for this repository. It is binding for every a
 
 ## Shared contract
 
-**Read [`AGENTS.shared.md`](C:/Users/Ben/.agent-kit/AGENTS.shared.md) completely before this file.** It holds the rules every repository using the kit shares, and they bind here as fully as anything written below. This file adds only what is specific to this repository; where the two conflict, the more specific instruction wins (`AGENTS.shared.md`, *Safe start*).
+**Read `AGENTS.shared.md` completely before this file.** It holds the rules every repository using the kit shares, resolved from the `AGENTKIT_HOME` environment variable if set, else `.agent-kit` in the home directory, and they bind here as fully as anything written below. This file adds only what is specific to this repository; where the two conflict, the more specific instruction wins (`AGENTS.shared.md`, *Safe start*).
 
 ## Repository identity
 
