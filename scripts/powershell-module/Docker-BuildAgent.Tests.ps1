@@ -33,6 +33,21 @@ Describe 'Default image (S9.1)' {
         $BuildAgentConfig.DockerImage | Should -Be "ghcr.io/the-running-dev/build-agent:$script:ModuleVersion"
         $BuildAgentConfig.DockerImage | Should -Not -BeLike '*:latest'
     }
+
+    It 'is the module''s own pre-release when the module is one' {
+        # The release stamps a pre-release module with PSData Prerelease; its image carries the same label.
+        $copy = Join-Path $script:Workspace 'prerelease-module'
+        New-Item -ItemType Directory -Path $copy -Force | Out-Null
+        Copy-Item -Path (Join-Path $PSScriptRoot 'Docker-BuildAgent.psm1') -Destination $copy
+        $manifest = Get-Content -LiteralPath $script:ManifestPath -Raw
+        $manifest = $manifest -replace '(?m)^(\s*)PSData = @\{', "`$0`r`n`$1    Prerelease = 'rc1'"
+        Set-Content -LiteralPath (Join-Path $copy 'Docker-BuildAgent.psd1') -Value $manifest
+
+        Remove-Module $script:ModuleName -Force -ErrorAction SilentlyContinue
+        Import-Module (Join-Path $copy 'Docker-BuildAgent.psd1') -Force
+
+        $BuildAgentConfig.DockerImage | Should -Be "ghcr.io/the-running-dev/build-agent:$script:ModuleVersion-rc1"
+    }
 }
 
 Describe 'Set-BuildAgentConfig defaults (R-CONFIG-002)' {
