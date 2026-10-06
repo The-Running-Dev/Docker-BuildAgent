@@ -321,12 +321,18 @@ public class DockerServiceTests : IDisposable
         Assert.DoesNotContain(_testParams.RegistryToken, exception.ToString());
     }
 
-    [Fact]
-    public void Login_PassesTheRegistryHostOnly()
+    [Theory]
+    [InlineData("registry.example.com/myapp", "registry.example.com")]
+    [InlineData("ghcr.io/owner/repo", "ghcr.io")]
+    [InlineData("https://ghcr.io/owner/repo", "ghcr.io")]
+    [InlineData("registry.example.com", "registry.example.com")]
+    public void Login_PassesTheRegistryHostOnly(string registryUrl, string expectedServer)
     {
+        _testParams.RegistryUrl = registryUrl;
+
         _dockerService.Login(_testParams);
 
-        Assert.Equal("registry.example.com", _docker.LoginServer);
+        Assert.Equal(expectedServer, _docker.LoginServer);
     }
 
     [Fact]

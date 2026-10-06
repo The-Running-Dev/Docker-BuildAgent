@@ -6,7 +6,7 @@ namespace Surface.SurfaceDerivation;
 
 /// <summary>
 /// Derives one TemplateLocation item per Docker template discovery location, in the order
-/// `forge/Docker/Docker.cs` and `forge/Common/Utilities/Docker.cs` actually try them (the two
+/// `forge/Docker/Docker.cs` and `forge/Common/Services/DockerService.cs` actually try them (the two
 /// files design/20-contract.md's "Docker template discovery" section names as "Declared at"):
 /// (1) the explicit templates directory when it exists, (2) that same value resolved under the
 /// root directory, (3) `&lt;templates&gt;/Dockerfile.&lt;appType&gt;` when no Dockerfile exists at the

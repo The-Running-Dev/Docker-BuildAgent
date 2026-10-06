@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 
 using Nuke.Common;
 using Nuke.Common.Tooling;
@@ -159,7 +158,7 @@ public class DockerService : IDockerService
             throw new ArgumentNullException(nameof(parameters));
         }
 
-        var server = Regex.Replace(parameters.RegistryUrl, @"/.*$", "");
+        var server = parameters.RegistryUrl.GetRegistryServer();
 
         try
         {

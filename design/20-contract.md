@@ -408,7 +408,7 @@ Semantics this document adds:
 
 Declared at
 [`forge/Docker/Docker.cs`](../forge/Docker/Docker.cs) and
-[`forge/Common/Utilities/Docker.cs`](../forge/Common/Utilities/Docker.cs).
+[`forge/Common/Services/DockerService.cs`](../forge/Common/Services/DockerService.cs).
 
 Semantics this document adds: the ordered discovery locations are a protected surface.
 Each location is a `TemplateLocation` manifest item whose `Value` is its position, so
