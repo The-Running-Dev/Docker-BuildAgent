@@ -1,5 +1,6 @@
 extern alias NodeAssembly;
 
+using System.Reflection;
 using Xunit;
 
 using Entities;
@@ -31,49 +32,64 @@ public sealed class NodeBuildTests : IDisposable
     }
 
     [Fact]
-    public void Parameters_InitializesWithDefaults()
+    public void Configure_UsesTheArtifactsDirField_WhenTheDirectoryExists()
     {
+        var elsewhere = Path.Combine(_rootDir, "elsewhere");
+        Directory.CreateDirectory(elsewhere);
         var build = new NodeBuild();
-        var parameters = CreateParameters();
-        build.SetParameters(parameters);
+        build.SetParameters(CreateParameters("artifacts"));
+        SetField(build, "ArtifactsDir", elsewhere);
 
-        Assert.NotNull(build.Parameters);
-        Assert.NotNull(build.Parameters.ArtifactsDir);
+        build.ConfigureForTest();
+
+        Assert.Equal(elsewhere, build.Parameters.ArtifactsDir);
     }
 
     [Fact]
-    public void Parameters_SetsArtifactsDirCorrectly()
+    public void Configure_ResolvesARelativeArtifactsDirField_UnderTheRoot()
     {
         var build = new NodeBuild();
-        var parameters = CreateParameters();
-        build.SetParameters(parameters);
+        build.SetParameters(CreateParameters("artifacts"));
+        SetField(build, "ArtifactsDir", "out");
+
+        build.ConfigureForTest();
+
+        Assert.Equal(Path.Combine(_rootDir, "out"), build.Parameters.ArtifactsDir);
+    }
+
+    [Fact]
+    public void Configure_KeepsTheParameterValue_WhenTheFieldIsUnset()
+    {
+        var build = new NodeBuild();
+        build.SetParameters(CreateParameters("artifacts"));
+
+        build.ConfigureForTest();
 
         Assert.Equal(_artifactsDir, build.Parameters.ArtifactsDir);
     }
 
-    [Fact]
-    public void Parameters_SetsVersionCorrectly()
-    {
-        var build = new NodeBuild();
-        var parameters = CreateParameters();
-        build.SetParameters(parameters);
-
-        Assert.NotNull(build.Parameters.Version);
-        Assert.Equal("2.0.1", build.Parameters.Version.Version);
-    }
-
-    private NodeParams CreateParameters()
+    private NodeParams CreateParameters(string artifactsDir)
     {
         return new NodeParams
         {
             RootDirectory = _rootDir,
-            ArtifactsDir = _artifactsDir,
+            ArtifactsDir = artifactsDir,
             Version = new VersionInfo { Version = "2.0.1" }
         };
     }
 
+    private static void SetField<T>(object target, string fieldName, T value)
+    {
+        var field = target.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Field '{fieldName}' not found.");
+
+        field.SetValue(target, value);
+    }
+
     private sealed class NodeBuild : NodeAssembly::Node
     {
+        public void ConfigureForTest() => Configure();
+
         public void SetParameters(NodeParams parameters) => Parameters = parameters;
     }
 }

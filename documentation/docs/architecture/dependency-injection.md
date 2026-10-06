@@ -70,9 +70,6 @@ access to the build instance. The only production use is in `Base.Build`, which 
 with the default services and uses it to mark the project directory as a safe git directory before
 the targets run. Everything else should take its services from the build's `ServiceProvider`.
 
-`DockerServiceDecorator` and `DockerSimulationService` are not registered by
-`AddForgeServices()`. Only tests use them.
-
 ## Testing
 
 The tests are in `forge/Common.Tests` and use xUnit and Moq:

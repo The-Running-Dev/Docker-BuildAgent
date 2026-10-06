@@ -136,8 +136,7 @@ pwsh scripts/Update-ParameterDocs.ps1
 ```
 
 To preview the site with hot reload, run `./scripts/build-docs-local.ps1`. It needs `pnpm` and the
-`docs-template/` submodule, and serves http://localhost:3000. `docs.ps1` and `docs-image.ps1` in the
-repository root are older helpers and are not the supported flow.
+`docs-template/` submodule, and serves http://localhost:3000.
 
 ## Contributing
 
