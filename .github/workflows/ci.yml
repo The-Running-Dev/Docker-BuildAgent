@@ -15,19 +15,22 @@
 #     the pull request when a document names something the repository does not have, the home page
 #     has drifted from README.md, or parameters.md has drifted from the *Params classes.
 #   - Build ("Build & Validate"): runs after ModuleTests.
-#       1. Skips duplicate runs for the same content (skip-duplicate-actions)
-#       2. Checks out the repository with full history and submodules
-#       3. Runs the shared setup action (.github/actions/common)
-#       4. Runs every test project in forge/Forge.sln with coverage (.github/actions/tests): test
+#       1. Checks out the repository with full history and submodules
+#       2. Runs the shared setup action (.github/actions/common)
+#       3. Runs every test project in forge/Forge.sln with coverage (.github/actions/tests): test
 #          results as a check run, a coverage summary as a sticky pull request comment, and the
 #          coverage report as a workflow artifact
-#       5. Dry-runs the Docker build (nuke --type docker --dry-run true)
+#       4. Dry-runs the Docker build (nuke --type docker --dry-run true), which builds the image
+#          without pushing it
+#       5. Scans that image for known vulnerabilities and reports them in the log (not yet a gate)
 #       6. Builds the documentation site from docs-template without deploying it
+#
+# Concurrency: a newer run for the same pull request (or ref) cancels the one in progress.
 #
 # Environment (Build job, dry-run step):
 #   - GITHUB_TOKEN, RegistryToken, NotificationsWebHookUrl
 #
-# Permissions: packages:write, contents:write, checks:write, pull-requests:write
+# Permissions: contents:read, checks:write (test results), pull-requests:write (coverage comment)
 #
 # Publishing is done by build.yml (a push to main) and by release.yml and release-tag.yml
 # (releases); see documentation/docs/ci-cd.md and documentation/docs/releases.md.
@@ -39,10 +42,13 @@ on:
   pull_request:
 
 permissions:
-  packages: write
-  contents: write
+  contents: read
   checks: write
   pull-requests: write
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ModuleTests:
@@ -55,10 +61,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install .NET SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
         with:
           dotnet-version: 8.x
 
@@ -81,17 +87,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Prevent duplicate workflow runs for the same content
-      - name: Skip Duplicate Actions
-        uses: fkirc/skip-duplicate-actions@v5
-        with:
-          cancel_others: true
-          concurrent_skipping: same_content_newer
-          skip_after_successful_duplicate: true
-
       # Checkout the repository with full git history for GitVersion
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           submodules: recursive
@@ -112,9 +110,35 @@ jobs:
           RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
           NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
 
+      # The dry run builds the image but does not push it; find it by the source label the
+      # Dockerfile sets, which the base image does not carry.
+      - name: Find Built Image
+        id: image
+        run: |
+          image=$(docker image ls \
+            --filter "label=org.opencontainers.image.source=https://github.com/The-Running-Dev/Docker-BuildAgent" \
+            --format '{{.Repository}}:{{.Tag}}' | head -n 1)
+          if [ -z "$image" ]; then
+            echo "::error::The dry run built no image to scan."
+            exit 1
+          fi
+          echo "ref=$image" >> "$GITHUB_OUTPUT"
+
+      # Reports the vulnerabilities that have a fix available; the table is in the log. Not a gate
+      # yet: the image currently carries fixable critical findings (base-image perl, node packages),
+      # so fail-build would block every pull request until they are remediated.
+      - name: Scan Image
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: ${{ steps.image.outputs.ref }}
+          fail-build: false
+          severity-cutoff: high
+          only-fixed: true
+          output-format: table
+
       # Validate docs-template build on pull requests (no deploy)
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: '22'
 

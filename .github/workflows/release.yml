@@ -35,7 +35,6 @@ permissions:
   packages: write
   contents: write
   checks: write
-  pull-requests: write
 
 # I13/S3.11: one CI concurrency group spans every publishing workflow (Build, Release,
 # Release-from-Tag) so at most one run publishes at a time. cancel-in-progress: false means a
@@ -59,7 +58,7 @@ jobs:
     steps:
       # Checkout with full history for GitVersion and submodules (the Dockerfile copies docs-template/)
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           submodules: recursive
@@ -90,7 +89,7 @@ jobs:
 
       # Trigger documentation build if needed
       - name: Trigger Documentation Build
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: Update-Documentation
