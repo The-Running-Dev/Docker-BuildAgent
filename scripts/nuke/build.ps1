@@ -71,16 +71,15 @@ param(
 # Import the helper module for common build operations
 Import-Module (Join-Path $PSScriptRoot 'nuke-helpers.psm1') -Force
 
+# Production is the default; only an explicit -isProduction:$false turns it off. This is decided here
+# because $PSBoundParameters inside a function holds that function's parameters, not the script's.
+$isProduction = if ($PSBoundParameters.ContainsKey('isProduction')) { [bool]$isProduction } else { $true }
+
 function Invoke-NodeTemplateBuild {
     <#
     .SYNOPSIS
         Builds a Node.js documentation app from a template repository.
     #>
-
-    # Set default value for production build if not specified
-    if (-not $PSBoundParameters.ContainsKey('isProduction')) {
-        $isProduction = $true
-    }
 
     # Define file paths and setup variables
     $templateSetupFile = "template-setup.ps1"
