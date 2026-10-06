@@ -18,7 +18,7 @@ runs:
 
     # Publish test results inline in GitHub
     - name: Publish Test Results
-      uses: dorny/test-reporter@3eeb9fc888e82e8be2fb356bbeec2750231672bc # v1
+      uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a # v3.2.0
       if: always()
       with:
         name: 'Test Results'
@@ -28,7 +28,7 @@ runs:
 
     # Generate and display coverage report inline
     - name: Generate Coverage Report
-      uses: danielpalme/ReportGenerator-GitHub-Action@b7115d212c0f7814a0cb17fb43ec36983c707ccb # 5.3.10
+      uses: danielpalme/ReportGenerator-GitHub-Action@d3ebf1f760f7d8ab92cc44d9bcfee7ad73722a31 # 5.5.11
       with:
         reports: './test-results/**/coverage.cobertura.xml'
         targetdir: './coverage-report'
@@ -38,7 +38,7 @@ runs:
 
     # Add coverage summary to PR and workflow summary
     - name: Add Coverage PR Comment
-      uses: marocchino/sticky-pull-request-comment@773744901bac0e8cbb5a0dc842800d45e9b2b405 # v2.9.4
+      uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
       if: github.event_name == 'pull_request'
       with:
         recreate: true
@@ -46,7 +46,7 @@ runs:
 
     # Upload detailed coverage report as artifact (optional)
     - name: Upload Detailed Coverage Report
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: coverage-html-report
         path: './coverage-report'
