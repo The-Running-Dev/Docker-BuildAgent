@@ -41,7 +41,7 @@ The parameters of each type are listed in `documentation/docs/parameters.md`, an
 | `Surface` | Derives, validates, serializes and compares the surface manifest | `Surface.Tests` | Types (Surface manifest); Persisted schemas (Surface manifest asset); Error semantics (Surface model) |
 | `Release` | Release version, release claim and release notes validation; the release pipeline types | `Release.Tests` | Types (Release version, Release claim); Error semantics (Release pipeline) |
 | `Update` | The container updater: health check, rollback, lock and update log | `Update.Tests` | Types (Container update, Prior image pin and prior container); Persisted schemas (Update log); Error semantics (Updater) |
-| `Tool` | The global tool executable; today it handles the `update` command and calls `Update` | none | Global tool |
+| `Tool` | The global tool `BuildAgent.Tool`, command `build-agent`; today it handles the `update` command and calls `Update`. Packing needs `-p:ReleaseVersion=<version>` | none | Global tool |
 | `DocsCheck` | Checks that the documentation names real paths, commands, parameters and build types, and the canonical-contract rules | `DocsCheck.Tests` | Error semantics (Docs check) |
 
 How the projects relate:

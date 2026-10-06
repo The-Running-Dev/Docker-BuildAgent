@@ -9,19 +9,31 @@ sidebar_position: 15
 The update tool replaces a running container with one built from a newer image, waits for the
 replacement to report healthy, and puts the original back if it does not.
 
+The tool is the .NET global tool `BuildAgent.Tool`, and its command is `build-agent`:
+
+```bash
+dotnet tool install --global BuildAgent.Tool
+```
+
 :::caution Not yet published
-The tool is built in this repository but is not published as a package, and it has no installed
-command name. Both depend on an open decision, **U-1** in the contract (who owns the tool feed
-and its publishing keys). This page shows the command as `<tool>`; there is nothing to install
-yet.
+The first release that publishes the tool is 2.0.0, which is not released yet. Until then there is
+nothing on nuget.org to install; pack it from a checkout instead:
+
+```bash
+dotnet pack forge/Tool -c Release -p:ReleaseVersion=0.0.0-local -o artifacts/tool
+dotnet tool install --global BuildAgent.Tool --add-source artifacts/tool --version 0.0.0-local
+```
+
+Packing without `ReleaseVersion` fails: a release stamps the tool's version, and the tool never
+supplies its own.
 :::
 
 ## Commands
 
 ```text
-<tool> update <container> [--image <reference>] [--health-timeout <duration>]
-                          [--no-restore] [--notify <url>]
-<tool> update --clear-lock <container>
+build-agent update <container> [--image <reference>] [--health-timeout <duration>]
+                               [--no-restore] [--notify <url>]
+build-agent update --clear-lock <container>
 ```
 
 | Option | Meaning |

@@ -102,6 +102,18 @@ jobs:
       - name: Tests & Coverage
         uses: ./.github/actions/tests
 
+      # The global tool packs, installs and answers as `build-agent` (contract § Global tool).
+      # 0.0.0-ci is a throwaway version: nothing here publishes.
+      - name: Pack Global Tool
+        run: |
+          dotnet pack forge/Tool -c Release -p:ReleaseVersion=0.0.0-ci -o "$RUNNER_TEMP/tool"
+          dotnet tool install BuildAgent.Tool --tool-path "$RUNNER_TEMP/tool-bin" --add-source "$RUNNER_TEMP/tool" --version 0.0.0-ci
+          if "$RUNNER_TEMP/tool-bin/build-agent" 2> "$RUNNER_TEMP/usage.txt"; then
+            echo "::error::build-agent with no arguments should exit non-zero with its usage."
+            exit 1
+          fi
+          grep -q '^Usage: build-agent update' "$RUNNER_TEMP/usage.txt"
+
       # Run the Docker build in dry-run mode for validation
       - name: Validate Build
         run: nuke --type docker --dry-run true

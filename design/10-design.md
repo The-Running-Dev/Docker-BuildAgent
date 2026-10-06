@@ -514,6 +514,6 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 
 ## Open questions
 
-1. **Who owns the package identities and publishing keys on the .NET tool feed and the PowerShell Gallery?** The identities must be reserved and keys stored as CI secrets before the first 2.0.0 release can publish. This is an operational prerequisite, not a design choice; it blocks the first publish, not the slices.
+None is open. Question 1 of this revision, who owns the package identities and publishing keys on the .NET tool feed and the PowerShell Gallery, is closed by the 2026-10-06 decision on the tool's identity in [`90-decisions.md`](90-decisions.md).
 
 Questions 1–4 of the previous revision are closed and recorded in [`90-decisions.md`](90-decisions.md) under 2026-09-20: main pushes move `latest` only; the module's default image pins to its own version; "direct invocation" means a packaged host-invokable launcher; and automated update-path verification is Linux-only.

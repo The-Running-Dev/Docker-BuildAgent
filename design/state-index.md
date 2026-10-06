@@ -141,6 +141,7 @@ questions live in `design/20-contract.md` under `## Unresolved`.
 | decision/2026-10-03-updater-owns-its-notifier | `unit/document/design-10-design` |
 | decision/2026-10-04-completion-rerun-moves-latest | `unit/document/design-10-design` |
 | decision/2026-10-04-sink-identity-recorded-before-write | `unit/document/design-10-design` |
+| decision/2026-10-06-tool-identity | `unit/document/design-20-contract` |
 | decision/2026-10-06-update-refuses-unreproduced-settings | `unit/document/design-20-contract` |
 <!-- decision-affects:end -->
 

@@ -36,7 +36,8 @@ CI has three jobs:
   [Parameters](parameters.md) no longer match the `*Params` classes.
 - **Build & Validate** runs after Module Tests. It runs every test project in `forge/Forge.sln` with
   coverage (test results appear as a check run, and a coverage summary is posted on the pull
-  request), makes a dry run of the Docker build with `nuke --type docker --dry-run true`, and
+  request), packs the global tool `BuildAgent.Tool` and checks that it installs and answers as
+  `build-agent`, makes a dry run of the Docker build with `nuke --type docker --dry-run true`, and
   builds the documentation site from `docs-template`. The dry run builds the image without pushing
   it; Build & Validate then scans that image with Grype (`anchore/scan-action`) and lists the
   high and critical vulnerabilities that have a fix available in the job log. The scan reports;

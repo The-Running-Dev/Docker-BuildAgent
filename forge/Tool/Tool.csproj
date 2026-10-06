@@ -8,9 +8,33 @@
     <NukeRootDirectory>..</NukeRootDirectory>
     <NukeScriptDirectory>..</NukeScriptDirectory>
     <NukeTelemetryVersion>1</NukeTelemetryVersion>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
+
+  <!-- design/20-contract.md § Global tool (2026-10-06 decision on the tool's identity). -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <PackageId>BuildAgent.Tool</PackageId>
+    <ToolCommandName>build-agent</ToolCommandName>
+    <Authors>The-Running-Dev</Authors>
+    <Description>Runs build-agent builds and updates a running container to a newer image with health-checked rollback.</Description>
+    <PackageProjectUrl>https://build-agent.subzerodev.com/docs/update-tool</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/The-Running-Dev/Docker-BuildAgent</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageTags>docker;build;nuke;update;rollback</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Version Condition="'$(ReleaseVersion)' != ''">$(ReleaseVersion)</Version>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Update\Update.csproj" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <!-- I1: the release stamps the tool's version; the package never defaults its own. -->
+  <Target Name="RequireReleaseVersion" BeforeTargets="GenerateNuspec">
+    <Error Condition="'$(ReleaseVersion)' == ''"
+           Text="BuildAgent.Tool is packed only with the release version: pass -p:ReleaseVersion=&lt;version&gt;." />
+  </Target>
 </Project>

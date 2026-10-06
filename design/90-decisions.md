@@ -6,6 +6,7 @@ Append-only. Newest at the top. The rejected alternatives are the point — with
 
 Every entry below, newest first, by date and title. The entries are not edited; this list follows them.
 
+- 2026-10-06 — The global tool is `BuildAgent.Tool` on nuget.org, invoked as `build-agent`, and the release workflow alone holds the publishing keys
 - 2026-10-06 — An update refuses every setting its replacement does not carry over, and pulls before it resolves
 - 2026-10-04 — A sink's identity is recorded just before it is written, and a package is identified by its content without the repository signature
 - 2026-10-04 — A re-run for a published release's own commit moves only `latest`
@@ -51,6 +52,12 @@ Every entry below, newest first, by date and title. The entries are not edited; 
 _A staging area, not a home. Things noticed mid-slice that were deliberately not acted on. `/track` turns each into a GitHub issue and removes it from here. An item that is a *decision* rather than a *todo* belongs below as an entry, not in an issue._
 
 ---
+
+### 2026-10-06 — The global tool is `BuildAgent.Tool` on nuget.org, invoked as `build-agent`, and the release workflow alone holds the publishing keys
+Context: `20-contract.md` U-1 and `10-design.md` Open question 1. The contract fixed the tool's command surface but not its package id or command name, so the tool could not be packed, its documents showed `<tool>`, and neither the tool nor the PowerShell module had a feed to publish to or a key to publish with.
+Chosen: The tool is the .NET global tool package `BuildAgent.Tool` on nuget.org, and its command is `build-agent`. The module is published to the PowerShell Gallery under its settled name, `Docker-BuildAgent`. The repository owner holds both listings. Their keys are the repository secrets `NUGET_API_KEY` and `PSGALLERY_API_KEY`, and only the release workflow reads them. Packing the tool without a release version fails, so no package carries a version the release did not stamp (I1).
+Rejected: `Docker.BuildAgent` / `buildagent` — the tool's job is not tied to Docker for the operator, and a hyphenated command reads as the product name. An owner-prefixed id such as `TheRunningDev.BuildAgent` — it guards against squatting, but the id is reserved on first publish either way and the prefix adds nothing an installer types twice. GitHub Packages — every install would need an authenticated extra package source. Packing without publishing — it leaves I1's three-sink release unable to complete.
+Reversibility: expensive — a published package id and command name are protected surfaces; renaming either is a breaking change.
 
 ### 2026-10-06 — An update refuses every setting its replacement does not carry over, and pulls before it resolves
 Context: `20-contract.md` U-10 and I34. The replacement is created from a fixed set of fields (image, name, labels, environment, command, entrypoint, mounts, ports, restart policy, networks), so a container started with any other run option — privileged mode, capabilities, devices, resource limits, DNS, a custom hostname, network aliases, a logging driver — was replaced by one silently missing it. Separately, a tag already present locally was never pulled, so `update` with the default image reference did nothing when the registry's tag had moved, and a signal mid-update left the lock and the pin behind.
