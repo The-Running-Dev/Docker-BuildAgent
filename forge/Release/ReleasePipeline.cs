@@ -66,6 +66,21 @@ public sealed class ReleasePipeline
         _latestTag = ordered.SingleOrDefault(sink => sink.Sink == ReleaseSink.ImageLatestTag);
     }
 
+    /// <summary>
+    /// The PowerShell Gallery takes a pre-release label of letters and digits only, so a label
+    /// every sink cannot hold is refused before anything is read or written.
+    /// </summary>
+    public static void EnsureSupportedPreRelease(ReleaseVersion version)
+    {
+        if (version.PreRelease != null && !version.PreRelease.All(char.IsAsciiLetterOrDigit))
+        {
+            throw new ReleaseException(
+                ReleaseErrorCode.PreReleaseLabelUnsupported,
+                null,
+                $"Pre-release label '{version.PreRelease}' is not supported: use letters and digits only, such as {version.Major}.{version.Minor}.{version.Patch}-rc1.");
+        }
+    }
+
     public async Task<ReleaseClaim> PublishAsync(ReleaseVersion version, string commitSha, string notes, SurfaceManifest manifest)
     {
         if (version is null)
@@ -87,15 +102,7 @@ public sealed class ReleasePipeline
                 "This run is not the CI publishing context; refusing to publish.");
         }
 
-        // The PowerShell Gallery takes a pre-release label of letters and digits only, so a label
-        // every sink cannot hold is refused before anything is read or written.
-        if (version.PreRelease != null && !version.PreRelease.All(char.IsAsciiLetterOrDigit))
-        {
-            throw new ReleaseException(
-                ReleaseErrorCode.PreReleaseLabelUnsupported,
-                null,
-                $"Pre-release label '{version.PreRelease}' is not supported: use letters and digits only, such as {version.Major}.{version.Minor}.{version.Patch}-rc1.");
-        }
+        EnsureSupportedPreRelease(version);
 
         // I5 / I3: existence checking writes nothing. A claim ref or a draft for another commit, a
         // published release for another commit, a versioned image tag or a git tag on another

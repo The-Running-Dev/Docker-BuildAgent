@@ -44,22 +44,29 @@ public static class ReleaseNotesValidator
             $"Release notes are missing required section(s): {string.Join(", ", missing)}.");
     }
 
+    /// <summary>True when <paramref name="line"/> is the heading of the breaking-changes section.</summary>
+    internal static bool IsBreakingChangesHeading(string line) => IsSectionHeading(line, BreakingChangeKeywords);
+
+    /// <summary>True when <paramref name="line"/> is the heading of the deprecations section.</summary>
+    internal static bool IsDeprecationsHeading(string line) => IsSectionHeading(line, DeprecationKeywords);
+
+    /// <summary>The ATX heading level of <paramref name="line"/>, or 0 when it is not a heading.</summary>
+    internal static int HeadingLevel(string line)
+    {
+        // A Markdown ATX heading: 1-6 '#' followed by a space. "#42 breaking change" is an
+        // issue reference, not a section.
+        var trimmed = line.TrimStart();
+        var level = trimmed.TakeWhile(c => c == '#').Count();
+        return level is < 1 or > 6 || level == trimmed.Length || !char.IsWhiteSpace(trimmed[level]) ? 0 : level;
+    }
+
     private static bool HasHeading(string notes, string[] keywords)
     {
         using var reader = new System.IO.StringReader(notes);
         string? line;
         while ((line = reader.ReadLine()) != null)
         {
-            // A Markdown ATX heading: 1-6 '#' followed by a space. "#42 breaking change" is an
-            // issue reference, not a section.
-            var trimmed = line.TrimStart();
-            var level = trimmed.TakeWhile(c => c == '#').Count();
-            if (level is < 1 or > 6 || level == trimmed.Length || !char.IsWhiteSpace(trimmed[level]))
-            {
-                continue;
-            }
-
-            if (keywords.Any(keyword => trimmed.Contains(keyword, StringComparison.OrdinalIgnoreCase)))
+            if (IsSectionHeading(line, keywords))
             {
                 return true;
             }
@@ -67,4 +74,7 @@ public static class ReleaseNotesValidator
 
         return false;
     }
+
+    private static bool IsSectionHeading(string line, string[] keywords) =>
+        HeadingLevel(line) > 0 && keywords.Any(keyword => line.Contains(keyword, StringComparison.OrdinalIgnoreCase));
 }
