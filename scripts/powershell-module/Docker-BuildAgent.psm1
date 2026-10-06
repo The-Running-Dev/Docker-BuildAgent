@@ -48,7 +48,8 @@ function Set-BuildAgentConfig {
 
     .PARAMETER WorkspacePath
     The directory to build. It is mounted at /workspace in the container and must exist as a
-    directory, otherwise the command fails with the WorkspaceInvalid error (exit status 3).
+    directory, otherwise the command fails with the WorkspaceInvalid error (exit status 3). A
+    relative path is resolved against the current directory and stored as an absolute path.
     Mandatory.
 
     .PARAMETER ArtifactsDir
@@ -129,7 +130,8 @@ function Set-BuildAgentConfig {
 
     $script:BuildAgentConfig.DockerImage = $DockerImage
     $script:BuildAgentConfig.DockerHost = $DockerHost
-    $script:BuildAgentConfig.WorkspacePath = $WorkspacePath
+    # Stored absolute: docker reads a bare relative name in -v as a named volume, not a path.
+    $script:BuildAgentConfig.WorkspacePath = (Resolve-Path -LiteralPath $WorkspacePath).ProviderPath
     $script:BuildAgentConfig.ArtifactsDir = $ArtifactsDir
     $script:BuildAgentConfig.Environment = $Environment
     $script:BuildAgentConfig.Parameters = $AdditionalParameters
@@ -193,7 +195,8 @@ function Confirm-BuildAgentImage {
 function Convert-ToKebabCase {
     param([string]$inputString)
 
-    return ($inputString -replace '([a-z])([A-Z])', '$1-$2').ToLower()
+    # -creplace: -replace ignores case, so [a-z][A-Z] would split every pair of letters.
+    return ($inputString -creplace '([a-z])([A-Z])', '$1-$2').ToLower()
 }
 
 # --- Build Invocation ---
