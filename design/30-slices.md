@@ -76,12 +76,10 @@ named in the lines below. Where a slice landed with a stated gap, the gap is in 
 
 Each item names a contract `## Unresolved` entry. None may be answered by an implementing slice.
 
-**The global tool's published entry point — issue #14 (U-1).** Naming the .NET package id or the
-invoked command would introduce a signature the contract does not carry. This blocks installing the
-tool from the public .NET tool feed, its `ToolCommand` manifest items, and its published invocation
-in every document. It does not block S2, S4 or S5, which are written against the Updater and the
-command *surface*, which the contract determines regardless of the name. The same entry's key-custody
-half blocks publishing the PowerShell module to the Gallery, although the module's name is settled.
+**The global tool's published entry point — issue #14 (U-1).** Resolved by the 2026-10-06 decision
+on the tool's identity: the package is `BuildAgent.Tool` on nuget.org, the command is `build-agent`,
+and the module goes to the PowerShell Gallery. The tool's `ToolCommand` manifest items are no longer
+blocked; no slice derives them yet.
 
 **The `node-template` flow's route to Config (U-5).** In-process, a tool subcommand, and a
 JSON-emitting invocation are three different public surfaces. Until one is chosen, no slice can land

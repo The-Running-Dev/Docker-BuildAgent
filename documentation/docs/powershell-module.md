@@ -12,9 +12,9 @@ writing the `docker run` command. It supports Windows PowerShell 5.1 and PowerSh
 ## Installing
 
 :::caution Not yet published
-The module is not published to the PowerShell Gallery. Its publishing depends on an open decision,
-**U-1** in the contract (who owns the Gallery listing and its keys). Until that is settled there is
-no `Install-Module` command to run.
+The module is published to the PowerShell Gallery as `Docker-BuildAgent`, and the first release
+that publishes it is 2.0.0, which is not released yet. Until then there is no `Install-Module`
+command to run.
 :::
 
 To use it from a checkout of this repository:

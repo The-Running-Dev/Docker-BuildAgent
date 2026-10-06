@@ -11,8 +11,8 @@ using Update;
 var arguments = args;
 if (arguments.Length == 0 || arguments[0] != "update")
 {
-    Console.Error.WriteLine("Usage: <tool> update <container> [--image <reference>] [--health-timeout <duration>] [--no-restore] [--notify <url>]");
-    Console.Error.WriteLine("       <tool> update --clear-lock <container>");
+    Console.Error.WriteLine("Usage: build-agent update <container> [--image <reference>] [--health-timeout <duration>] [--no-restore] [--notify <url>]");
+    Console.Error.WriteLine("       build-agent update --clear-lock <container>");
     return 1;
 }
 

@@ -335,14 +335,15 @@ Semantics the declaration cannot carry:
 
 ### Global tool
 
-Greenfield. The tool package identifier and the invoked command name are
-`## Unresolved` U-1; the command surface below is determined regardless of the name.
+Greenfield. The tool is the .NET global tool package `BuildAgent.Tool` on nuget.org, and
+its command is `build-agent` (2026-10-06 decision on the tool's identity). The package
+carries the release version (I1) and nothing else; packing it without one fails.
 
 ```text
-<tool> build <type> [--<parameter> <value>]...
-<tool> update <container> [--image <reference>] [--health-timeout <duration>]
-                          [--no-restore] [--notify <url>]
-<tool> update --clear-lock <container>
+build-agent build <type> [--<parameter> <value>]...
+build-agent update <container> [--image <reference>] [--health-timeout <duration>]
+                               [--no-restore] [--notify <url>]
+build-agent update --clear-lock <container>
 ```
 
 - `build` accepts the same five types and the same parameter names as the in-image
@@ -650,13 +651,10 @@ slice inventing an answer.
 Ids are permanent. An entry resolved by a decision is struck from this list and never
 reused, so the numbering carries gaps.
 
-**U-1 — The global tool's package identifier and command name.** The design fixes the
-tool's responsibilities and not its identity, and `10-design.md` Open question 1 leaves
-ownership of the .NET tool feed and the PowerShell Gallery, and custody of their
-publishing keys, open.
-*Blocks:* the tool's `ToolCommand` manifest items, its published invocation in every
-document, the CI step that publishes it, and the CI step that publishes the PowerShell
-module to the Gallery.
+*U-1 was resolved by the 2026-10-06 decision on the tool's identity and is struck. The
+tool is `BuildAgent.Tool` on nuget.org, invoked as `build-agent`; the module goes to the
+PowerShell Gallery under its settled name; the repository owner holds both listings, and
+their keys are repository secrets that only the release workflow reads.*
 
 *U-2, U-3 and U-4 were resolved by the 2026-09-20 decisions and are struck.*
 
