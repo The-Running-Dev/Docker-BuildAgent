@@ -3,8 +3,8 @@ using Xunit;
 namespace Surface.Tests;
 
 /// <summary>
-/// The baseline is the highest published release below the candidate (I8), by version precedence and
-/// never by publish date.
+/// The baseline is the highest published stable release below the candidate (I8), by version
+/// precedence and never by publish date.
 /// </summary>
 public class GitHubReleaseManifestSourceTests
 {
@@ -34,11 +34,20 @@ public class GitHubReleaseManifestSourceTests
         Assert.Equal("v2.10.0", Select("2.11.0", "v2.9.0", "v2.10.0"));
     }
 
+    // A release counts its breaking changes and deprecations from the previous stable release, so its
+    // own release candidates are never its baseline.
     [Fact]
-    public void SelectBaselineTag_RanksPreReleasesBySemVerPrecedence()
+    public void SelectBaselineTag_SkipsPreReleases()
     {
-        Assert.Equal("v2.0.0-rc.1", Select("2.0.0", "v2.0.0-beta.10", "v2.0.0-rc.1", "v2.0.0-beta.2", "v1.9.0"));
-        Assert.Equal("v2.0.0-beta.10", Select("2.0.0-rc.1", "v2.0.0-beta.2", "v2.0.0-beta.10"));
+        Assert.Equal("v1.9.0", Select("2.0.0", "v2.0.0-beta.10", "v2.0.0-rc.1", "v1.9.0"));
+        Assert.Equal("v1.9.0", Select("2.0.0-rc2", "v2.0.0-rc1", "v1.9.0"));
+        Assert.Null(Select("2.0.0", "v2.0.0-rc1", "v1.0.0-rc1"));
+    }
+
+    [Fact]
+    public void SelectBaselineTag_ATaggedPreReleaseCandidateSitsBelowItsRelease()
+    {
+        Assert.Equal("v1.9.0", Select("2.0.0-rc1", "v1.9.0", "v2.0.0"));
     }
 
     [Fact]

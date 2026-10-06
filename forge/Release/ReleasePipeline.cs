@@ -21,6 +21,10 @@ namespace Release;
 /// written. A resume compares every sink that holds the version against the claim before any
 /// write, and skips a sink only on a match. A run that finds the release published for its own
 /// commit is a completion re-run: it verifies the release and moves only <c>latest</c>.
+///
+/// <c>latest</c> names the highest published stable release: a pre-release never moves it, and
+/// neither does a stable release below the highest one already published. A pre-release label is
+/// one alphanumeric identifier (2.1.0-rc1), the form every sink accepts.
 /// </summary>
 public sealed class ReleasePipeline
 {
@@ -83,10 +87,22 @@ public sealed class ReleasePipeline
                 "This run is not the CI publishing context; refusing to publish.");
         }
 
+        // The PowerShell Gallery takes a pre-release label of letters and digits only, so a label
+        // every sink cannot hold is refused before anything is read or written.
+        if (version.PreRelease != null && !version.PreRelease.All(char.IsAsciiLetterOrDigit))
+        {
+            throw new ReleaseException(
+                ReleaseErrorCode.PreReleaseLabelUnsupported,
+                null,
+                $"Pre-release label '{version.PreRelease}' is not supported: use letters and digits only, such as {version.Major}.{version.Minor}.{version.Patch}-rc1.");
+        }
+
         // I5 / I3: existence checking writes nothing. A claim ref or a draft for another commit, a
-        // published release for another commit, a versioned image tag or a git tag makes the
-        // version taken. A claim ref or a draft for this commit is a claim this run resumes, and a
-        // release published for this commit is one this run completes.
+        // published release for another commit, a versioned image tag or a git tag on another
+        // commit makes the version taken. A claim ref or a draft for this commit is a claim this
+        // run resumes, a release published for this commit is one this run completes, and a git
+        // tag on this commit with nothing else holding the version is a release this run makes
+        // from that tag.
         var claimRefCommit = await _claimStore.FindClaimRefAsync(version).ConfigureAwait(false);
         if (claimRefCommit != null && !string.Equals(claimRefCommit, commitSha, StringComparison.Ordinal))
         {
@@ -114,26 +130,15 @@ public sealed class ReleasePipeline
         }
 
         var tagCommit = await _gitTagChecker.FindTagCommitAsync(version).ConfigureAwait(false);
-        if (tagCommit != null)
+        if (tagCommit != null && !string.Equals(tagCommit, commitSha, StringComparison.Ordinal))
         {
-            if (!string.Equals(tagCommit, commitSha, StringComparison.Ordinal))
-            {
-                throw new ReleaseException(
-                    ReleaseErrorCode.TagPointsElsewhere,
-                    null,
-                    $"Git tag {version.ToTagString()} already points at commit {tagCommit}, not {commitSha}.");
-            }
-
-            if (!resuming)
-            {
-                throw new ReleaseException(
-                    ReleaseErrorCode.VersionAlreadyExists,
-                    null,
-                    $"Version {version.ToPackageString()} already has git tag {version.ToTagString()}.");
-            }
+            throw new ReleaseException(
+                ReleaseErrorCode.TagPointsElsewhere,
+                null,
+                $"Git tag {version.ToTagString()} already points at commit {tagCommit}, not {commitSha}.");
         }
 
-        // I6: major never decreases.
+        // I6: major never decreases. The highest published release is the highest stable one.
         var highestPublished = await _highestPublishedSource.GetHighestPublishedAsync().ConfigureAwait(false);
         if (highestPublished != null && version.Major < highestPublished.Major)
         {
@@ -264,7 +269,11 @@ public sealed class ReleasePipeline
         await _claimStore.PublishAsync(claim).ConfigureAwait(false);
         var published = claim with { State = ClaimState.Published };
 
-        await MoveLatestAsync(published).ConfigureAwait(false);
+        if (!version.IsPreRelease && (highestPublished == null || version.CompareTo(highestPublished) >= 0))
+        {
+            await MoveLatestAsync(published).ConfigureAwait(false);
+        }
+
         return published;
     }
 
@@ -272,7 +281,8 @@ public sealed class ReleasePipeline
     /// A completion re-run: the release is published for this run's commit. Before moving
     /// <c>latest</c> it checks that the git tag points at the commit, that the version is the
     /// highest published release, and that every versioned sink holds the claim's artifact.
-    /// Nothing else is written.
+    /// Nothing else is written. A pre-release is verified the same way, except against the
+    /// highest release, and never moves <c>latest</c>.
     /// </summary>
     private async Task<ReleaseClaim> CompleteAsync(ReleaseClaim claim)
     {
@@ -295,8 +305,10 @@ public sealed class ReleasePipeline
                 $"Git tag {version.ToTagString()} points at commit {tagCommit}, not {claim.CommitSha}.");
         }
 
-        var highestPublished = await _highestPublishedSource.GetHighestPublishedAsync().ConfigureAwait(false);
-        if (highestPublished != version)
+        var highestPublished = !version.IsPreRelease
+            ? await _highestPublishedSource.GetHighestPublishedAsync().ConfigureAwait(false)
+            : null;
+        if (!version.IsPreRelease && highestPublished != version)
         {
             var highest = highestPublished?.ToPackageString() ?? "no release";
             throw new ReleaseException(
@@ -319,7 +331,11 @@ public sealed class ReleasePipeline
 
         EnsureHeldMatch(version, held, claim);
 
-        await MoveLatestAsync(claim).ConfigureAwait(false);
+        if (!version.IsPreRelease)
+        {
+            await MoveLatestAsync(claim).ConfigureAwait(false);
+        }
+
         return claim;
     }
 

@@ -66,9 +66,11 @@ public sealed class ReleasePipelineTests
         return claim;
     }
 
-    // S3.1: A version already held by a claim, a versioned image tag or a git tag fails with
-    // VersionAlreadyExists before any write, naming which of the three held it (I5). A release
-    // published for this run's own commit is a completion re-run instead, covered below.
+    // S3.1: A version already held by a claim or a versioned image tag fails with
+    // VersionAlreadyExists before any write, naming which held it (I5). A git tag on another commit
+    // fails with TagPointsElsewhere (S3.4); a git tag on this run's own commit is the release being
+    // made from that tag. A release published for this run's own commit is a completion re-run
+    // instead, covered below.
     [Fact]
     public async Task Publish_FailsWithVersionAlreadyExists_WhenClaimAlreadyHoldsVersion()
     {
@@ -97,18 +99,96 @@ public sealed class ReleasePipelineTests
         Assert.All(sinks, s => Assert.False(s.WasCalled));
     }
 
+    // I5: a pushed tag on this run's own commit, with no claim and no sink holding the version,
+    // is the release being made from that tag.
     [Fact]
-    public async Task Publish_FailsWithVersionAlreadyExists_WhenGitTagAlreadyPointsAtSameCommit()
+    public async Task Publish_ReleasesFromAGitTagAlreadyAtTheCommit()
     {
-        var (pipeline, _, _, gitTagChecker, _, _, sinks) = Build();
+        var (pipeline, claimStore, _, gitTagChecker, _, _, sinks) = Build();
         gitTagChecker.Seed(Version, CommitSha);
+
+        var claim = await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.Equal(ClaimState.Published, claim.State);
+        Assert.Equal(1, claimStore.DraftsCreated);
+        Assert.All(sinks, s => Assert.True(s.WasCalled));
+    }
+
+    // The own-commit tag frees only the tag: a sink already holding the version still takes it.
+    [Fact]
+    public async Task Publish_FailsWithVersionAlreadyExists_WhenTheTagIsAtTheCommitButASinkHoldsTheVersion()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, _, _, sinks) = Build();
+        gitTagChecker.Seed(Version, CommitSha);
+        SinkFor(sinks, ReleaseSink.GlobalTool).HeldIdentity = "sha256:elsewhere";
 
         var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
             pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString())));
 
         Assert.Equal(ReleaseErrorCode.VersionAlreadyExists, ex.Code);
-        Assert.Contains("git tag", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(nameof(ReleaseSink.GlobalTool), ex.Message);
+        Assert.Empty(claimStore.Claims);
         Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // A pre-release label every sink can hold is one alphanumeric identifier; anything else is
+    // refused before any read or write.
+    [Theory]
+    [InlineData("beta.1")]
+    [InlineData("rc-1")]
+    public async Task Publish_FailsWithPreReleaseLabelUnsupported_WhenTheLabelIsNotAlphanumeric(string label)
+    {
+        var (pipeline, claimStore, _, _, _, _, sinks) = Build();
+        var version = new ReleaseVersion(2, 1, 0, label);
+
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(version, CommitSha, TestNotes.Valid, TestManifest.Empty(version.ToPackageString())));
+
+        Assert.Equal(ReleaseErrorCode.PreReleaseLabelUnsupported, ex.Code);
+        Assert.Contains(label, ex.Message);
+        Assert.Empty(claimStore.Refs);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+    }
+
+    // A pre-release is published to every versioned sink and as a release, but never moves latest.
+    [Fact]
+    public async Task Publish_PreRelease_WritesEveryVersionedSink_AndLeavesLatestUnmoved()
+    {
+        var (pipeline, _, _, _, highestPublished, _, sinks) = Build();
+        highestPublished.Highest = new ReleaseVersion(2, 0, 0, null);
+        var version = new ReleaseVersion(2, 1, 0, "rc1");
+
+        var claim = await pipeline.PublishAsync(version, CommitSha, TestNotes.Valid, TestManifest.Empty(version.ToPackageString()));
+
+        Assert.Equal(ClaimState.Published, claim.State);
+        Assert.All(sinks.Where(s => s.Sink != ReleaseSink.ImageLatestTag), s => Assert.Equal("2.1.0-rc1", s.RecordedPackageVersion));
+        Assert.False(SinkFor(sinks, ReleaseSink.ImageLatestTag).WasCalled);
+    }
+
+    // latest names the highest stable release: a back-patch below it publishes without moving latest.
+    [Fact]
+    public async Task Publish_BelowTheHighestPublishedRelease_LeavesLatestUnmoved()
+    {
+        var (pipeline, _, _, _, highestPublished, _, sinks) = Build();
+        highestPublished.Highest = new ReleaseVersion(2, 1, 0, null);
+        var version = new ReleaseVersion(2, 0, 1, null);
+
+        var claim = await pipeline.PublishAsync(version, CommitSha, TestNotes.Valid, TestManifest.Empty(version.ToPackageString()));
+
+        Assert.Equal(ClaimState.Published, claim.State);
+        Assert.True(SinkFor(sinks, ReleaseSink.PowerShellModule).WasCalled);
+        Assert.False(SinkFor(sinks, ReleaseSink.ImageLatestTag).WasCalled);
+    }
+
+    [Fact]
+    public async Task Publish_AboveTheHighestPublishedRelease_MovesLatest()
+    {
+        var (pipeline, _, _, _, highestPublished, _, sinks) = Build();
+        highestPublished.Highest = new ReleaseVersion(1, 9, 0, null);
+
+        await pipeline.PublishAsync(Version, CommitSha, TestNotes.Valid, TestManifest.Empty(Version.ToPackageString()));
+
+        Assert.True(SinkFor(sinks, ReleaseSink.ImageLatestTag).WasCalled);
     }
 
     // S3.2: A draft claim bound to a different commit fails with VersionAlreadyExists, naming
@@ -785,6 +865,35 @@ public sealed class ReleasePipelineTests
         Assert.All(sinks.Where(s => s.Sink != ReleaseSink.ImageLatestTag), s => Assert.False(s.WasCalled));
         Assert.Equal(0, claimStore.DraftsCreated);
         Assert.Empty(claimStore.IdentitiesRecorded);
+    }
+
+    // Completion re-run of a pre-release: verified like a release, and latest does not move.
+    [Fact]
+    public async Task Publish_CompletionRerun_OfAPreRelease_VerifiesWithoutMovingLatest()
+    {
+        var (pipeline, claimStore, _, gitTagChecker, highestPublished, _, sinks) = Build();
+        var version = new ReleaseVersion(2, 1, 0, "rc1");
+        var seeded = new ReleaseClaim(version, CommitSha, ClaimState.Published, TestNotes.Valid, TestManifest.Empty(version.ToPackageString()));
+        foreach (var sink in sinks.Where(s => s.Sink != ReleaseSink.ImageLatestTag))
+        {
+            seeded = seeded.WithIdentity(sink.Sink, sink.BuiltIdentity);
+            sink.HeldIdentity = sink.BuiltIdentity;
+        }
+
+        claimStore.SeedRef(version, CommitSha);
+        claimStore.Seed(seeded);
+        gitTagChecker.Seed(version, CommitSha);
+        highestPublished.Highest = new ReleaseVersion(2, 0, 0, null);
+
+        var claim = await pipeline.PublishAsync(version, CommitSha, TestNotes.Valid, TestManifest.Empty(version.ToPackageString()));
+
+        Assert.Same(seeded, claim);
+        Assert.All(sinks, s => Assert.False(s.WasCalled));
+
+        SinkFor(sinks, ReleaseSink.GlobalTool).HeldIdentity = "sha256:replaced";
+        var ex = await Assert.ThrowsAsync<ReleaseException>(() =>
+            pipeline.PublishAsync(version, CommitSha, TestNotes.Valid, TestManifest.Empty(version.ToPackageString())));
+        Assert.Equal(ReleaseErrorCode.SinkArtifactMismatch, ex.Code);
     }
 
     // Completion re-run: latest is never moved back to a release that is no longer the highest.

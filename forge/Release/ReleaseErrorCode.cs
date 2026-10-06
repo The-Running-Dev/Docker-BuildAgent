@@ -15,6 +15,7 @@ public enum ReleaseErrorCode
     SinkPublishFailed,
     NotPublishedByCi,
     SinkArtifactMismatch,
+    PreReleaseLabelUnsupported,
 }
 
 /// <summary>

@@ -12,10 +12,12 @@ using Octokit;
 namespace Surface;
 
 /// <summary>
-/// Reads surface-manifest.json from the highest published GitHub release below the candidate (I8),
+/// Reads surface-manifest.json from the highest published stable GitHub release below the candidate (I8),
 /// via Octokit for release/asset listing and a plain HttpClient for the asset bytes (Octokit does not
 /// expose release asset content directly). "Highest" is SemVer precedence, not publish date: a
-/// back-published patch to an older line is never the baseline for the current one.
+/// back-published patch to an older line is never the baseline for the current one. A pre-release is
+/// never the baseline, so a release's breaking changes and deprecations are counted from the previous
+/// stable release, not from its own release candidates.
 /// </summary>
 public sealed class GitHubReleaseManifestSource : IBaselineManifestSource
 {
@@ -87,14 +89,14 @@ public sealed class GitHubReleaseManifestSource : IBaselineManifestSource
     }
 
     /// <summary>
-    /// Picks the tag of the highest published release below <paramref name="candidate"/>, ignoring tags
-    /// that are not versions. Returns null when there is none.
+    /// Picks the tag of the highest published stable release below <paramref name="candidate"/>,
+    /// ignoring pre-releases and tags that are not versions. Returns null when there is none.
     /// </summary>
     internal static string? SelectBaselineTag(IEnumerable<string?> publishedTags, SemanticVersion candidate)
     {
         return publishedTags
             .Select(tag => (Tag: tag, Ok: SemanticVersion.TryParse(tag, out var version), Version: version))
-            .Where(t => t.Ok && t.Version.CompareTo(candidate) < 0)
+            .Where(t => t.Ok && t.Version.PreRelease == null && t.Version.CompareTo(candidate) < 0)
             .OrderByDescending(t => t.Version)
             .Select(t => t.Tag)
             .FirstOrDefault();

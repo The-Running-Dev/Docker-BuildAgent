@@ -8,8 +8,11 @@ namespace Release;
 /// <summary>
 /// The product version. One value per release (I1), semantic, without build metadata.
 /// </summary>
-public sealed record ReleaseVersion(int Major, int Minor, int Patch, string? PreRelease)
+public sealed record ReleaseVersion(int Major, int Minor, int Patch, string? PreRelease) : IComparable<ReleaseVersion>
 {
+    /// <summary>True for a pre-release version, such as 2.1.0-rc1.</summary>
+    public bool IsPreRelease => PreRelease != null;
+
     /// <summary>
     /// Parses a version from either a git/GitHub tag form ("v2.0.0", "v2.0.0-beta.1") or a bare
     /// package form ("2.0.0", "2.0.0-beta.1") — the two forms GitVersion's own output and a
@@ -61,6 +64,72 @@ public sealed record ReleaseVersion(int Major, int Minor, int Patch, string? Pre
     private static bool IsValidPreRelease(string preRelease) =>
         preRelease.Split('.').All(identifier =>
             identifier.Length > 0 && identifier.All(c => char.IsAsciiLetterOrDigit(c) || c == '-'));
+
+    /// <summary>
+    /// Semantic-version precedence: the numeric parts in order, then a pre-release below its
+    /// release, then the pre-release identifiers one by one (numeric identifiers compare as
+    /// numbers and sort below alphanumeric ones; a shorter list sorts below a longer one it prefixes).
+    /// </summary>
+    public int CompareTo(ReleaseVersion? other)
+    {
+        if (other is null)
+        {
+            return 1;
+        }
+
+        var core = Major.CompareTo(other.Major);
+        if (core == 0)
+        {
+            core = Minor.CompareTo(other.Minor);
+        }
+
+        if (core == 0)
+        {
+            core = Patch.CompareTo(other.Patch);
+        }
+
+        if (core != 0)
+        {
+            return core;
+        }
+
+        if (PreRelease is null || other.PreRelease is null)
+        {
+            return (PreRelease is null ? 1 : 0) - (other.PreRelease is null ? 1 : 0);
+        }
+
+        var mine = PreRelease.Split('.');
+        var theirs = other.PreRelease.Split('.');
+        for (var i = 0; i < Math.Min(mine.Length, theirs.Length); i++)
+        {
+            var compared = CompareIdentifier(mine[i], theirs[i]);
+            if (compared != 0)
+            {
+                return compared;
+            }
+        }
+
+        return mine.Length.CompareTo(theirs.Length);
+    }
+
+    private static int CompareIdentifier(string left, string right)
+    {
+        var leftNumeric = left.All(char.IsAsciiDigit);
+        var rightNumeric = right.All(char.IsAsciiDigit);
+        if (leftNumeric && rightNumeric)
+        {
+            // Compare as numbers without overflowing: a longer digit string is larger.
+            var byLength = left.TrimStart('0').Length.CompareTo(right.TrimStart('0').Length);
+            return byLength != 0 ? byLength : string.CompareOrdinal(left.TrimStart('0'), right.TrimStart('0'));
+        }
+
+        if (leftNumeric != rightNumeric)
+        {
+            return leftNumeric ? -1 : 1;
+        }
+
+        return Math.Sign(string.CompareOrdinal(left, right));
+    }
 
     /// <summary>Produces the git tag and the GitHub release tag, e.g. "v2.0.0".</summary>
     public string ToTagString() => $"v{ToPackageString()}";

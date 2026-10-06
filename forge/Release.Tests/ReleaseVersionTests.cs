@@ -70,4 +70,33 @@ public sealed class ReleaseVersionTests
     {
         Assert.Equal("2.0.0", new ReleaseVersion(2, 0, 0, null).ToPackageString());
     }
+
+    // SemVer precedence, each pair lower first.
+    [Theory]
+    [InlineData("1.9.9", "2.0.0")]
+    [InlineData("2.9.0", "2.10.0")]
+    [InlineData("2.0.9", "2.0.10")]
+    [InlineData("2.1.0-rc1", "2.1.0")]
+    [InlineData("2.0.0", "2.1.0-rc1")]
+    [InlineData("2.1.0-beta2", "2.1.0-rc1")]
+    [InlineData("2.1.0-2", "2.1.0-10")]
+    [InlineData("2.1.0-99", "2.1.0-rc")]
+    [InlineData("2.1.0-rc", "2.1.0-rc.1")]
+    [InlineData("2.1.0-rc.2", "2.1.0-rc.10")]
+    public void CompareTo_OrdersBySemVerPrecedence(string lower, string higher)
+    {
+        var low = ReleaseVersion.Parse(lower);
+        var high = ReleaseVersion.Parse(higher);
+
+        Assert.True(low.CompareTo(high) < 0, $"{lower} should sort below {higher}");
+        Assert.True(high.CompareTo(low) > 0, $"{higher} should sort above {lower}");
+        Assert.Equal(0, low.CompareTo(ReleaseVersion.Parse(lower)));
+    }
+
+    [Fact]
+    public void IsPreRelease_IsTrueOnlyWithALabel()
+    {
+        Assert.True(ReleaseVersion.Parse("2.1.0-rc1").IsPreRelease);
+        Assert.False(ReleaseVersion.Parse("2.1.0").IsPreRelease);
+    }
 }
