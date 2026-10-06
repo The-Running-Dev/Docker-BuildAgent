@@ -23,8 +23,12 @@ public class SurfaceGateTests
 
         public static FakeBaselineSource Throwing(SurfaceException ex) => new(null, ex);
 
-        public Task<string?> GetLatestManifestJsonAsync()
+        public string? RequestedVersion { get; private set; }
+
+        public Task<string?> GetBaselineManifestJsonAsync(string candidateVersion)
         {
+            RequestedVersion = candidateVersion;
+
             if (_throws != null)
             {
                 throw _throws;
@@ -99,6 +103,39 @@ public class SurfaceGateTests
         {
             Assert.Contains(diff.Name, result.Message);
         }
+    }
+
+    // I8: the baseline is chosen relative to the candidate, so the source is asked for the release below it.
+    [Fact]
+    public async Task EvaluateAsync_AsksTheSourceForTheBaselineBelowTheCandidateVersion()
+    {
+        using var root = new TempScriptRoot();
+        var source = FakeBaselineSource.Returning(null);
+
+        await SurfaceGate.EvaluateAsync(root.RootDirectory, "2.3.0", source);
+
+        Assert.Equal("2.3.0", source.RequestedVersion);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_UndeprecatedRemovalAtAMajorBump_FailsAndSaysDeprecationComesFirst()
+    {
+        using var root = new TempScriptRoot();
+        var candidate = SurfaceDeriver.Derive(root.RootDirectory, "3.0.0");
+
+        var baselineItems = new List<SurfaceItem>(candidate.Items)
+        {
+            new(SurfaceItemKind.BuildParameter, "RetiredParameter", "string|", null, null),
+        };
+        var baseline = new SurfaceManifest(candidate.ManifestSchemaVersion, "2.4.0", baselineItems);
+        var source = FakeBaselineSource.Returning(SurfaceManifestSerializer.Serialize(baseline));
+
+        var result = await SurfaceGate.EvaluateAsync(root.RootDirectory, "3.0.0", source);
+
+        Assert.False(result.Success);
+        Assert.Equal(SurfaceErrorCode.BlockingDifference, result.ErrorCode);
+        Assert.Contains("'RetiredParameter'", result.Message);
+        Assert.Contains("without first being deprecated", result.Message);
     }
 
     [Fact]

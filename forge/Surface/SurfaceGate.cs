@@ -7,11 +7,17 @@ using System.Threading.Tasks;
 
 namespace Surface;
 
-/// <summary>Reads the manifest asset attached to the highest published release, as the S1.11 baseline.</summary>
+/// <summary>
+/// Reads the manifest asset attached to the highest published release below the candidate, as the
+/// S1.11 baseline (I8).
+/// </summary>
 public interface IBaselineManifestSource
 {
-    /// <summary>Returns the baseline manifest JSON, or null when no baseline release has a manifest asset.</summary>
-    Task<string?> GetLatestManifestJsonAsync();
+    /// <summary>
+    /// Returns the baseline manifest JSON for <paramref name="candidateVersion"/>, or null when there is
+    /// no published release below it or that release has no manifest asset.
+    /// </summary>
+    Task<string?> GetBaselineManifestJsonAsync(string candidateVersion);
 }
 
 public sealed record SurfaceGateResult(
@@ -45,7 +51,7 @@ public static class SurfaceGate
         string? baselineJson;
         try
         {
-            baselineJson = await baselineSource.GetLatestManifestJsonAsync();
+            baselineJson = await baselineSource.GetBaselineManifestJsonAsync(productVersion);
         }
         catch (SurfaceException ex)
         {
@@ -80,7 +86,7 @@ public static class SurfaceGate
 
         if (comparison.Blocking.Count > 0)
         {
-            return Failed(candidate, baseline, comparison, SurfaceErrorCode.BlockingDifference, DescribeBlocking(comparison));
+            return Failed(candidate, baseline, comparison, SurfaceErrorCode.BlockingDifference, DescribeBlocking(comparison, baseline));
         }
 
         return new SurfaceGateResult(true, candidate, baseline, comparison, null, "No blocking differences.");
@@ -103,14 +109,21 @@ public static class SurfaceGate
         return new SurfaceGateResult(false, candidate!, baseline, comparison, code, message);
     }
 
-    private static string DescribeBlocking(SurfaceComparison comparison)
+    private static string DescribeBlocking(SurfaceComparison comparison, SurfaceManifest baseline)
     {
         var builder = new StringBuilder();
         builder.AppendLine($"{comparison.Blocking.Count} blocking surface difference(s):");
 
         foreach (var d in comparison.Blocking)
         {
-            builder.AppendLine($"- [{d.Kind}] {d.ItemKind} '{d.Name}': baseline='{d.BaselineValue}', candidate='{d.CandidateValue}' (not in the compatible set {{ItemAdded, DeprecationAdded}} and no major version increase)");
+            var undeprecatedRemoval = d.Kind == SurfaceDifferenceKind.ItemRemoved
+                && baseline.Items.Any(i => i.Kind == d.ItemKind && i.Name == d.Name && i.DeprecatedSince == null);
+
+            var reason = undeprecatedRemoval
+                ? "removed without first being deprecated, which no major version increase allows"
+                : "not in the compatible set {ItemAdded, DeprecationAdded} and no major version increase";
+
+            builder.AppendLine($"- [{d.Kind}] {d.ItemKind} '{d.Name}': baseline='{d.BaselineValue}', candidate='{d.CandidateValue}' ({reason})");
         }
 
         return builder.ToString();

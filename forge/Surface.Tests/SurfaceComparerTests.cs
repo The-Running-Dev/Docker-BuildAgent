@@ -121,6 +121,44 @@ public class SurfaceComparerTests
         Assert.Single(comparison.All);
     }
 
+    // design/10-design.md step 3: removing an item the baseline did not already mark deprecated fails at
+    // any major. A major bump does not waive the deprecation that has to come first.
+    [Fact]
+    public void Compare_UndeprecatedItemRemoved_MajorIncreased_StillBlocks()
+    {
+        var baseline = Manifest("2.4.0", Item("Gone", "string|"), Item("Port", "int|8080"));
+        var candidate = Manifest("3.0.0", Item("Port", "int|9090"));
+
+        var comparison = SurfaceComparer.Compare(baseline, candidate);
+
+        var diff = Assert.Single(comparison.Blocking);
+        Assert.Equal(SurfaceDifferenceKind.ItemRemoved, diff.Kind);
+        Assert.Equal("Gone", diff.Name);
+    }
+
+    [Fact]
+    public void Compare_DeprecatedItemRemoved_MajorIncreased_DoesNotBlock()
+    {
+        var baseline = Manifest("2.4.0", Item("Gone", "string|", deprecatedSince: "2.1.0", removeIn: "3.0.0"));
+        var candidate = Manifest("3.0.0");
+
+        var comparison = SurfaceComparer.Compare(baseline, candidate);
+
+        Assert.Empty(comparison.Blocking);
+        Assert.Equal(SurfaceDifferenceKind.ItemRemoved, Assert.Single(comparison.All).Kind);
+    }
+
+    [Fact]
+    public void Compare_DeprecatedItemRemoved_MajorUnchanged_Blocks()
+    {
+        var baseline = Manifest("2.4.0", Item("Gone", "string|", deprecatedSince: "2.1.0", removeIn: "3.0.0"));
+        var candidate = Manifest("2.5.0");
+
+        var comparison = SurfaceComparer.Compare(baseline, candidate);
+
+        Assert.Equal(SurfaceDifferenceKind.ItemRemoved, Assert.Single(comparison.Blocking).Kind);
+    }
+
     [Fact]
     public void Compare_DuplicateItemsInEitherManifest_ThrowsDuplicateItem()
     {
