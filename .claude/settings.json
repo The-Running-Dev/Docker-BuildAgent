@@ -1,21 +1,5 @@
 {
   "hooks": {
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "pwsh",
-            "args": [
-              "-NoProfile",
-              "-Command",
-              "& (Join-Path $HOME '.agent-kit/tools/Measure-Session.ps1') -Hook"
-            ],
-            "timeout": 30
-          }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
       {
         "hooks": [
