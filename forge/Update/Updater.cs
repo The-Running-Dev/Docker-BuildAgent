@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Update;
@@ -74,11 +75,17 @@ public sealed class Updater
     /// <summary>Runs the update and, when <paramref name="notifyUrl"/> is given (<c>--notify</c>), sends the
     /// notification after the outcome is logged (design/10-design.md § Control flow 3, step 13). Notification is
     /// best effort: it never changes the returned outcome, and the URL never appears in any output (I44). A refusal
-    /// throws before any outcome exists and is not notified.</summary>
+    /// throws before any outcome exists and is not notified.
+    ///
+    /// <paramref name="cancellationToken"/> is the interruption signal (design/10-design.md § Process interruption).
+    /// Cancelled before the target's first change, the update releases its lock and pin and throws
+    /// <see cref="OperationCanceledException"/>; cancelled after it, the update stops waiting for health and
+    /// restores the prior container (whatever <see cref="UpdateOptions.RestoreOnFailure"/> says), recording
+    /// <see cref="UpdateErrorCode.Interrupted"/>.</summary>
     public async Task<UpdateOutcome> RunAsync(string containerName, string? imageReference, UpdateOptions options,
-        string? notifyUrl = null)
+        string? notifyUrl = null, CancellationToken cancellationToken = default)
     {
-        var outcome = await RunUpdateAsync(containerName, imageReference, options);
+        var outcome = await RunUpdateAsync(containerName, imageReference, options, cancellationToken);
 
         if (notifyUrl != null)
         {
@@ -118,7 +125,8 @@ public sealed class Updater
         }
     }
 
-    private async Task<UpdateOutcome> RunUpdateAsync(string containerName, string? imageReference, UpdateOptions options)
+    private async Task<UpdateOutcome> RunUpdateAsync(string containerName, string? imageReference, UpdateOptions options,
+        CancellationToken cancellationToken)
     {
         // Refuses every update on the host until corrected (S2.19) — checked first and unconditionally.
         var initialLogState = _log.ReadState();
@@ -162,6 +170,9 @@ public sealed class Updater
             return UpdateOutcome.AlreadyCurrent;
         }
 
+        // The pull above is the slow step; an interruption during it has nothing to release.
+        cancellationToken.ThrowIfCancellationRequested();
+
         var updateId = Guid.NewGuid();
         var now = _clock.UtcNow;
         var deadline = now + LockStopGrace + options.HealthTimeout + LockDeadlineMargin;
@@ -194,16 +205,35 @@ public sealed class Updater
             throw;
         }
 
-        // Refusals from here through the log write are before the target's first change (I41): the lock this
-        // attempt just created must not survive them.
+        // Everything from here through the log write is before the target's first change (I41): whatever ends
+        // the attempt here — a refusal, a daemon error, an interruption, a fault of any other kind — the lock
+        // and the pin this attempt created must not survive it.
+        var pinTag = UpdateNaming.PriorImageTag(containerName);
+        var pinned = false;
+        UpdateRecord startRecord;
         try
         {
-            await CheckResidueAsync(containerName);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            var pinTag = UpdateNaming.PriorImageTag(containerName);
+            // The target was inspected before the lock existed; another process could have changed it since.
+            // Only a reading taken under the lock is the one this update may act on.
+            target = await _runtime.InspectAsync(containerName)
+                ?? throw new UpdateException(UpdateErrorCode.TargetNotFound, containerName,
+                    $"No container named '{containerName}' was found.");
+            RefuseUnsupportedShape(containerName, target);
+            if (string.Equals(resolvedImageId, target.ImageId, StringComparison.Ordinal))
+            {
+                await TryRemoveContainerAsync(lockName);
+                return UpdateOutcome.AlreadyCurrent;
+            }
+
+            await CheckResidueAsync(containerName);
+            cancellationToken.ThrowIfCancellationRequested();
+
             try
             {
                 await _runtime.TagImageAsync(target.ImageId, pinTag);
+                pinned = true;
             }
             catch (DockerRuntimeException ex)
             {
@@ -211,7 +241,7 @@ public sealed class Updater
                     $"The prior image for '{containerName}' could not be pinned as '{pinTag}': {ex.Message}", ex);
             }
 
-            var startRecord = new UpdateRecord(
+            startRecord = new UpdateRecord(
                 RecordSchemaVersion: 1,
                 UpdateId: updateId,
                 ContainerName: containerName,
@@ -223,85 +253,95 @@ public sealed class Updater
                 Outcome: null,
                 FailureCode: null);
 
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
                 _log.Append(startRecord);
             }
             catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
             {
-                await TryRemoveImageTagAsync(pinTag);
                 throw new UpdateException(UpdateErrorCode.LogUnwritable, containerName,
                     $"The start entry for '{containerName}' could not be written to the update log: {ex.Message}", ex);
             }
-
-            // The first change to the target happens here. A failure past this point is not covered by I41:
-            // it is S4's job, from here on, to bring the target back rather than leave residue for the next
-            // update to refuse on.
-            var priorName = UpdateNaming.PriorContainerName(containerName);
-            try
-            {
-                await _runtime.StopAsync(containerName);
-                await _runtime.RenameAsync(containerName, priorName);
-                var spec = BuildReplacementSpec(containerName, target, resolvedImageId);
-                await _runtime.CreateReplacementAsync(spec);
-                await _runtime.StartAsync(containerName);
-            }
-            catch (DockerRuntimeException ex)
-            {
-                // S4.10: no updated container exists to keep, so restore is unconditional here regardless of
-                // --no-restore — there is nothing "unhealthy" to leave in place, only a failed creation attempt.
-                await Console.Error.WriteLineAsync(
-                    $"The replacement for '{containerName}' could not be created: {ex.Message}");
-                return await RestoreAndFinalizeAsync(startRecord, lockName, containerName, priorName, target.Id,
-                    UpdateErrorCode.ReplacementCreateFailed);
-            }
-
-            var healthOutcome = await WaitForHealthAsync(containerName, options.HealthTimeout);
-            if (healthOutcome == HealthWaitOutcome.Healthy)
-            {
-                // Design step 10: the prior container is removed before the outcome is written and the lock
-                // released. A removal the daemon refuses does not undo a healthy update, but it is reported,
-                // since the next update of this container refuses on the prior container as residue (S2.9).
-                try
-                {
-                    await _runtime.RemoveAsync(priorName, force: true);
-                }
-                catch (DockerRuntimeException ex)
-                {
-                    await Console.Error.WriteLineAsync(
-                        $"'{containerName}' was updated, but its prior container '{priorName}' could not be removed: " +
-                        $"{ex.Message}. The next update of '{containerName}' refuses until it is removed.");
-                }
-
-                return await FinalizeAsync(startRecord, lockName, UpdateOutcome.Succeeded, null);
-            }
-
-            var (failureCode, failureMessage) = healthOutcome switch
-            {
-                HealthWaitOutcome.TimedOut => (UpdateErrorCode.HealthTimedOut,
-                    $"The replacement '{containerName}' did not report healthy within {options.HealthTimeout}."),
-                HealthWaitOutcome.Absent => (UpdateErrorCode.HealthCheckAbsent,
-                    $"The replacement '{containerName}' declares no health check, so it cannot be verified."),
-                HealthWaitOutcome.Exited => (UpdateErrorCode.ReplacementExited,
-                    $"The replacement '{containerName}' stopped running before it reported healthy."),
-                _ => throw new InvalidOperationException("unreachable"),
-            };
-            await Console.Error.WriteLineAsync($"{failureMessage} ({failureCode})");
-
-            if (!options.RestoreOnFailure)
-            {
-                // S4.5: left in place for manual recovery — the replacement, the prior container and its pin
-                // are none of them touched.
-                return await FinalizeAsync(startRecord, lockName, UpdateOutcome.UnhealthyNotRestored, failureCode);
-            }
-
-            return await RestoreAndFinalizeAsync(startRecord, lockName, containerName, priorName, target.Id, failureCode);
         }
-        catch (UpdateException ex) when (ex.Code is UpdateErrorCode.ResiduePresent or UpdateErrorCode.PinFailed or UpdateErrorCode.LogUnwritable)
+        catch (Exception)
         {
+            if (pinned)
+            {
+                await TryRemoveImageTagAsync(pinTag);
+            }
+
             await TryRemoveContainerAsync(lockName);
             throw;
         }
+
+        // The first change to the target happens here. A failure past this point is not covered by I41: it is
+        // S4's job, from here on, to bring the target back rather than leave residue for the next update to
+        // refuse on — so no exception of any type may leave this method without the restore path having run.
+        var priorName = UpdateNaming.PriorContainerName(containerName);
+        try
+        {
+            await _runtime.StopAsync(containerName);
+            await _runtime.RenameAsync(containerName, priorName);
+            var spec = BuildReplacementSpec(containerName, target, resolvedImageId);
+            await _runtime.CreateReplacementAsync(spec);
+            await _runtime.StartAsync(containerName);
+        }
+        catch (Exception ex)
+        {
+            // S4.10: no updated container exists to keep, so restore is unconditional here regardless of
+            // --no-restore — there is nothing "unhealthy" to leave in place, only a failed creation attempt.
+            await Console.Error.WriteLineAsync(
+                $"The replacement for '{containerName}' could not be created: {ex.Message}");
+            return await RestoreAndFinalizeAsync(startRecord, lockName, containerName, priorName, target.Id,
+                UpdateErrorCode.ReplacementCreateFailed);
+        }
+
+        var healthOutcome = await WaitForHealthAsync(containerName, options.HealthTimeout, cancellationToken);
+        if (healthOutcome == HealthWaitOutcome.Healthy)
+        {
+            // Design step 10: the prior container is removed before the outcome is written and the lock
+            // released. A removal the daemon refuses does not undo a healthy update, but it is reported,
+            // since the next update of this container refuses on the prior container as residue (S2.9).
+            try
+            {
+                await _runtime.RemoveAsync(priorName, force: true);
+            }
+            catch (Exception ex)
+            {
+                await Console.Error.WriteLineAsync(
+                    $"'{containerName}' was updated, but its prior container '{priorName}' could not be removed: " +
+                    $"{ex.Message}. The next update of '{containerName}' refuses until it is removed.");
+            }
+
+            return await FinalizeAsync(startRecord, lockName, UpdateOutcome.Succeeded, null);
+        }
+
+        var (failureCode, failureMessage) = healthOutcome switch
+        {
+            HealthWaitOutcome.TimedOut => (UpdateErrorCode.HealthTimedOut,
+                $"The replacement '{containerName}' did not report healthy within {options.HealthTimeout}."),
+            HealthWaitOutcome.Absent => (UpdateErrorCode.HealthCheckAbsent,
+                $"The replacement '{containerName}' declares no health check, so it cannot be verified."),
+            HealthWaitOutcome.Exited => (UpdateErrorCode.ReplacementExited,
+                $"The replacement '{containerName}' stopped running before it reported healthy."),
+            HealthWaitOutcome.Interrupted => (UpdateErrorCode.Interrupted,
+                $"The update of '{containerName}' was interrupted before the replacement reported healthy."),
+            _ => throw new InvalidOperationException("unreachable"),
+        };
+        await Console.Error.WriteLineAsync($"{failureMessage} ({failureCode})");
+
+        // An interrupted update restores whatever --no-restore says: the operator stopped it, and a replacement
+        // never verified must not be left standing as if it were the outcome they chose (design § Process
+        // interruption).
+        if (!options.RestoreOnFailure && healthOutcome != HealthWaitOutcome.Interrupted)
+        {
+            // S4.5: left in place for manual recovery — the replacement, the prior container and its pin
+            // are none of them touched.
+            return await FinalizeAsync(startRecord, lockName, UpdateOutcome.UnhealthyNotRestored, failureCode);
+        }
+
+        return await RestoreAndFinalizeAsync(startRecord, lockName, containerName, priorName, target.Id, failureCode);
     }
 
     /// <summary>Removes exactly the named target's lock, if one exists, and reports what it held (design/30-slices.md
@@ -327,17 +367,24 @@ public sealed class Updater
         Absent,
         TimedOut,
         Exited,
+        Interrupted,
     }
 
     // Not specified by the contract beyond "the timeout" (S4.7); this slice's own disclosed poll cadence.
     private static readonly TimeSpan HealthPollInterval = TimeSpan.FromSeconds(1);
 
-    private async Task<HealthWaitOutcome> WaitForHealthAsync(string containerName, TimeSpan timeout)
+    private async Task<HealthWaitOutcome> WaitForHealthAsync(string containerName, TimeSpan timeout,
+        CancellationToken cancellationToken)
     {
         var deadline = _clock.UtcNow + timeout;
 
         while (true)
         {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return HealthWaitOutcome.Interrupted;
+            }
+
             var verdict = await PollHealthAsync(containerName);
             if (verdict.HasValue)
             {
@@ -361,10 +408,10 @@ public sealed class Updater
         {
             inspection = await _runtime.InspectAsync(containerName);
         }
-        catch (DockerRuntimeException)
+        catch (Exception)
         {
-            // A daemon error while polling is no verdict on the replacement. Letting it escape would skip
-            // restore, the outcome record and the lock release, so it counts as "not healthy yet".
+            // A failed poll is no verdict on the replacement. Letting it escape would skip restore, the outcome
+            // record and the lock release, so it counts as "not healthy yet".
             return null;
         }
 
@@ -391,7 +438,7 @@ public sealed class Updater
         {
             restoreFailure = await AttemptRestoreAsync(containerName, priorName, originalId);
         }
-        catch (DockerRuntimeException ex)
+        catch (Exception ex)
         {
             restoreFailure = $"Restoring '{containerName}' from its prior container '{priorName}' could not proceed: {ex.Message}";
         }
@@ -501,7 +548,7 @@ public sealed class Updater
         {
             _log.Append(completedRecord);
         }
-        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException)
+        catch (Exception ex)
         {
             await Console.Error.WriteLineAsync(
                 $"The outcome ({outcome}) for update {startRecord.UpdateId} of '{startRecord.ContainerName}' " +
@@ -539,6 +586,14 @@ public sealed class Updater
         {
             throw new UpdateException(UpdateErrorCode.TargetShapeUnsupported, containerName,
                 $"Container '{containerName}' has an anonymous volume mounted at '{anonymousVolume.Destination}', which cannot be reproduced exactly.");
+        }
+
+        // I34: the replacement differs from the target in image only. A setting the replacement would not carry
+        // is refused by name rather than dropped.
+        if (target.UnreproducedSettings is { Count: > 0 } unreproduced)
+        {
+            throw new UpdateException(UpdateErrorCode.TargetShapeUnsupported, containerName,
+                $"Container '{containerName}' has settings the replacement cannot reproduce: {string.Join(", ", unreproduced)}.");
         }
     }
 
@@ -658,16 +713,18 @@ public sealed class Updater
             Mounts: target.Mounts,
             Ports: target.Ports,
             RestartPolicy: target.RestartPolicy,
-            Networks: target.Networks);
+            Networks: target.Networks,
+            Log: target.Log);
     }
 
+    // Best-effort cleanup on the way out of a failure: a second failure here must not replace the first.
     private async Task TryRemoveContainerAsync(string name)
     {
         try
         {
             await _runtime.RemoveAsync(name, force: true);
         }
-        catch (DockerRuntimeException)
+        catch (Exception)
         {
         }
     }
@@ -678,7 +735,7 @@ public sealed class Updater
         {
             await _runtime.RemoveImageTagAsync(tag);
         }
-        catch (DockerRuntimeException)
+        catch (Exception)
         {
         }
     }

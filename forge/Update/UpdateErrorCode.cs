@@ -20,6 +20,10 @@ public enum UpdateErrorCode
     HealthTimedOut,
     ReplacementExited,
     RestoreFailed,
+
+    /// <summary>The process was signalled to stop after the target's first change; recorded as the failure code
+    /// of the restore that follows (design/10-design.md § Process interruption).</summary>
+    Interrupted,
 }
 
 public sealed class UpdateException : Exception

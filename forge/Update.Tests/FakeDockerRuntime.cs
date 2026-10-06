@@ -27,6 +27,23 @@ public sealed class FakeDockerRuntime : IDockerRuntime
     public Func<string, string, bool>? FailRename { get; set; }
     public Func<string, bool>? FailStart { get; set; }
 
+    /// <summary>Called with (operation, name) before each named operation; a non-null exception is thrown from it.
+    /// Unlike the Fail* hooks, which simulate the daemon refusing, this can throw any exception type — a fault
+    /// outside Docker's own error reporting.</summary>
+    public Func<string, string, Exception?>? Fault { get; set; }
+
+    /// <summary>Runs after a marker container (the lock) is created, with its name — the moment between taking
+    /// the lock and acting under it.</summary>
+    public Action<string>? AfterCreateMarker { get; set; }
+
+    private void ThrowIfFaulted(string operation, string name)
+    {
+        if (Fault?.Invoke(operation, name) is { } exception)
+        {
+            throw exception;
+        }
+    }
+
     /// <summary>Overrides <see cref="ContainerInspection.Running"/> and <see cref="ContainerInspection.HealthStatus"/>
     /// for a container name on every <see cref="InspectAsync"/> of it, simulating a health check that starts,
     /// times out, or a replacement that exits — none of which this in-memory daemon otherwise models on its
@@ -72,6 +89,7 @@ public sealed class FakeDockerRuntime : IDockerRuntime
 
     public Task<ContainerInspection?> InspectAsync(string name)
     {
+        ThrowIfFaulted("inspect", name);
         lock (_gate)
         {
             if (!_containers.TryGetValue(name, out var container))
@@ -110,6 +128,8 @@ public sealed class FakeDockerRuntime : IDockerRuntime
 
     public Task<string> CreateMarkerAsync(string name, string imageId, IReadOnlyDictionary<string, string> labels)
     {
+        ThrowIfFaulted("create-marker", name);
+        string id;
         lock (_gate)
         {
             if (_containers.ContainsKey(name))
@@ -117,7 +137,7 @@ public sealed class FakeDockerRuntime : IDockerRuntime
                 throw new DockerRuntimeException($"name already in use: {name}");
             }
 
-            var id = Guid.NewGuid().ToString("N");
+            id = Guid.NewGuid().ToString("N");
             _containers[name] = new ContainerInspection(
                 Id: id,
                 Name: name,
@@ -134,12 +154,15 @@ public sealed class FakeDockerRuntime : IDockerRuntime
                 RestartPolicy: "no",
                 Networks: Array.Empty<string>(),
                 Links: Array.Empty<string>());
-            return Task.FromResult(id);
         }
+
+        AfterCreateMarker?.Invoke(name);
+        return Task.FromResult(id);
     }
 
     public Task<string> CreateReplacementAsync(ContainerCreateSpec spec)
     {
+        ThrowIfFaulted("create", spec.Name);
         lock (_gate)
         {
             if (FailCreateReplacement?.Invoke(spec.Name) == true)
@@ -169,6 +192,7 @@ public sealed class FakeDockerRuntime : IDockerRuntime
                 RestartPolicy: spec.RestartPolicy,
                 Networks: spec.Networks,
                 Links: Array.Empty<string>(),
+                Log: spec.Log,
                 // A replacement is healthy from the moment it exists unless a test's HealthProbe says
                 // otherwise (S4) — so every pre-S4 success test keeps passing without simulating health at all.
                 HealthStatus: "healthy");
@@ -176,15 +200,23 @@ public sealed class FakeDockerRuntime : IDockerRuntime
         }
     }
 
-    public Task StartAsync(string name) =>
-        FailStart?.Invoke(name) == true
+    public Task StartAsync(string name)
+    {
+        ThrowIfFaulted("start", name);
+        return FailStart?.Invoke(name) == true
             ? throw new DockerRuntimeException($"simulated start failure for {name}")
             : Mutate(name, c => c with { Running = true });
+    }
 
-    public Task StopAsync(string name) => Mutate(name, c => c with { Running = false });
+    public Task StopAsync(string name)
+    {
+        ThrowIfFaulted("stop", name);
+        return Mutate(name, c => c with { Running = false });
+    }
 
     public Task RenameAsync(string currentName, string newName)
     {
+        ThrowIfFaulted("rename", currentName);
         lock (_gate)
         {
             if (FailRename?.Invoke(currentName, newName) == true)
@@ -210,6 +242,7 @@ public sealed class FakeDockerRuntime : IDockerRuntime
 
     public Task RemoveAsync(string name, bool force)
     {
+        ThrowIfFaulted("remove", name);
         lock (_gate)
         {
             _containers.Remove(name);
@@ -219,6 +252,7 @@ public sealed class FakeDockerRuntime : IDockerRuntime
 
     public Task TagImageAsync(string imageId, string tag)
     {
+        ThrowIfFaulted("tag", tag);
         lock (_gate)
         {
             if (FailTagImage?.Invoke(tag) == true)
@@ -238,6 +272,7 @@ public sealed class FakeDockerRuntime : IDockerRuntime
 
     public Task RemoveImageTagAsync(string tag)
     {
+        ThrowIfFaulted("rmi", tag);
         lock (_gate)
         {
             _imageReferences.Remove(tag);

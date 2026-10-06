@@ -6,6 +6,7 @@ Append-only. Newest at the top. The rejected alternatives are the point — with
 
 Every entry below, newest first, by date and title. The entries are not edited; this list follows them.
 
+- 2026-10-06 — An update refuses every setting its replacement does not carry over, and pulls before it resolves
 - 2026-10-04 — A sink's identity is recorded just before it is written, and a package is identified by its content without the repository signature
 - 2026-10-04 — A re-run for a published release's own commit moves only `latest`
 - 2026-10-03 — `latest` moves last, after the release is published
@@ -50,6 +51,12 @@ Every entry below, newest first, by date and title. The entries are not edited; 
 _A staging area, not a home. Things noticed mid-slice that were deliberately not acted on. `/track` turns each into a GitHub issue and removes it from here. An item that is a *decision* rather than a *todo* belongs below as an entry, not in an issue._
 
 ---
+
+### 2026-10-06 — An update refuses every setting its replacement does not carry over, and pulls before it resolves
+Context: `20-contract.md` U-10 and I34. The replacement is created from a fixed set of fields (image, name, labels, environment, command, entrypoint, mounts, ports, restart policy, networks), so a container started with any other run option — privileged mode, capabilities, devices, resource limits, DNS, a custom hostname, network aliases, a logging driver — was replaced by one silently missing it. Separately, a tag already present locally was never pulled, so `update` with the default image reference did nothing when the registry's tag had moved, and a signal mid-update left the lock and the pin behind.
+Chosen: Inspect output is compared against the daemon's defaults, and every setting the replacement does not carry over refuses the update with `TargetShapeUnsupported`, naming each setting. Settings an image can supply (user, working directory, stop signal, health check) are compared against the image's own configuration and refused only when they differ; if the image cannot be inspected, any such setting that is set refuses. The logging driver and its options are carried over rather than refused. Image resolution always pulls first, except for an image ID; a failed pull falls back to a local image of that reference with a warning, and fails only when none exists. After the lock is taken the target is inspected again. A first SIGINT or SIGTERM is handled: before the swap it releases the pin and the lock and exits 1; during the health wait it restores whatever `RestoreOnFailure` says and records the outcome as `Interrupted`. A second signal terminates at once.
+Rejected: Reproduce every run option — each one is a new mapping from inspect output back to a create flag, and a single mistake is the silent approximation I34 forbids. Ignore settings that do not affect the application — whether a setting matters is the operator's call, not the tool's. Pull only when the image is missing — the default reference is meant to pick up a moved tag, and that is exactly the case it missed. Fail when the pull fails — an offline host with the image present could then never update to it.
+Reversibility: cheap — the refusal list can shrink as each setting gains a faithful reproduction, without changing any exit status.
 
 ### 2026-10-04 — A sink's identity is recorded just before it is written, and a package is identified by its content without the repository signature
 Context: `20-contract.md` U-13, raised while applying the 2026-10-03 decision on F4. That decision recorded every artifact's identity at build time, but a resume rebuilds, and neither the image nor the packages are built byte-reproducibly, so a resume's identities never matched the ones recorded. Separately, nuget.org adds a repository signature to a package on upload, so the package it serves has a different SHA-256 from the one pushed.

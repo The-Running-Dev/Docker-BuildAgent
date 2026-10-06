@@ -507,6 +507,7 @@ for the same commit, which finds the release published and moves `latest` alone
 | `HealthCheckAbsent` | The target declares no health check | No | Treat as unhealthy; restore per `RestoreOnFailure` |
 | `HealthTimedOut` | The check did not pass within the timeout | Yes | Restore per `RestoreOnFailure`; exit 10 or 11 |
 | `ReplacementExited` | The replacement exited before becoming healthy | No | Restore per `RestoreOnFailure`; exit 10 or 11 |
+| `Interrupted` | A signal arrived during the health wait | No | Restore whatever `RestoreOnFailure` says; exit 10, or 12 if the restore fails |
 | `RestoreFailed` | The prior container cannot be returned to its name | No | Exit 12 naming the prior container and its labels |
 
 `LockHeld` is retryable in the sense that the same invocation may succeed later. It
@@ -670,14 +671,9 @@ slice.
 F4, F5, F6 and F8 and are struck: the claim records each artifact's identity, the claim
 starts with an atomic ref, the Updater owns its notifier, and `latest` moves last.*
 
-**U-10 — The enumerated set of unsupported container shapes.** `10-design.md` states
-the rule and delegates the list here, but the list cannot be written from the design:
-it is whatever the Docker API fails to reproduce from inspect output, which is a
-verified fact about the daemon rather than a design choice. Anonymous volumes and
-legacy container links are in it on the design's own statement; the rest needs a
-round-trip probe per shape.
-*Blocks:* `UpdateErrorCode.TargetShapeUnsupported`'s refusal list and the refusal tests
-the brief requires.
+*U-10 was resolved by the 2026-10-06 decision on unreproduced settings and is struck.
+The refusal list is every setting the replacement does not carry over, read from inspect
+output; the round-trip probe tests keep it honest against a live daemon.*
 
 *U-11 was resolved by the 2026-09-20 decision on Windows verification and is struck.
 The gap it names is now stated under § Global tool rather than pending.*

@@ -28,10 +28,18 @@ public sealed record PortSpec(
     string? HostIp,
     string? HostPort);
 
+/// <summary>The container's logging driver and its options, from <c>HostConfig.LogConfig</c>. Reproduced as given,
+/// so a container on the daemon's default driver keeps it and one with its own driver or options keeps those.</summary>
+public sealed record LogSpec(
+    string Driver,
+    IReadOnlyDictionary<string, string> Options);
+
 /// <summary>The state of a container as inspect reports it, restricted to the fields the Updater needs to
 /// refuse safely (I34) or reproduce exactly. <see cref="HealthStatus"/> is Docker's own status string
 /// ("starting", "healthy", "unhealthy") from <c>State.Health.Status</c>, or null when the container declares
-/// no health check at all (S4's concern; not read anywhere before S4).</summary>
+/// no health check at all (S4's concern; not read anywhere before S4). <see cref="UnreproducedSettings"/> names
+/// every setting the container carries that a replacement would not reproduce (I34); the Updater refuses a target
+/// that has any. Null and empty both mean none.</summary>
 public sealed record ContainerInspection(
     string Id,
     string Name,
@@ -48,7 +56,9 @@ public sealed record ContainerInspection(
     string RestartPolicy,
     IReadOnlyList<string> Networks,
     IReadOnlyList<string> Links,
-    string? HealthStatus = null);
+    string? HealthStatus = null,
+    LogSpec? Log = null,
+    IReadOnlyList<string>? UnreproducedSettings = null);
 
 /// <summary>Everything needed to create a container that reproduces another's configuration except its image
 /// (I34). Built from a <see cref="ContainerInspection"/> by the Updater, not by the runtime.</summary>
@@ -62,7 +72,8 @@ public sealed record ContainerCreateSpec(
     IReadOnlyList<MountSpec> Mounts,
     IReadOnlyList<PortSpec> Ports,
     string RestartPolicy,
-    IReadOnlyList<string> Networks);
+    IReadOnlyList<string> Networks,
+    LogSpec? Log = null);
 
 /// <summary>Thrown by an <see cref="IDockerRuntime"/> member for a daemon- or registry-level failure. The
 /// Updater maps this to the appropriate <see cref="UpdateErrorCode"/> for the step that was in progress.</summary>
