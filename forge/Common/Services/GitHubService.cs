@@ -10,6 +10,7 @@ using Octokit;
 using Microsoft.Extensions.Logging;
 
 using Entities;
+using Extensions;
 using Utilities;
 using Parameters;
 
@@ -157,7 +158,7 @@ public class GitHubService : IGitHubService
         }
 
         var owner = match.Groups["owner"].Value;
-        var repo = match.Groups["repo"].Value.Replace(".git", "");
+        var repo = match.Groups["repo"].Value.TrimGitSuffix();
 
         return (owner, repo);
     }

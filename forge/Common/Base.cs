@@ -119,7 +119,7 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
         {
             Config = new BuildConfig(RootDirectory),
             RootDirectory = RootDirectory,
-            RepositoryUrl = GitRepository?.HttpsUrl?.Replace(".git", "") ?? "Unknown",
+            RepositoryUrl = GitRepository?.HttpsUrl?.TrimGitSuffix() ?? "Unknown",
             Version = Common.GetVersion(RootDirectory),
             Verbosity = Verbosity
         };
@@ -174,9 +174,19 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
                 Version = Parameters?.Version?.ToString() ?? "Unknown",
                 WebHookUrl = NotificationsWebHookUrl
             };
-            p.Urls = GitService.GetUrls(p.Branch, p.Commit);
 
-            notifications.Send(p).GetAwaiter().GetResult();
+            // I44: a notification never changes the build's outcome. Send itself never faults; this guards
+            // the URL lookup and any notifier that does not honour that.
+            try
+            {
+                p.Urls = GitService.GetUrls(p.Branch, p.Commit);
+
+                notifications.Send(p).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{DateTime.Now:HH:mm:ss} [WRN] Failed to Send Notification: {ex.GetType().Name}");
+            }
         }
     }
 
@@ -190,8 +200,9 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
     /// <param name="configurationGate">Resolves the project's configuration file before anything else runs (I18).</param>
     /// <param name="targets">An array of expressions representing the build targets to execute.</param>
     /// <returns>An integer indicating the result of the build process. Returns 2 if the project configuration is
-    /// invalid, before any environment file is generated; -1 if the environment setup is incomplete; otherwise,
-    /// returns the result of executing the targets.</returns>
+    /// invalid, before any environment file is generated; -1 if the environment setup is incomplete; 5 or 6 when a
+    /// Docker or registry operation failed (<see cref="BuildFailure"/>); otherwise, returns the result of executing
+    /// the targets.</returns>
     protected static int Build<T>(IBuildConfigurationGate configurationGate, params Expression<Func<T, Target>>[] targets) where T : NukeBuild, new()
     {
         var config = new BuildConfig(RootDirectory);
@@ -217,8 +228,17 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
             msg => Console.WriteLine($"{DateTime.Now:HH:mm:ss} [INF] {msg}"),
             msg => Console.WriteLine($"{DateTime.Now:HH:mm:ss} [WRN] {msg}"));
 
+        void DeleteGeneratedEnvFiles()
+        {
+            Files.DeleteIfExists(config.EnvFilePath);
+            Files.DeleteIfExists(config.AppEnvFilePath);
+        }
+
         if (!isSuccessful)
         {
+            // The partial file holds the values that were set; never leave it behind.
+            DeleteGeneratedEnvFiles();
+
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} [ERR] [ERROR] Build Env Incomplete...(See {config.EnvMapFile})");
 
             return -1;
@@ -241,12 +261,6 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
             }
         }
 
-        void DeleteGeneratedEnvFiles()
-        {
-            Files.DeleteIfExists(config.EnvFilePath);
-            Files.DeleteIfExists(config.AppEnvFilePath);
-        }
-
         AppDomain.CurrentDomain.ProcessExit += (_, _) => DeleteGeneratedEnvFiles();
         Console.CancelKeyPress += (_, _) => DeleteGeneratedEnvFiles();
 
@@ -265,7 +279,7 @@ public abstract class Base<TParams, TNotifications> : NukeBuild
             Console.WriteLine($"{DateTime.Now:HH:mm:ss} [WRN] Could not set GitService safe directory: {ex.Message}");
         }
 
-        return Execute(targets);
+        return BuildFailure.Resolve(Execute(targets));
     }
 
     /// <summary>

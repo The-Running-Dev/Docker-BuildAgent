@@ -94,10 +94,23 @@ public class StringExtensionsTests
     [InlineData("https://github.com/owner/repo/issues/1", "owner/repo")]
     [InlineData("owner/repo", "owner/repo")]
     [InlineData("owner", "owner")]
+    [InlineData("https://github.com/owner/owner.github.io.git", "owner/owner.github.io")]
     public void GetGitHubRepoSlug_Normalizes(string input, string expected)
     {
         var result = input.GetGitHubRepoSlug();
 
         Assert.Equal(expected, result);
+    }
+
+    [Theory]
+    [InlineData("https://github.com/owner/repo.git", "https://github.com/owner/repo")]
+    [InlineData("https://github.com/owner/repo.git/", "https://github.com/owner/repo")]
+    [InlineData("https://github.com/owner/owner.github.io", "https://github.com/owner/owner.github.io")]
+    [InlineData("https://github.com/owner/owner.github.io.git", "https://github.com/owner/owner.github.io")]
+    [InlineData("repo", "repo")]
+    [InlineData("", "")]
+    public void TrimGitSuffix_RemovesOnlyTheTrailingSuffix(string input, string expected)
+    {
+        Assert.Equal(expected, input.TrimGitSuffix());
     }
 }

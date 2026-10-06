@@ -46,6 +46,8 @@ public class GitHubServiceTests
     [InlineData("https://github.com/owner/repo.git", "owner", "repo")]
     [InlineData("git@github.com:owner/repo.git", "owner", "repo")]
     [InlineData("https://github.com/microsoft/dotnet", "microsoft", "dotnet")]
+    [InlineData("https://github.com/owner/owner.github.io", "owner", "owner.github.io")]
+    [InlineData("git@github.com:owner/owner.github.io.git", "owner", "owner.github.io")]
     public void ParseRepositoryUrl_WithValidUrls_ShouldReturnOwnerAndRepo(string url, string expectedOwner, string expectedRepo)
     {
         var (owner, repo) = _gitHubService.ParseRepositoryUrl(url);
