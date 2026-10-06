@@ -1,16 +1,22 @@
 # Tag-Based Release Workflow
 #
-# This workflow creates releases when you push a version tag to the repository.
-# This is useful if you prefer to create releases by pushing tags rather than
-# using the manual workflow dispatch method.
+# Releases the commit a pushed version tag points at, through forge/Publish (design/10-design.md,
+# control flow 2). The tag names the version, so it must be one GitVersion would accept and that
+# no other commit or release holds; a tag with nothing else holding its version is a release this
+# run makes from that tag (I5).
 #
 # Usage:
-#   1. Create and push a tag: git tag v1.2.3 && git push origin v1.2.3
-#   2. The workflow will automatically run and create a release
+#   1. Create and push a tag: git tag v2.1.0 && git push origin v2.1.0
+#   2. The workflow will run and publish the release
 #
 # Tag Format:
-#   - Use semantic versioning: v1.2.3, v1.0.0-beta.1, etc.
-#   - Must start with 'v' (configured in GitVersion.yml)
+#   - v<MAJOR>.<MINOR>.<PATCH>, optionally with a pre-release label of letters and digits:
+#     v2.1.0-rc1. A pre-release is published to every sink and marked as a pre-release on
+#     GitHub, and it never moves the image's `latest`. Dotted or hyphenated labels (v2.1.0-rc.1)
+#     are refused: the PowerShell Gallery cannot hold them.
+#
+# Secrets: REGISTRY_TOKEN, NUGET_API_KEY, PSGALLERY_API_KEY (in the `release` environment or the
+# repository). A failed run is resumed by re-running it.
 
 name: Release-from-Tag
 
@@ -42,44 +48,32 @@ jobs:
     needs: ModuleTests
     name: Release from Tag
     runs-on: ubuntu-latest
-    
+    environment: release
+
     steps:
-      # Checkout with full history and submodules (the Dockerfile copies docs-template/)
+      # Full history for the previous release tag; submodules because the Dockerfile copies
+      # docs-template/
       - name: Checkout Repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           submodules: recursive
 
-      # Setup build environment
       - name: Setup Environment
         uses: ./.github/actions/common
 
-      # Run tests
       - name: Tests & Coverage
         uses: ./.github/actions/tests
 
-      # Determine if this is a prerelease
-      - name: Check if Pre-Release
-        id: prerelease
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          if [[ "$TAG_NAME" =~ -[a-zA-Z] ]]; then
-            echo "prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "prerelease=false" >> $GITHUB_OUTPUT
-          fi
+      - name: Publish Release
+        uses: ./.github/actions/publish-release
+        with:
+          tag: ${{ github.ref_name }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          registry-token: ${{ secrets.REGISTRY_TOKEN }}
+          nuget-api-key: ${{ secrets.NUGET_API_KEY }}
+          psgallery-api-key: ${{ secrets.PSGALLERY_API_KEY }}
 
-      # Build and create release
-      - name: Build and Create Release
-        run: nuke --type docker --create-github-release true --pre-release "${{ steps.prerelease.outputs.prerelease }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
-          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
-
-      # Trigger documentation build
       - name: Trigger Documentation Build
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:

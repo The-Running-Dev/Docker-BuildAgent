@@ -1,20 +1,26 @@
 # Manual Release Workflow
 #
-# Creates an official release from the commit it is dispatched on. The version always comes
-# from GitVersion; a manually supplied version is not honoured yet (design/00-brief.md,
-# I5), so the `version` input fails the run rather than being silently ignored.
+# Releases the commit it is dispatched on through forge/Publish (design/10-design.md, control
+# flow 2). The version's core always comes from GitVersion; a manually supplied version is not
+# honoured (I5), so the `version` input fails the run rather than being silently ignored. A
+# pre-release label (letters and digits, e.g. rc1) makes the release 2.1.0-rc1: published to
+# every sink and marked as a pre-release on GitHub, and it never moves the image's `latest`.
 #
 # Usage:
 #   1. Go to the Actions tab in GitHub
 #   2. Select the "Release" workflow
-#   3. Click "Run workflow", optionally ticking "Mark as Pre-Release"
+#   3. Click "Run workflow", optionally giving a pre-release label
 #
 # The workflow will:
 #   - Run the module tests and every forge test project
-#   - Build and publish the Docker image (latest and the GitVersion version tag)
-#   - Create a GitHub release with an auto-generated changelog
-#   - Tag the repository with the version number
+#   - Refuse a version that is taken, a lower major, or a breaking surface change without a major
+#   - Build the image, the BuildAgent.Tool package and the Docker-BuildAgent module package
+#   - Publish them to ghcr.io, nuget.org and the PowerShell Gallery, then the GitHub release and tag
+#   - Move the image's `latest` when this is the highest stable release
 #   - Dispatch the Update-Documentation event
+#
+# Secrets: REGISTRY_TOKEN, NUGET_API_KEY, PSGALLERY_API_KEY (in the `release` environment or the
+# repository). A failed run is resumed by re-running it for the same commit.
 
 name: Release
 
@@ -22,14 +28,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Not supported yet: any value fails the run. Leave empty; the version comes from GitVersion'
+        description: 'Not supported: any value fails the run. Leave empty; the version comes from GitVersion'
         required: false
         type: string
-      prerelease:
-        description: 'Mark as Pre-Release'
+      prerelease-label:
+        description: 'Pre-release label, letters and digits only (e.g. rc1). Leave empty for a stable release'
         required: false
-        type: boolean
-        default: false
+        type: string
 
 permissions:
   packages: write
@@ -54,40 +59,40 @@ jobs:
     needs: ModuleTests
     name: Release
     runs-on: ubuntu-latest
-    
+    environment: release
+
     steps:
-      # Checkout with full history for GitVersion and submodules (the Dockerfile copies docs-template/)
+      # Full history for GitVersion and the previous release tag; submodules because the
+      # Dockerfile copies docs-template/
       - name: Checkout Repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           submodules: recursive
 
-      # Setup build environment
       - name: Setup Environment
         uses: ./.github/actions/common
 
-      # Run tests to ensure quality
       - name: Tests & Coverage
         uses: ./.github/actions/tests
 
-      # A manual version is not honoured by the build (Version always comes from GitVersion),
-      # so refuse it instead of publishing a different version than the operator asked for.
+      # A manual version is never honoured (the core comes from GitVersion), so refuse it instead
+      # of publishing a different version than the operator asked for.
       - name: Reject Unsupported Version Input
         if: ${{ github.event.inputs.version != '' }}
         run: |
-          echo "::error::The version input is not supported yet; the release version comes from GitVersion. Re-run with it empty, or push a version tag to use Release-from-Tag."
+          echo "::error::The version input is not supported; the release version comes from GitVersion. Re-run with it empty, or push a version tag to use Release-from-Tag."
           exit 1
 
-      # Build and create release
-      - name: Build and Create Release
-        run: nuke --type docker --create-github-release true --pre-release "${{ github.event.inputs.prerelease }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
-          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+      - name: Publish Release
+        uses: ./.github/actions/publish-release
+        with:
+          label: ${{ github.event.inputs.prerelease-label }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          registry-token: ${{ secrets.REGISTRY_TOKEN }}
+          nuget-api-key: ${{ secrets.NUGET_API_KEY }}
+          psgallery-api-key: ${{ secrets.PSGALLERY_API_KEY }}
 
-      # Trigger documentation build if needed
       - name: Trigger Documentation Build
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
         with:
