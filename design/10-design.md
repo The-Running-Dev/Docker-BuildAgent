@@ -160,25 +160,29 @@ Launchers ········► Image            (by published version, not by cod
 
 A push to `main` is not a release: it moves `latest` only, and writes no version to any sink (2026-09-20 decision).
 
+The Release and Release-from-Tag workflows run the steps below through one entry point, `forge/Publish` (2026-10-06 decision on the release entry point).
+
 Steps 1–5 write nothing. The first write is step 6.
 
-1. Run tests. Compute or validate the version.
+1. Run tests. Take the version from the pushed tag, or from GitVersion's `MajorMinorPatch` with the dispatch's pre-release label. **Fail** on a label that is not one identifier of letters and digits.
 2. **Refuse** if the version exists (derived rule in *Release claim*), if its major is below the current major, or if a version tag already points at a different commit.
+   - **Release from its own tag:** a version tag at this run's commit, with no claim and no versioned sink holding the version, is the release being made from that tag, not an existing version (I5).
    - **Completion re-run:** when the version's release is already published for this commit, the run does not refuse and does not publish. It checks that the git tag points at this commit and that every versioned sink holds the version with the identity the claim records, then performs step 9 alone and stops (2026-10-04 decision). A sink that does not match fails with `SinkArtifactMismatch`; a version that is not the highest published release is refused as `VersionAlreadyExists`, so a re-run never moves `latest` back to an older release. This writes no versioned sink, so I5 holds.
 3. Derive the surface manifest. Load the baseline, which is the manifest asset of the highest published release below this version.
    - **Fail** on *any* difference from the baseline unless the major increases, except the compatible set: adding an item, marking an existing item deprecated, and adding a supported schema version.
    - **Fail** on removal of an item the baseline did not already mark deprecated, at any major.
-   - v2.0.0 has no baseline and is judged only by the migration guide.
+   - The baseline is a stable release; a pre-release is never one (I8).
+   - 2.0.0 and its pre-releases have no baseline and are judged only by the migration guide. For every other release a missing baseline fails.
 
    The rule is a whitelist so that it cannot fall behind the manifest: a list of forbidden differences leaves each field later added to the manifest unchecked, and reports nothing when it does.
-4. Assemble release notes. Mechanically detected breaking changes and deprecations are inserted into their sections. **Fail** if either section heading is missing from the final body. An empty section carries an explicit "none".
+4. Assemble release notes. The body is the version's authored page under `documentation/docs/release-notes/` when one exists, without its front matter, title and not-yet-released notice and with its relative links made absolute at the commit; otherwise it lists the commit subjects since the previous release tag. Mechanically detected breaking changes and deprecations are inserted into their sections. **Fail** if either section heading is missing from the final body. An empty section carries an explicit "none".
 5. Build every artifact with the version stamped in, and compute each artifact's identity: the image digest and the two packages' content hashes. Nothing is pushed or recorded yet. Builds are not byte-reproducible, so a resume computes new identities here; step 7 uses them only for sinks that do not yet hold the version.
 6. **Claim:** create the ref `refs/release-claims/v<version>` at the commit through the refs API, then the draft release bound to the commit SHA, with notes and manifest attached.
    - **The ref exists at this commit:** this is a resume; continue under it, creating the draft if it is absent.
    - **The ref exists at another commit:** refuse. Another run holds the version.
 7. Publish to the versioned sinks in a fixed order: image versioned tag, global tool, PowerShell module. A sink that already holds this version is skipped, not rebuilt, **only when its artifact's identity matches the one the claim records**; this is what makes a retry resume. Every sink that already holds the version is compared before any sink is written, and a mismatch fails with `SinkArtifactMismatch` naming the sink, with nothing written by this run. For each sink that does not hold the version, the run records this build's identity for it in the claim, then writes it.
-8. Create the git tag if absent, then publish the release. The docs-site build dispatch follows.
-9. Move `latest` to this version. It moves last, so a release that is not yet published never moves it (I4). A failure here leaves a complete, published release and a stale `latest`, which is fixed by re-running the release for the same commit: the completion re-run in step 2 performs this step alone.
+8. Create the git tag if absent, then publish the release, marked as a pre-release for a pre-release version. The docs-site build dispatch follows.
+9. Move `latest` to this version when it is stable and at or above the highest published stable release; a pre-release never moves it. It moves last, so a release that is not yet published never moves it (I4). A failure here leaves a complete, published release and a stale `latest`, which is fixed by re-running the release for the same commit: the completion re-run in step 2 performs this step alone.
 
 ### 3. An operator updates a named container (global tool)
 

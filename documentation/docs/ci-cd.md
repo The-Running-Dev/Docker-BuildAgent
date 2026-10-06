@@ -55,10 +55,13 @@ When a push to `main` changes files under `documentation/`, Build also dispatche
 
 ### Release and Release-from-Tag
 
-Both run the Module Tests workflow and the test projects, then build and push the image under the
-version tag and `latest`, create the GitHub release and dispatch `Update-Documentation`. Release
-is started by hand; Release-from-Tag starts when a `v*` tag is pushed. See
-[Release Management](releases.md) for versions, pre-releases and what a release contains.
+Both run the Module Tests workflow and the test projects, then publish through the
+`publish-release` action (`.github/actions/publish-release`), which logs in to ghcr.io and runs
+the release entry point `forge/Publish`, and finally dispatch `Update-Documentation`. The release
+job runs in the `release` environment and reads the secrets `REGISTRY_TOKEN`, `NUGET_API_KEY` and
+`PSGALLERY_API_KEY`. Release is started by hand; Release-from-Tag starts when a `v*` tag is
+pushed. See [Release Management](releases.md) for versions, pre-releases and what a release
+contains.
 
 ### One publisher at a time
 
@@ -104,27 +107,28 @@ write packages and contents.
 1. Go to the **Actions** tab of the repository.
 2. Select the **Release** workflow.
 3. Choose **Run workflow**.
-4. Set **Mark as Pre-Release** for a beta or release candidate.
+4. For a pre-release, give a **pre-release label** of letters and digits, such as `rc1`.
 5. Choose **Run workflow**.
 
-The workflow takes one working input, the pre-release flag. The version always comes from
-GitVersion: a **Release Version** input exists, but a run that supplies it fails with an explicit
-error instead of ignoring it. There is no release-notes input; the notes are generated from the
-commit history.
+The workflow takes one working input, the pre-release label. The core version always comes from
+GitVersion: a **version** input exists, but a run that supplies it fails with an explicit error
+instead of ignoring it. There is no release-notes input; the notes come from the version's page
+under `documentation/docs/release-notes`, or from the commit history when there is none.
 
 ### Option 2: tag-based release
 
 ```bash
 # Create and push a version tag
-git tag v1.2.3
-git push origin v1.2.3
+git tag v2.1.0
+git push origin v2.1.0
 
 # For pre-releases
-git tag v1.0.0-beta.1
-git push origin v1.0.0-beta.1
+git tag v2.1.0-rc1
+git push origin v2.1.0-rc1
 ```
 
-A tag with a suffix such as `-beta` or `-rc` is marked as a pre-release.
+A tag with a label is a pre-release. The label is letters and digits only: `v2.1.0-rc.1` is
+refused.
 
 ---
 
