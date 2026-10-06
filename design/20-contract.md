@@ -695,3 +695,15 @@ and the domain is now carried by the subsection heading alone.*
 identity is recorded just before that sink is written and packages compare by a
 content hash that excludes the repository signature, and a re-run for a published
 release's own commit moves only `latest`.*
+
+**U-15 — Whether the build wrapper's parameters and NUKE's own parameters are protected
+surface.** The manifest derives `BuildParameter` items from the public properties of the
+`*Params` classes alone (§ Build parameters). The parameters of `scripts/nuke/build.ps1`
+(`AppDir`, `PackageManager`, `SkipInstall`, `IsProduction`, `NodeTemplateRepositoryUrl`)
+and the `[Parameter]` field `ChangeLogSource` on `Forge` (`--change-log-source`) are
+documented and real, but no manifest item names them, so the surface gate cannot see a
+change to them and the docs check reports each documented use as `UnknownName`. Deriving
+them adds items to the manifest, and so to every later release's baseline; leaving them
+out makes them unprotected names the documentation still teaches.
+*Blocks:* the ten findings recorded in `design/docs-check-recorded.txt`, and the
+compatibility promise for those names.

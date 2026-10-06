@@ -135,7 +135,7 @@ dist/
 package.json
 ```
 
-The Node package manager is detected from lock files in the project root: `pnpm-lock.yaml` selects pnpm, `yarn.lock` selects yarn, anything else selects npm. `NodeService` and the static `Node` utility check them in a different order, so a project with both lock files gets different answers.
+The Node package manager is detected from lock files in the project root: `pnpm-lock.yaml` selects pnpm, `yarn.lock` selects yarn, anything else selects npm.
 
 ## Which command runs what
 

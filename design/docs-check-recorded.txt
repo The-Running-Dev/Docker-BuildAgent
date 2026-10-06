@@ -5,7 +5,7 @@
 # What remains is a gap in the surface manifest, not stale prose: each name is real in the tree (a parameter of
 # scripts/nuke/build.ps1, or the [Parameter] field ChangeLogSource on Forge) but the manifest derives only public
 # properties of the *Params classes (I17), so the check cannot know it. Whether the wrapper and Nuke parameters join
-# the manifest is a contract decision; a test keeps every name below present in the tree.
+# the manifest is open as U-15 in design/20-contract.md § Unresolved; a test keeps every name below present in the tree.
 
 UnknownName	README.md	change-log-source	Real Nuke [Parameter] field (ChangeLogSource on Forge) that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.
 UnknownName	documentation/docs/build-types.md	AppDir	Real parameter of the build.ps1 wrapper that the surface manifest does not derive (only *Params properties are); the docs are right, the manifest is incomplete.

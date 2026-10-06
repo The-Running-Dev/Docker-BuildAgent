@@ -102,6 +102,10 @@ withdrawn until the boundary is settled.
 unreproduced settings: beyond anonymous volumes and legacy container links, the update refuses
 every setting the replacement does not carry over, and carries the logging configuration over.
 
+**The wrapper's and NUKE's own parameters on the surface (U-15).** The build wrapper's
+parameters and the `ChangeLogSource` field are documented but derived into no manifest item, so
+no slice can protect them or clear the docs check's ten recorded findings until U-15 is decided.
+
 **Recovering prior-container residue.** The contract's tool surface has `update --clear-lock` and no
 command that returns a prior container left behind by an interrupted update. An operator can
 therefore clear the lock but has no supplied way to complete the restore, and S5's criteria for it

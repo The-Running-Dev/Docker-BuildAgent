@@ -3,12 +3,13 @@
 The corpus-wide facts a single record cannot state alone: the unit table of contents, and the
 four reverse edges a unit record does not carry directly (`Invariant.BoundBy`,
 `Contract.Consumers`, `Decision.Affects`, `Question.Affects`). Every table below is a
-**projected** marked region (`AGENTS.shared.md` § *Marked regions*) — rendered by
-`tools/Update-DesignProjection.ps1` from `design/state/`, and overwritten on every
-regeneration. No table here is written by hand.
+**projected** marked region (`AGENTS.shared.md` § *Marked regions*): it states what the records
+under `design/state/` say, and a change to a record is made in the record and in its row here in
+the same commit. The kit's projection tool is retired and no tool regenerates these tables, so
+they are kept by hand.
 
 This repository has written document unit records, invariant records and decision records under
-`design/state/`, alongside the work mirror (`design/state/work/`, refreshed by `/track`). It has
+`design/state/`, alongside the work mirror (`design/state/work/`, refreshed by hand). It has
 written no question records, so the questions table is empty for that reason alone; the open
 questions live in `design/20-contract.md` under `## Unresolved`.
 
@@ -157,10 +158,10 @@ questions live in `design/20-contract.md` under `## Unresolved`.
 ## Outstanding
 
 From a checkout with no network: the outstanding work, its order, and each item's criteria,
-mirrored from GitHub by `tools/Update-WorkMirror.ps1` into `WorkRef` records
-(`design/state/work/`). **GitHub stays the authority** — this table is a mirror, stale by
-default, and never cited as the reason work is or is not done. `Mirrored at` names the commit
-the mirror was taken at; check it against `git log` before trusting an entry that looks old.
+mirrored by hand from GitHub into `WorkRef` records (`design/state/work/`); the kit's mirror
+tool is retired. **GitHub stays the authority** — this table is a mirror, stale by default,
+and never cited as the reason work is or is not done. `Mirrored at` names the commit the mirror
+was taken at; check it against `git log` before trusting an entry that looks old.
 
 <!-- outstanding:start -->
 | Rank | Issue | Title | Criteria | Mirrored at |
