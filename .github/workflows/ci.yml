@@ -29,6 +29,9 @@
 #
 # Environment (Build job, dry-run step):
 #   - GITHUB_TOKEN, RegistryToken, NotificationsWebHookUrl
+#   - Runs without repository secrets (Dependabot, forks) get placeholders for the last two, which
+#     .build/.build.env.map requires, and notifications off. The dry run never pushes or releases,
+#     so the token is not used.
 #
 # Permissions: contents:read, checks:write (test results), pull-requests:write (coverage comment)
 #
@@ -116,11 +119,11 @@ jobs:
 
       # Run the Docker build in dry-run mode for validation
       - name: Validate Build
-        run: nuke --type docker --dry-run true
+        run: nuke --type docker --dry-run true --notifications ${{ secrets.NOTIFICATIONS_WEBHOOK_URL != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
-          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN || 'unset-no-secrets' }}
+          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL || 'unset-no-secrets' }}
 
       # The dry run builds the image but does not push it; find it by the source label the
       # Dockerfile sets, which the base image does not carry.
