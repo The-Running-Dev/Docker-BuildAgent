@@ -3,6 +3,9 @@
 # Runs on pull requests when they are opened, updated, marked ready for review or reopened, and
 # posts review comments on the pull request. It needs the CLAUDE_CODE_OAUTH_TOKEN secret and
 # publishes nothing.
+#
+# Skipped on Dependabot pull requests: their runs get no repository secrets, and the action refuses
+# a bot actor. A skipped job satisfies the required claude-review check.
 
 name: Claude Code Review
 
@@ -12,6 +15,7 @@ on:
 
 jobs:
   claude-review:
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
