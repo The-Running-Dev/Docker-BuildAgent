@@ -29,6 +29,9 @@
 #
 # Environment (Build job, dry-run step):
 #   - GITHUB_TOKEN, RegistryToken, NotificationsWebHookUrl
+#   - Runs without repository secrets (Dependabot, forks) get placeholders for the last two, which
+#     .build/.build.env.map requires, and notifications off. The dry run never pushes or releases,
+#     so the token is not used.
 #
 # Permissions: contents:read, checks:write (test results), pull-requests:write (coverage comment)
 #
@@ -61,10 +64,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install .NET SDK
-        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: 8.x
 
@@ -89,7 +92,7 @@ jobs:
     steps:
       # Checkout the repository with full git history for GitVersion
       - name: Checkout Repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
@@ -116,11 +119,11 @@ jobs:
 
       # Run the Docker build in dry-run mode for validation
       - name: Validate Build
-        run: nuke --type docker --dry-run true
+        run: nuke --type docker --dry-run true --notifications ${{ secrets.NOTIFICATIONS_WEBHOOK_URL != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
-          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN || 'unset-no-secrets' }}
+          NotificationsWebHookUrl: ${{ secrets.NOTIFICATIONS_WEBHOOK_URL || 'unset-no-secrets' }}
 
       # The dry run builds the image but does not push it; find it by the source label the
       # Dockerfile sets, which the base image does not carry.
@@ -150,7 +153,7 @@ jobs:
 
       # Validate docs-template build on pull requests (no deploy)
       - name: Setup Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
 
