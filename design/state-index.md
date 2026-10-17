@@ -145,6 +145,7 @@ questions live in `design/20-contract.md` under `## Unresolved`.
 | decision/2026-10-06-release-entry-point | `unit/document/design-10-design` |
 | decision/2026-10-06-tool-identity | `unit/document/design-20-contract` |
 | decision/2026-10-06-update-refuses-unreproduced-settings | `unit/document/design-20-contract` |
+| decision/2026-10-17-nuget-trusted-publishing | `unit/document/design-10-design` |
 <!-- decision-affects:end -->
 
 ## Questions — blocks and answered

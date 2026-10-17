@@ -50,13 +50,46 @@ is never deleted. Pin a version when a build must reproduce.
   the module `Docker-BuildAgent` on the PowerShell Gallery, the GitHub release with its
   `surface-manifest.json` asset and the version tag, and, for the highest stable release,
   `latest`.
-- **Needs**: the secrets `REGISTRY_TOKEN`, `NUGET_API_KEY` and `PSGALLERY_API_KEY`, in the
-  `release` environment the job runs in or in the repository.
+- **Needs**: the secrets `REGISTRY_TOKEN` and `PSGALLERY_API_KEY`, in the `release` environment
+  the job runs in or in the repository, and the `release` environment variable `NUGET_USER`.
+  nuget.org is reached through Trusted Publishing: the job exchanges its GitHub OIDC token for an
+  API key that lasts one hour, so no NuGet key is stored. See
+  [Setting up publishing](#setting-up-publishing).
 
 The three publishing workflows (Build, Release and Release-from-Tag) share one `buildagent-publish`
 concurrency group. At most one of them publishes at a time and a run already in flight finishes
 rather than being cancelled. GitHub keeps only one pending run per group, so a newer queued run
 replaces an older queued one; if your queued release disappears, run it again.
+
+## Setting up publishing
+
+Once per repository, `scripts/Initialize-ReleasePublishing.ps1` sets up what the release workflows
+need, through the GitHub CLI. It is safe to re-run: it changes only what differs and ends with a
+table of what is set and what is missing.
+
+1. On nuget.org, open **Trusted Publishing** from your account menu and add two policies, one per
+   workflow file: repository owner `The-Running-Dev`, repository `Docker-BuildAgent`, workflow
+   file `release.yml` (then `release-tag.yml`), environment `release`.
+2. On the PowerShell Gallery, create an API key with the glob pattern `Docker-BuildAgent` and the
+   scope **Push new packages and package versions**.
+3. Run the script with your nuget.org profile name (not your email address) and the key:
+
+   ```powershell
+   pwsh scripts/Initialize-ReleasePublishing.ps1 -NuGetUser <profile> -PSGalleryApiKey (Read-Host -AsSecureString 'PowerShell Gallery API key')
+   ```
+
+   It creates the `release` environment, deployable from `main` and from `v*` tags, with you as
+   the required reviewer (`-NoReviewer` drops the approval), stores `NUGET_USER` and
+   `PSGALLERY_API_KEY` there, and checks that `REGISTRY_TOKEN` exists. `-OpenBrowser` opens the
+   nuget.org and PowerShell Gallery pages for steps 1 and 2; `-WhatIf` shows what it would change.
+4. Start the first release from the same script, as a pre-release first:
+
+   ```powershell
+   pwsh scripts/Initialize-ReleasePublishing.ps1 -StartRelease -PreReleaseLabel rc1 -Watch
+   ```
+
+   It refuses while anything it can check is missing. It cannot see nuget.org policies: a missing
+   one fails the run at **Log in to NuGet**, before anything is published.
 
 ## Creating a release
 
@@ -144,8 +177,11 @@ The entry point refuses to run anywhere but CI, so there is no local release com
 The error names its code, such as `VersionAlreadyExists`, `SurfaceGateFailed` or
 `SinkPublishFailed [GlobalTool]`.
 
-- Check that `REGISTRY_TOKEN` can push to ghcr.io, and that `NUGET_API_KEY` and
-  `PSGALLERY_API_KEY` are set and valid.
+- Run `scripts/Initialize-ReleasePublishing.ps1` and fix what its table reports missing.
+- Check that `REGISTRY_TOKEN` can push to ghcr.io and that `PSGALLERY_API_KEY` is valid.
+- A failure at **Log in to NuGet** means nuget.org has no trusted publishing policy matching the
+  workflow file and the `release` environment, or `NUGET_USER` is not the policy owner's profile
+  name.
 - Check that the tests pass.
 
 **The version already exists**
