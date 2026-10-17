@@ -19,8 +19,9 @@
 #   - Move the image's `latest` when this is the highest stable release
 #   - Dispatch the Update-Documentation event
 #
-# Secrets: REGISTRY_TOKEN, NUGET_API_KEY, PSGALLERY_API_KEY (in the `release` environment or the
-# repository). A failed run is resumed by re-running it for the same commit.
+# Secrets: REGISTRY_TOKEN and PSGALLERY_API_KEY (in the `release` environment or the repository),
+# and the variable NUGET_USER: nuget.org is reached through Trusted Publishing (OIDC), with no stored
+# key. A failed run is resumed by re-running it for the same commit.
 
 name: Release
 
@@ -40,6 +41,7 @@ permissions:
   packages: write
   contents: write
   checks: write
+  id-token: write # NuGet Trusted Publishing exchanges the OIDC token for a one-hour API key
 
 # I13/S3.11: one CI concurrency group spans every publishing workflow (Build, Release,
 # Release-from-Tag) so at most one run publishes at a time. cancel-in-progress: false means a
@@ -90,7 +92,7 @@ jobs:
           label: ${{ github.event.inputs.prerelease-label }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           registry-token: ${{ secrets.REGISTRY_TOKEN }}
-          nuget-api-key: ${{ secrets.NUGET_API_KEY }}
+          nuget-user: ${{ vars.NUGET_USER }}
           psgallery-api-key: ${{ secrets.PSGALLERY_API_KEY }}
 
       - name: Trigger Documentation Build

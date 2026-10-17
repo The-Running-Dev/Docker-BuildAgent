@@ -56,10 +56,12 @@ When a push to `main` changes files under `documentation/`, Build also dispatche
 ### Release and Release-from-Tag
 
 Both run the Module Tests workflow and the test projects, then publish through the
-`publish-release` action (`.github/actions/publish-release`), which logs in to ghcr.io and runs
-the release entry point `forge/Publish`, and finally dispatch `Update-Documentation`. The release
-job runs in the `release` environment and reads the secrets `REGISTRY_TOKEN`, `NUGET_API_KEY` and
-`PSGALLERY_API_KEY`. Release is started by hand; Release-from-Tag starts when a `v*` tag is
+`publish-release` action (`.github/actions/publish-release`), which logs in to ghcr.io and to
+nuget.org and runs the release entry point `forge/Publish`, and finally dispatch
+`Update-Documentation`. The release job runs in the `release` environment and reads the secrets
+`REGISTRY_TOKEN` and `PSGALLERY_API_KEY` and the variable `NUGET_USER`. nuget.org is reached
+through Trusted Publishing: the job's OIDC token (`id-token: write`) is exchanged for an API key
+that lasts one hour. Release is started by hand; Release-from-Tag starts when a `v*` tag is
 pushed. See [Release Management](releases.md) for versions, pre-releases and what a release
 contains.
 

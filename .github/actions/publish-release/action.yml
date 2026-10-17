@@ -7,13 +7,17 @@
 # The version is the pushed tag when `tag` is given; otherwise it is GitVersion's MajorMinorPatch for
 # the checked-out commit, with `label` as its pre-release label. A pre-release never moves `latest`.
 #
+# nuget.org is reached through Trusted Publishing: the job's GitHub OIDC token is exchanged for a
+# one-hour API key just before publishing, so no long-lived NuGet key exists. The calling job needs
+# `id-token: write`, and nuget.org needs a trusted publishing policy for the calling workflow file.
+#
 # Usage (after checkout with full history and submodules, and ./.github/actions/common):
 #   - uses: ./.github/actions/publish-release
 #     with:
 #       tag: ${{ github.ref_name }}        # or label: rc1, or neither
 #       github-token: ${{ secrets.GITHUB_TOKEN }}
 #       registry-token: ${{ secrets.REGISTRY_TOKEN }}
-#       nuget-api-key: ${{ secrets.NUGET_API_KEY }}
+#       nuget-user: ${{ vars.NUGET_USER }}
 #       psgallery-api-key: ${{ secrets.PSGALLERY_API_KEY }}
 
 name: Publish Release
@@ -34,8 +38,8 @@ inputs:
   registry-token:
     description: Token that can push to ghcr.io
     required: true
-  nuget-api-key:
-    description: nuget.org API key for BuildAgent.Tool
+  nuget-user:
+    description: The nuget.org profile name that owns BuildAgent.Tool and its trusted publishing policy
     required: true
   psgallery-api-key:
     description: PowerShell Gallery API key for Docker-BuildAgent
@@ -51,11 +55,18 @@ runs:
         REGISTRY_USER: ${{ github.repository_owner }}
       run: echo "$REGISTRY_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
 
+    # Last step before publishing: the key it returns expires after one hour.
+    - name: Log in to NuGet (Trusted Publishing)
+      id: nuget-login
+      uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+      with:
+        user: ${{ inputs.nuget-user }}
+
     - name: Publish
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
-        NUGET_API_KEY: ${{ inputs.nuget-api-key }}
+        NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         PSGALLERY_API_KEY: ${{ inputs.psgallery-api-key }}
         RELEASE_TAG: ${{ inputs.tag }}
         RELEASE_LABEL: ${{ inputs.label }}
