@@ -140,8 +140,9 @@ Launchers ········► Image            (by published version, not by cod
 ### 1. A consumer runs `build <type>` (in the image, or on the host through the global tool or module)
 
 1. **On the host (launchers only):**
-   - The launcher resolves the image reference: its own version, unless overridden. Both launchers pin to their own version (2026-09-20 decision).
-   - It resolves the Docker host and forwards the explicit arguments. For the module, it also forwards module configuration at its own precedence tier.
+   - The launcher resolves the image reference: its own version, unless overridden (the module's `DockerImage` setting, the tool's `BUILD_AGENT_IMAGE` variable). Both launchers pin to their own version (2026-09-20 decision; 2026-10-25 decision on the host build launcher).
+   - It resolves the Docker host and forwards the explicit arguments. For the module, it also forwards module configuration at its own precedence tier. The tool forwards, by name only, the environment the build reads: the parameter environment names, the names the `.build/` map files read, and the CI variables (2026-10-25 decision on the host build launcher).
+   - In a GitHub workflow, the root `action.yml` installs the tool at the version of the tag it is used at and runs it, so the workflow inherits the same pinning.
    - It runs one container with the workspace mounted, and returns the container's exit status unchanged.
 2. **In the image:** `build` validates the type against the accepted set, and Build types starts the requested type.
 3. **Config:**
@@ -292,7 +293,7 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 - **What fails:** Docker is missing on the host, the image version cannot be pulled, or the workspace path cannot be mounted (Docker Desktop file sharing).
 - **Detection:** the docker exit status before the build starts.
 - **System response:** the launcher reports and exits non-zero. It never falls back to `latest` or to any other version.
-- **User sees:** the image reference, and whether the failure was the pull or the mount.
+- **User sees:** the image reference, and whether the failure was the pull or the mount. When `docker run` itself refuses (status 125), the tool says the mount was most likely refused and passes 125 through unchanged (2026-10-25 decision on the host build launcher).
 
 ### Release path
 

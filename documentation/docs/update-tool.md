@@ -1,13 +1,18 @@
 ---
 id: update-tool
-title: "Update and Rollback Tool"
+title: "Global Tool"
 sidebar_position: 15
 ---
 
-# Update and Rollback Tool
+# Global Tool
 
-The update tool replaces a running container with one built from a newer image, waits for the
-replacement to report healthy, and puts the original back if it does not.
+The global tool runs builds from the host and updates running containers:
+
+- `build-agent build` runs a build in the image of the tool's own version, with the current
+  directory as the workspace, without a `docker run` line. See [Running a build](#running-a-build).
+- `build-agent update` replaces a running container with one built from a newer image, waits for
+  the replacement to report healthy, and puts the original back if it does not. See
+  [Commands](#commands).
 
 The tool is the .NET global tool `BuildAgent.Tool`, and its command is `build-agent`:
 
@@ -155,6 +160,9 @@ next update refuse (exit 22) until you remove it. A log line that cannot be pars
 every update on the host, with exit 22, until it is corrected.
 
 ## Exit statuses
+
+The statuses of `build-agent update`; those of `build-agent build` are under
+[Running a build](#running-a-build).
 
 | Status | Meaning |
 |---|---|

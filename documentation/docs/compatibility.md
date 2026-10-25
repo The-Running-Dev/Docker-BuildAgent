@@ -20,7 +20,8 @@ documented behaviour, on a protected surface. The protected surfaces are:
 - **The image**, at least its invocation: the entrypoint, the accepted build types, the mounts,
   and the environment inputs.
 - **The build command** (`build`).
-- **The global tool.**
+- **The global tool** (`build-agent build` and `build-agent update`), and the GitHub Action at the
+  repository root: its inputs `type`, `args`, `version` and `working-directory`.
 - **Project configuration.**
 - **Docker-template discovery.**
 - **The PowerShell module.**

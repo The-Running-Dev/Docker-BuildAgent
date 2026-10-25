@@ -108,6 +108,29 @@ This runs the `node` build type with all its [targets](targets#node) and default
 
 This generates a formatted changelog from the Git commit history and saves it to `CHANGELOG.md`. Dates use the format `yyyy.MM.dd`, and commits are grouped by date, newest first.
 
+## Run It Without docker run
+
+The examples above spell out the `docker run` line. The global tool `build-agent` runs the same
+builds from the host: it runs the image of its own version, mounts the current directory, connects
+the container to your Docker host and forwards the variables the build reads by name only.
+
+```bash
+dotnet tool install --global BuildAgent.Tool
+build-agent build docker
+build-agent build forge --change-log-source all
+```
+
+In a GitHub workflow, the repository's own action does the same:
+
+```yaml
+- uses: The-Running-Dev/Docker-BuildAgent@v2.0.0
+  with:
+    type: docker
+```
+
+See [Running a build](update-tool#running-a-build) and [GitHub Actions](ci-cd#build-agent-action).
+The tool and the action are published from release 2.0.0 on.
+
 ## Learn More
 
 These examples show the common cases. For every build type, parameter and advanced scenario:

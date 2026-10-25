@@ -21,7 +21,8 @@ Docker-BuildAgent is a build image built on [NUKE](https://nuke.build/). It stan
 - A dry-run mode for safe testing
 - Change log generation from the Git history, with customizable formatting
 - The Forge build system, which provides five build types (`docker`, `node`, `node-in-docker`, `node-template`, `forge`)
-- An optional [project configuration file](project-configuration.md), a [PowerShell module](powershell-module.md) and an [update and rollback tool](update-tool.md)
+- An optional [project configuration file](project-configuration.md), a [PowerShell module](powershell-module.md) and a [global tool](update-tool.md), `build-agent`, that runs builds from the host and updates running containers with rollback
+- A [GitHub Action](ci-cd.md#build-agent-action), `uses: The-Running-Dev/Docker-BuildAgent@<tag>`, that runs a build pinned to the image of the same version
 
 The tools in the image (Node.js, the Angular CLI, PowerShell, the .NET SDKs, Git and GitVersion) are listed in [What the image contains](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/README.md#what-the-image-contains).
 

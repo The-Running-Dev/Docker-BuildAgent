@@ -356,14 +356,39 @@ build-agent update --clear-lock <container>
 
 - `build` accepts the same five types and the same parameter names as the in-image
   command (I29). It launches the versioned image matching the tool's own version
-  and never substitutes another (I27).
+  and never substitutes another (I27). The one override is the environment variable
+  `BUILD_AGENT_IMAGE`, not an option, so no build parameter name is taken; a tool
+  packed without a release version refuses with 5 (`ImageUnavailable`) unless it is
+  set (2026-10-25 decision on the host build launcher).
+- `build` mounts the current directory as the image's working directory. An unset or
+  `npipe://` `DOCKER_HOST` becomes the mounted `/var/run/docker.sock`; a `unix://`
+  socket is mounted at its own path; a `tcp://` host is passed as it is.
+- `build` forwards environment by name only (`-e NAME`, never a value), and only the
+  variables set and non-empty on the host among: the published parameter environment
+  names; the names the workspace's `.build/.build.env.map` and `.build/.app.env.map`
+  read (`env:X` or bare `X`, not `const:`); and `CI`, `GH_TOKEN` and `GITHUB_*` other
+  than those holding host paths. The logged command hides the build arguments (I25).
 - `update` defaults `--image` to the target container's image reference resolved
   afresh against the registry, and `--health-timeout` to 120 seconds.
 - `--no-restore` disables automatic restore; restore is the default.
 - `--clear-lock` is the only operator action that removes a lock it does not own
   (I31). It takes no other action and never touches the target.
 
-Exit statuses:
+Exit statuses of `build`: the container's own status, unchanged (I28), or, before the
+container starts:
+
+| Status | Outcome |
+| --- | --- |
+| 1 | No type, or a type outside the accepted set; the usage is printed |
+| 3 | `WorkspaceInvalid` |
+| 5 | `DockerUnavailable` or `ImageUnavailable` |
+
+A `docker run` status of 125 means the container never started. The tool says the
+workspace or socket mount was most likely refused, names the image, and passes 125
+through unchanged; it is not mapped to `WorkspaceInvalid` (2026-10-25 decision on the
+host build launcher).
+
+Exit statuses of `update`:
 
 | Status | Outcome |
 | --- | --- |
@@ -390,6 +415,24 @@ containers (2026-09-20 decision). Every status above is verified automatically o
 Linux. On Windows only what needs no live daemon — argument translation, Docker host
 resolution, path and mount handling — is covered. Live-daemon update behaviour on a
 Windows host is a stated, unverified gap, and no document may describe it as verified.
+
+**GitHub Action.** The repository root `action.yml` is a composite action over `build`
+(2026-10-25 decision on the host build launcher):
+
+```text
+uses: The-Running-Dev/Docker-BuildAgent@v<version>
+with: type, args, version, working-directory
+```
+
+- `type` is required and passed as `build`'s type. `args` is split on whitespace and
+  never evaluated, so a value cannot contain spaces.
+- `version` defaults to the version of the `v<semver>` tag the action is used at. At a
+  branch or commit with no `version`, the action fails; it never chooses a version,
+  and never `latest` (I27).
+- It installs `BuildAgent.Tool` of that version into the runner's temporary directory
+  and runs `build-agent build` in `working-directory` (default: the checkout). Secrets
+  reach the build through the step's environment, forwarded by name; the step's status
+  is the build's.
 
 ### PowerShell module
 
@@ -530,7 +573,7 @@ never becomes a takeover (I31).
 | `DockerUnavailable` | The daemon cannot be reached | Yes | Exit 5 |
 | `ImageUnavailable` | The configured image cannot be obtained | Yes | Exit 5; never substitute a version (I27) |
 | `WorkspaceInvalid` | The workspace path is absent or not a directory | No | Exit 3 |
-| `BuildFailed` | The container exited non-zero | No | Propagate the status unchanged (I28) |
+| `BuildFailed` | The container exited non-zero | No | Propagate the status unchanged (I28); for the global tool, a `docker run` status of 125 also gets the mount diagnostic |
 
 ### Docs check — `DocsCheckError(DocsCheckErrorCode Code, string Document, string Name, string Message)`
 

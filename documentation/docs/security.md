@@ -33,6 +33,10 @@ report a vulnerability, follow the
 - Build output strips GitHub personal access tokens and URL hosts from the values it displays,
   and the parameter display leaves out `RegistryToken`. The PowerShell module prints "arguments
   hidden for security" instead of the argument list.
+- `build-agent build` and the GitHub Action forward environment variables to the container by
+  name only (`-e NAME`), so a secret's value never appears on the `docker run` command line, in
+  the process list or in the log, and the logged command hides the build arguments. Pass a secret
+  through its environment variable, not as an argument.
 - A path that logs a secret or writes one to disk is a vulnerability. Report it.
 
 ## Image vulnerabilities
