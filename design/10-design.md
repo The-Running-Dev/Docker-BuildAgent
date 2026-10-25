@@ -354,8 +354,8 @@ Steps 1–3 change nothing and take no lock. Step 4 creates the lock and step 5 
 
 **.NET tool feed and PowerShell Gallery**
 
-- **What fails:** a key is missing, the feed rejects a duplicate, or indexing is delayed.
-- **Detection:** push response. A version-visibility check runs as part of the existence check.
+- **What fails:** the Trusted Publishing login to nuget.org fails, the PowerShell Gallery key is missing, the feed rejects a duplicate, or indexing is delayed (2026-10-17 decision on Trusted Publishing).
+- **Detection:** the login step, then the push response. A version-visibility check runs as part of the existence check.
 - **Consequence:** a feed rejecting a duplicate is a second line of defence, not the check. An indexing delay can make a just-published package invisible to a re-run's existence check; the claim, not feed visibility, is what the resume logic keys on.
 
 **Git tag**
