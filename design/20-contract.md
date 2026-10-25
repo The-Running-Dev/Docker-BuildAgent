@@ -663,7 +663,10 @@ reused, so the numbering carries gaps.
 *U-1 was resolved by the 2026-10-06 decision on the tool's identity and is struck. The
 tool is `BuildAgent.Tool` on nuget.org, invoked as `build-agent`; the module goes to the
 PowerShell Gallery under its settled name; the repository owner holds both listings, and
-their keys are repository secrets that only the release workflow reads.*
+only the release workflows publish to them. nuget.org is reached through Trusted Publishing,
+a one-hour key exchanged for the workflow's OIDC token against a policy per release workflow
+restricted to the `release` environment; the PowerShell Gallery key is a secret of that
+environment (2026-10-17 decision on Trusted Publishing).*
 
 *U-2, U-3 and U-4 were resolved by the 2026-09-20 decisions and are struck.*
 
