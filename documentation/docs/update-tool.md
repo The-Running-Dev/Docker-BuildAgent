@@ -28,6 +28,48 @@ Packing without `ReleaseVersion` fails: a release stamps the tool's version, and
 supplies its own.
 :::
 
+## Running a build
+
+```text
+build-agent build <type> [--<parameter> <value>]...
+```
+
+`build-agent build` runs the same build as `build <type>` inside the image, from the host. It
+accepts the same build types (`docker`, `node`, `node-in-docker`, `node-template`, `forge`) and
+the same parameters as [Parameters](parameters.md) lists, and passes them to the image unchanged.
+
+- **Image.** It runs `ghcr.io/the-running-dev/build-agent:<version>`, where `<version>` is the
+  tool's own version, pulling it if it is not present. It never runs another version in its
+  place. To run a different image, such as one built locally, set `BUILD_AGENT_IMAGE` to its
+  reference. A tool packed without a release version has no image of its own and refuses to run
+  unless `BUILD_AGENT_IMAGE` is set.
+- **Workspace.** The current directory is mounted at `/workspace`.
+- **Docker.** The container reaches the host's Docker daemon through `DOCKER_HOST`. When it is
+  unset or a Windows named pipe, the tool mounts `/var/run/docker.sock`; a `unix://` socket is
+  mounted at the same path; a `tcp://` host is passed as it is.
+- **Environment.** The tool forwards, by name only, the variables the build reads that are set and
+  not empty on the host: the environment names in [Parameters](parameters.md), the variables named
+  in the workspace's `.build/.build.env.map` and `.build/.app.env.map`, and `CI`, `GH_TOKEN` and
+  the `GITHUB_*` variables other than those holding host paths. Values never appear on the
+  `docker run` command line or in the output, and the logged command hides the build arguments.
+  Pass a secret through its environment variable rather than as an argument.
+
+The exit status is the container's own, unchanged. Before the build starts the tool can also
+fail with:
+
+| Status | Meaning |
+|---|---|
+| 1 | No build type, or one the image does not accept. The usage is printed. |
+| 3 | `WorkspaceInvalid`: the current directory does not exist. |
+| 5 | `DockerUnavailable`: `docker` is not on `PATH` or the daemon does not answer. `ImageUnavailable`: the image could not be pulled, or the tool has no version and `BUILD_AGENT_IMAGE` is not set. |
+
+If `docker run` itself exits 125, the container never started; the tool says that the mount of
+the workspace or the Docker socket was most likely refused (on Docker Desktop, check file
+sharing), and still exits 125.
+
+In GitHub Actions, the repository's own action installs the tool and runs this command; see
+[GitHub Actions](ci-cd.md#build-agent-action).
+
 ## Commands
 
 ```text

@@ -1,0 +1,70 @@
+name: build-agent build
+description: Runs a build-agent build in the versioned build-agent image, through the BuildAgent.Tool global tool.
+author: The-Running-Dev
+
+# A consumer pins this action to a release tag (uses: The-Running-Dev/Docker-BuildAgent@vX.Y.Z); the tool of that
+# version runs the image of that version (contract § Global tool, I27). Parameters with secrets go through `env:`
+# under their published environment names, never through `args`: the tool forwards them by name only (I25).
+inputs:
+  type:
+    description: The build type, one of docker, node, node-in-docker, node-template, forge.
+    required: true
+  args:
+    description: >-
+      Build parameters passed verbatim to `build-agent build <type>`, split on whitespace
+      (for example `--dry-run true --image-tag my-app`). A value cannot contain spaces.
+    required: false
+    default: ""
+  version:
+    description: >-
+      BuildAgent.Tool version to run. Defaults to the version of the tag this action is used at;
+      required when the action is used at a branch or commit.
+    required: false
+    default: ""
+  working-directory:
+    description: The workspace to build. Defaults to the repository checkout.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve Version
+      id: version
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        ACTION_REF: ${{ github.action_ref }}
+      run: |
+        version="$INPUT_VERSION"
+        if [ -z "$version" ]; then
+          if [[ "$ACTION_REF" =~ ^v([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?)$ ]]; then
+            version="${BASH_REMATCH[1]}"
+          else
+            echo "::error::build-agent is used at '$ACTION_REF', which is not a release tag; set the 'version' input. No version is chosen in its place."
+            exit 1
+          fi
+        fi
+        echo "value=${version#v}" >> "$GITHUB_OUTPUT"
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Install build-agent
+      shell: bash
+      env:
+        TOOL_VERSION: ${{ steps.version.outputs.value }}
+      run: |
+        dotnet tool install BuildAgent.Tool --version "$TOOL_VERSION" --tool-path "$RUNNER_TEMP/build-agent-tool"
+
+    - name: Build
+      shell: bash
+      working-directory: ${{ inputs.working-directory || github.workspace }}
+      env:
+        BUILD_TYPE: ${{ inputs.type }}
+        BUILD_ARGS: ${{ inputs.args }}
+      run: |
+        read -ra arguments <<< "$BUILD_ARGS"
+        "$RUNNER_TEMP/build-agent-tool/build-agent" build "$BUILD_TYPE" "${arguments[@]}"

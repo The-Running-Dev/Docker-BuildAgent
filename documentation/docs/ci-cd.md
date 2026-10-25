@@ -139,6 +139,53 @@ refused.
 The examples below run in your repository and use Docker-BuildAgent image. They are starting
 points; for the workflows this repository itself runs, read the files in `.github/workflows`.
 
+## build-agent action
+
+The repository root holds a composite action that installs the global tool `BuildAgent.Tool` and
+runs [`build-agent build`](update-tool.md#running-a-build) on the runner. Use it at a release tag:
+the tool of that version runs the image of that version, so the build is pinned without naming an
+image.
+
+```yaml
+name: Docker-CI
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  Docker-CI:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Docker CI
+        uses: The-Running-Dev/Docker-BuildAgent@v2.0.0
+        with:
+          type: docker
+          args: --image-tag my-app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+```
+
+| Input | Meaning |
+|---|---|
+| `type` | The build type. Required. |
+| `args` | Parameters passed to the build unchanged, split on whitespace, so a value cannot contain spaces. Default: none. |
+| `version` | The `BuildAgent.Tool` version to install. Default: the version of the tag the action is used at. Required when the action is used at a branch or commit; no version is chosen in its place. |
+| `working-directory` | The workspace to build. Default: the repository checkout. |
+
+Secrets go in the step's `env:` under their environment names from [Parameters](parameters.md),
+never in `args`: the tool forwards them to the container by name, so their values never reach the
+command line or the log. The step fails with the build's own exit status.
+
+The runner needs Docker; GitHub's Ubuntu runners have it. The action needs a released
+`BuildAgent.Tool` on nuget.org, so it works from the first release that publishes the tool.
+
 ## Docker Image
 
 This workflow builds and pushes a Docker image using Docker-BuildAgent. It checks out your repository, runs the `build docker` command, and passes required secrets for authentication.

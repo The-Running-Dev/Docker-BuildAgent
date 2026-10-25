@@ -112,7 +112,8 @@ jobs:
             echo "::error::build-agent with no arguments should exit non-zero with its usage."
             exit 1
           fi
-          grep -q '^Usage: build-agent update' "$RUNNER_TEMP/usage.txt"
+          grep -q '^Usage: build-agent build' "$RUNNER_TEMP/usage.txt"
+          grep -q 'build-agent update' "$RUNNER_TEMP/usage.txt"
 
       # Run the Docker build in dry-run mode for validation
       - name: Validate Build
