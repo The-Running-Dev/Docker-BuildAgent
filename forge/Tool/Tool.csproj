@@ -17,7 +17,7 @@
     <PackageId>BuildAgent.Tool</PackageId>
     <ToolCommandName>build-agent</ToolCommandName>
     <Authors>The-Running-Dev</Authors>
-    <Description>Runs build-agent builds and updates a running container to a newer image with health-checked rollback.</Description>
+    <Description>Runs build-agent builds in the versioned image from the host and updates a running container to a newer image with health-checked rollback.</Description>
     <PackageProjectUrl>https://build-agent.subzerodev.com/docs/update-tool</PackageProjectUrl>
     <RepositoryUrl>https://github.com/The-Running-Dev/Docker-BuildAgent</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
@@ -26,6 +26,11 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Version Condition="'$(ReleaseVersion)' != ''">$(ReleaseVersion)</Version>
   </PropertyGroup>
+
+  <!-- The launcher runs the image of this version (I27); a build without one has no image of its own. -->
+  <ItemGroup Condition="'$(ReleaseVersion)' != ''">
+    <AssemblyMetadata Include="BuildAgentReleaseVersion" Value="$(ReleaseVersion)" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Update\Update.csproj" />

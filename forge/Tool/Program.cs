@@ -6,13 +6,25 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using Launcher;
 using Update;
 
 var arguments = args;
+if (arguments.Length > 0 && arguments[0] == "build")
+{
+    if (arguments.Length < 2 || !BuildInvocation.AcceptedBuildTypes.Contains(arguments[1]))
+    {
+        Console.Error.WriteLine($"build-agent build needs a build type, one of: {string.Join(", ", BuildInvocation.AcceptedBuildTypes)}.");
+        WriteUsage();
+        return 1;
+    }
+
+    return await RunBuildAsync(arguments[1], arguments.Skip(2).ToList());
+}
+
 if (arguments.Length == 0 || arguments[0] != "update")
 {
-    Console.Error.WriteLine("Usage: build-agent update <container> [--image <reference>] [--health-timeout <duration>] [--no-restore] [--notify <url>]");
-    Console.Error.WriteLine("       build-agent update --clear-lock <container>");
+    WriteUsage();
     return 1;
 }
 
@@ -40,6 +52,45 @@ switch (command)
 
     default:
         throw new InvalidOperationException("unreachable");
+}
+
+static void WriteUsage()
+{
+    Console.Error.WriteLine("Usage: build-agent build <type> [--<parameter> <value>]...");
+    Console.Error.WriteLine("       build-agent update <container> [--image <reference>] [--health-timeout <duration>] [--no-restore] [--notify <url>]");
+    Console.Error.WriteLine("       build-agent update --clear-lock <container>");
+}
+
+// design/20-contract.md § Global tool: runs the versioned image matching this tool's own version (I27) and exits
+// with the container's status unchanged (I28).
+static async Task<int> RunBuildAsync(string type, IReadOnlyList<string> buildArguments)
+{
+    var launcher = new BuildLauncher(new DockerCli(), Console.WriteLine, Console.Error.WriteLine);
+    string image;
+    try
+    {
+        image = BuildInvocation.ResolveImage(
+            BuildInvocation.ToolReleaseVersion(typeof(BuildInvocation).Assembly),
+            Environment.GetEnvironmentVariable);
+    }
+    catch (LauncherException ex)
+    {
+        Console.Error.WriteLine($"{ex.Error.Code}: {ex.Message}");
+        return ex.ExitStatus;
+    }
+
+    var workspace = Environment.CurrentDirectory;
+    var hostEnvironment = Environment.GetEnvironmentVariables()
+        .Cast<System.Collections.DictionaryEntry>()
+        .ToDictionary(e => (string)e.Key, e => (string?)e.Value ?? string.Empty, StringComparer.Ordinal);
+
+    return await launcher.RunAsync(
+        image,
+        workspace,
+        type,
+        buildArguments,
+        BuildInvocation.ResolveDockerHost(Environment.GetEnvironmentVariable("DOCKER_HOST")),
+        BuildInvocation.ForwardedEnvironment(workspace, hostEnvironment));
 }
 
 static async Task<int> RunClearLockAsync(IDockerRuntime runtime, string containerName)

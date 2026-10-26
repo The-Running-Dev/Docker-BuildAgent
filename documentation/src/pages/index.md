@@ -12,7 +12,7 @@ hide_table_of_contents: false
 [![License](https://img.shields.io/badge/License-MIT-blue?logo=opensourceinitiative&logoColor=white)](https://github.com/the-running-dev/Docker-BuildAgent/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/Docs-Live-blue?logo=gitbook&logoColor=white)](https://build-agent.subzerodev.com)
 
-Docker-BuildAgent is a container image that carries the tooling for building JavaScript/TypeScript, Node.js, Angular, .NET and PowerShell projects, plus a build command (`build`) that runs a standard build for your project. Use it in GitHub Actions or any other CI system that can run a container.
+Docker-BuildAgent is a container image that carries the tooling for building JavaScript/TypeScript, Node.js, Angular, .NET and PowerShell projects, plus a build command (`build`) that runs a standard build for your project. Use it in GitHub Actions or any other CI system that can run a container, or run it from your own machine with the `build-agent` .NET global tool.
 
 Canonical contract (image, build command, Docker-template discovery): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
 
@@ -27,7 +27,7 @@ The documentation site at [build-agent.subzerodev.com](https://build-agent.subze
 - [GitHub Actions](https://build-agent.subzerodev.com/docs/ci-cd): example workflows and this repository's own
 - [Release Management](https://build-agent.subzerodev.com/docs/releases) and [Compatibility and Support](https://build-agent.subzerodev.com/docs/compatibility)
 - [Security Model](https://build-agent.subzerodev.com/docs/security)
-- [PowerShell Module](https://build-agent.subzerodev.com/docs/powershell-module) and [Update and Rollback Tool](https://build-agent.subzerodev.com/docs/update-tool)
+- [PowerShell Module](https://build-agent.subzerodev.com/docs/powershell-module) and [Global Tool](https://build-agent.subzerodev.com/docs/update-tool) (`build-agent build` from the host, and container update and rollback)
 - [Development Guide](https://build-agent.subzerodev.com/docs/architecture/development-guide)
 - [Troubleshooting & FAQ](https://build-agent.subzerodev.com/docs/troubleshooting) and [Project Status](https://build-agent.subzerodev.com/docs/status)
 
@@ -89,7 +89,33 @@ docker run --rm -it \
 
 If your project has no `Dockerfile`, the agent looks for a matching template; see [Docker Templates](https://build-agent.subzerodev.com/docs/docker-templates).
 
+### From the host, with the global tool
+
+The .NET global tool `BuildAgent.Tool` (command `build-agent`) runs the same build without the `docker run` line. It runs the image of its own version, mounts the current directory at `/workspace`, connects the container to your Docker host, and forwards the environment variables the build reads by name only, so secret values never reach the command line:
+
+```bash
+dotnet tool install --global BuildAgent.Tool
+build-agent build docker --image-tag my-app
+```
+
+The tool is published from release 2.0.0 on; until then, pack it from a checkout as [Global Tool](https://build-agent.subzerodev.com/docs/update-tool) shows. Set `BUILD_AGENT_IMAGE` to run another image, such as one you built locally.
+
 ## Use it in GitHub Actions
+
+The repository is also a GitHub Action. Used at a release tag, it installs the global tool of that version and runs `build-agent build`, so the build is pinned to the image of the same version:
+
+```yaml
+      - name: Docker CI
+        uses: The-Running-Dev/Docker-BuildAgent@v2.0.0
+        with:
+          type: docker
+          args: --image-tag my-app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RegistryToken: ${{ secrets.REGISTRY_TOKEN }}
+```
+
+Its inputs are in [GitHub Actions](https://build-agent.subzerodev.com/docs/ci-cd#build-agent-action). To run the job inside the image instead:
 
 ```yaml
 name: Container-CI

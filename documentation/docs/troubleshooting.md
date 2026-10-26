@@ -31,6 +31,19 @@ the exit status. [Exit Codes](./exit-codes.md) says what each status means.
   - Pass secrets from your CI system's secret store.
 - **The Docker daemon is unreachable:**
   - Mount the socket with `-v /var/run/docker.sock:/var/run/docker.sock`, or set `DOCKER_HOST` to a reachable daemon.
+- **`build-agent build` exits 125 and says a mount was most likely refused:**
+  - `docker run` refused to start the container, usually because Docker cannot share the current directory or
+    the Docker socket. On Docker Desktop, add the drive or folder under Settings > Resources > File sharing, and
+    run the tool from a directory inside it.
+- **`build-agent build` exits 5:**
+  - `DockerUnavailable`: `docker` is not on `PATH` or the daemon does not answer. Start Docker and check
+    `docker info`.
+  - `ImageUnavailable`: the image of the tool's version could not be pulled, or the tool was packed without a
+    release version. Check the registry is reachable, or set `BUILD_AGENT_IMAGE` to an image you have.
+- **A variable is set on the host but the build inside `build-agent build` does not see it:**
+  - The tool forwards only the variables the build reads: the environment names in
+    [Parameters](./parameters.md), those named in `.build/.build.env.map` and `.build/.app.env.map`, and `CI`,
+    `GH_TOKEN` and `GITHUB_*`. A variable set to an empty value is not forwarded. Add the name to the map file.
 - **`No Dockerfile Template exists for application type`:**
   - The project has no Dockerfile at the configured path, and no `Dockerfile.<type>` exists for the detected type.
     The image ships templates for `angular` and `node` only. See [Docker Templates](./docker-templates.md).

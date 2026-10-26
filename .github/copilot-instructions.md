@@ -42,7 +42,7 @@ The parameters of each type are listed in `documentation/docs/parameters.md`, an
 | `Release` | Release version, release claim, release notes composition and validation; the release pipeline, its sink publishers and packagers | `Release.Tests` | Types (Release version, Release claim); Error semantics (Release pipeline) |
 | `Publish` | The release entry point the release workflows run through `.github/actions/publish-release`; it refuses to run outside CI | none (its parts are tested in `Release.Tests`) | Types (Release version); Error semantics (Release pipeline) |
 | `Update` | The container updater: health check, rollback, lock and update log | `Update.Tests` | Types (Container update, Prior image pin and prior container); Persisted schemas (Update log); Error semantics (Updater) |
-| `Tool` | The global tool `BuildAgent.Tool`, command `build-agent`; today it handles the `update` command and calls `Update`. Packing needs `-p:ReleaseVersion=<version>` | none | Global tool |
+| `Tool` | The global tool `BuildAgent.Tool`, command `build-agent`; it handles `build` (the host launcher in `forge/Tool/Launcher/`, which runs `docker run` on the image of the tool's own version) and `update` (which calls `Update`). Packing needs `-p:ReleaseVersion=<version>` | none | Global tool |
 | `DocsCheck` | Checks that the documentation names real paths, commands, parameters and build types, and the canonical-contract rules | `DocsCheck.Tests` | Error semantics (Docs check) |
 
 How the projects relate:
@@ -219,7 +219,7 @@ Build the solution first (the local `build.ps1` does this), then run the type th
 
 ## GitHub Actions
 
-The workflows are in `.github/workflows/`; shared steps are in `.github/actions/common` (environment setup) and `.github/actions/tests` (tests and coverage). `documentation/docs/ci-cd.md` describes each workflow.
+The workflows are in `.github/workflows/`; shared steps are in `.github/actions/common` (environment setup) and `.github/actions/tests` (tests and coverage). `documentation/docs/ci-cd.md` describes each workflow. The root `action.yml` is the public composite action consumers use (`uses: The-Running-Dev/Docker-BuildAgent@vX.Y.Z`): it installs `BuildAgent.Tool` of the tag's version and runs `build-agent build`. Its inputs are public surface.
 
 | Workflow | Trigger |
 |---|---|

@@ -6,8 +6,11 @@ sidebar_position: 17
 
 A script or CI step decides what to do from the exit status of `build`. This page lists every status the
 build command returns, what causes it, and what to do about it. The
-[update tool](./update-tool.md) and the [PowerShell module](./powershell-module.md) have statuses of
-their own, which those pages list.
+[global tool](./update-tool.md) and the [PowerShell module](./powershell-module.md) have statuses of
+their own, which those pages list. When `build-agent build` or the
+[GitHub Action](./ci-cd.md#build-agent-action) runs the build, the status below comes back
+unchanged; the tool adds its own only when the build never started (see
+[Where the statuses come from](#where-the-statuses-come-from)).
 
 The last column says whether the status exists in the code today. Statuses marked **contract only** are
 promised by [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)
@@ -43,5 +46,11 @@ so no target starts, and no artifact or image changes.
 - A launcher does not change the status: the PowerShell module raises a terminating error carrying the
   container's status, so `2` passes through. The module adds statuses 3 and 5 for faults it finds before
   the container starts. See [Errors](./powershell-module.md#errors).
+- `build-agent build`, and the [GitHub Action](./ci-cd.md#build-agent-action) that runs it, exit with
+  the container's status unchanged. Before the container starts the tool can exit 1 (no build type, or
+  one the image does not accept), 3 (`WorkspaceInvalid`) or 5 (`DockerUnavailable`,
+  `ImageUnavailable`). If `docker run` itself exits 125, the container never started: the tool prints
+  that a mount was most likely refused and still exits 125. See
+  [Running a build](./update-tool.md#running-a-build).
 
 Canonical contract (build command): [design/20-contract.md](https://github.com/The-Running-Dev/Docker-BuildAgent/blob/main/design/20-contract.md)

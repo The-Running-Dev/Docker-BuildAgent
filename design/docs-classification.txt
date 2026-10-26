@@ -30,7 +30,7 @@ documentation/docs/project-configuration.md	reference	design/20-contract.md	The 
 documentation/docs/release-notes/2.0.0.md	reference	PSModule.requirements.md	Release notes; the module change is the surface it explains.
 documentation/docs/releases.md	reference	design/20-contract.md	Release process; shows the build command.
 documentation/docs/security.md	reference	design/20-contract.md	The security model: what the image trusts, secrets and image vulnerabilities.
-documentation/docs/update-tool.md	reference	design/20-contract.md	The update and rollback tool: commands and exit statuses.
+documentation/docs/update-tool.md	reference	design/20-contract.md	The global tool: build-agent build and build-agent update, their options and exit statuses.
 documentation/src/pages/index.md	reference	design/20-contract.md	The site landing page; mirrors the README.
 
 documentation/docs/advanced.md	non-overlapping	-	Names no protected-surface name the docs check covers.
