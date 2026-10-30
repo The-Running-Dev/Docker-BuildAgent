@@ -29,7 +29,7 @@ public sealed class PackageSinkPublisherTests : IDisposable
     {
         Directory.CreateDirectory(_work);
         _package = Path.Combine(_work, "BuildAgent.Tool.2.1.0-RC1.nupkg");
-        File.WriteAllBytes(_package, Zip(("BuildAgent.Tool.nuspec", "<package />"), ("tools/net8.0/any/Tool.dll", "binary")));
+        File.WriteAllBytes(_package, Zip(("BuildAgent.Tool.nuspec", Nuspec("2.1.0-RC1")), ("tools/net8.0/any/Tool.dll", "binary")));
     }
 
     public void Dispose() => Directory.Delete(_work, recursive: true);
@@ -43,7 +43,7 @@ public sealed class PackageSinkPublisherTests : IDisposable
     [Fact]
     public async Task FindPublished_HashesTheFeedsCopy_AndIgnoresTheFeedsSignature()
     {
-        var signed = Zip(("BuildAgent.Tool.nuspec", "<package />"), ("tools/net8.0/any/Tool.dll", "binary"), (".signature.p7s", "signature"));
+        var signed = Zip(("BuildAgent.Tool.nuspec", Nuspec("2.1.0-RC1")), ("tools/net8.0/any/Tool.dll", "binary"), (".signature.p7s", "signature"));
         var http = Respond(HttpStatusCode.OK, signed);
         var publisher = Publisher(new FakeCommandRunner(), http);
 
@@ -56,7 +56,8 @@ public sealed class PackageSinkPublisherTests : IDisposable
     [Fact]
     public async Task FindPublished_ReportsADifferentPackage()
     {
-        var publisher = Publisher(new FakeCommandRunner(), Respond(HttpStatusCode.OK, Zip(("BuildAgent.Tool.nuspec", "<other />"))));
+        // The feed may write the version in another case; it is still the same version.
+        var publisher = Publisher(new FakeCommandRunner(), Respond(HttpStatusCode.OK, Zip(("BuildAgent.Tool.nuspec", Nuspec("2.1.0-rc1")))));
 
         Assert.NotEqual(publisher.BuiltIdentity, await publisher.FindPublishedIdentityAsync(Version));
     }
@@ -65,6 +66,23 @@ public sealed class PackageSinkPublisherTests : IDisposable
     public async Task FindPublished_IsNull_WhenTheFeedDoesNotHaveTheVersion()
     {
         Assert.Null(await Publisher(new FakeCommandRunner(), Respond(HttpStatusCode.NotFound)).FindPublishedIdentityAsync(Version));
+    }
+
+    [Fact]
+    public async Task FindPublished_IsNull_WhenTheFeedServesAnotherVersion()
+    {
+        // The PowerShell Gallery answers a version it does not have with the module's latest.
+        var latest = Zip(("BuildAgent.Tool.nuspec", Nuspec("2.0.0")), ("tools/net8.0/any/Tool.dll", "binary"));
+
+        Assert.Null(await Publisher(new FakeCommandRunner(), Respond(HttpStatusCode.OK, latest)).FindPublishedIdentityAsync(Version));
+    }
+
+    [Fact]
+    public async Task FindPublished_Throws_WhenTheServedPackageHasNoNuspec()
+    {
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Publisher(new FakeCommandRunner(), Respond(HttpStatusCode.OK, Zip(("tools/net8.0/any/Tool.dll", "binary")))).FindPublishedIdentityAsync(Version));
+        Assert.Contains("no nuspec", ex.Message);
     }
 
     [Fact]
@@ -137,6 +155,9 @@ public sealed class PackageSinkPublisherTests : IDisposable
         new(ReleaseSink.GlobalTool, _package, "BuildAgent.Tool", Version, PackageFeed.NuGetOrg, ApiKey, runner, new HttpClient(http));
 
     private static RecordingHandler Respond(HttpStatusCode status, byte[]? body = null) => new(status, body);
+
+    private static string Nuspec(string version) =>
+        $"<package xmlns=\"http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd\"><metadata><id>BuildAgent.Tool</id><version>{version}</version></metadata></package>";
 
     private static byte[] Zip(params (string Path, string Content)[] entries)
     {
