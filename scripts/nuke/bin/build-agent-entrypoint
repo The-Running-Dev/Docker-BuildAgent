@@ -42,11 +42,12 @@ for signal in "${forwarded[@]}"; do
 done
 
 # wait returns early when a trapped signal arrives; keep waiting until the command has exited.
-while :; do
+# The last wait gives the command's own status, which bash keeps even once the child is reaped.
+while kill -0 "$child" 2> /dev/null; do
     wait "$child"
-    status=$?
-    kill -0 "$child" 2> /dev/null || break
 done
+wait "$child"
+status=$?
 
 stop-dockerd || :
 exit "$status"

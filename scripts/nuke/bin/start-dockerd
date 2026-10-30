@@ -7,6 +7,8 @@
 # the kernel supports, starts dockerd on unix:///var/run/docker.sock with its log in
 # /var/log/dockerd.log, and exits 0 once `docker info` answers. On failure it exits 1 and prints
 # the end of the log. Safe to call more than once: a running daemon is waited for, not restarted.
+# It refuses to start when something else already holds /var/run/docker.sock, such as the host's
+# socket mounted into the container, rather than report another daemon as its own.
 #
 # The cgroup and mount preparation follows moby's hack/dind
 # (https://github.com/moby/moby/blob/8d9e3502aba39127e4d12196dae16d306f76993d/hack/dind), without
@@ -14,8 +16,9 @@
 # docker:dind's dockerd-entrypoint.sh. Stop the daemon with stop-dockerd.
 #
 # Environment:
-#   BUILD_AGENT_DOCKERD          1 or true to start the daemon; anything else does nothing
-#   BUILD_AGENT_DOCKERD_TIMEOUT  seconds to wait for the daemon to answer (default 60)
+#   BUILD_AGENT_DOCKERD           1 or true to start the daemon; anything else does nothing
+#   BUILD_AGENT_DOCKERD_TIMEOUT   seconds to wait for the daemon to answer (default 60)
+#   BUILD_AGENT_DOCKERD_IPTABLES  nft or legacy to force an iptables backend (default: detected)
 
 set -euo pipefail
 
@@ -29,6 +32,7 @@ pid_file=/var/run/docker.pid
 log_file=/var/log/dockerd.log
 data_root=/var/lib/docker
 timeout="${BUILD_AGENT_DOCKERD_TIMEOUT:-60}"
+iptables_mode="${BUILD_AGENT_DOCKERD_IPTABLES:-}"
 
 log() { echo "start-dockerd: $*" >&2; }
 
@@ -64,6 +68,10 @@ wait_for_daemon() {
         fi
         sleep 1
     done
+    # Only this dockerd counts: an answer after it died came from some other daemon.
+    if ! kill -0 "$pid" 2> /dev/null; then
+        fail "dockerd exited, and another daemon answers on $socket."
+    fi
     log "dockerd is ready on unix://$socket"
 }
 
@@ -82,19 +90,41 @@ if (((16#$cap_eff >> 21 & 1) == 0)); then
     fail "BUILD_AGENT_DOCKERD is set but the container is not privileged (CAP_SYS_ADMIN is missing). Start it with --privileged, or unset BUILD_AGENT_DOCKERD."
 fi
 
+# dockerd cannot listen on a socket mounted from outside the container (GitHub Actions mounts the
+# host's into every job container), and a daemon already answering there is not this one.
+if mountpoint -q "$socket" || daemon_answers; then
+    fail "$socket is already in use, most likely by the host's Docker socket mounted into this container. Remove that mount, or unmount it first: umount $socket"
+fi
+
+case "$iptables_mode" in
+    '' | nft | legacy) ;;
+    *) fail "BUILD_AGENT_DOCKERD_IPTABLES must be nft or legacy, not '$iptables_mode'." ;;
+esac
+
+if [ -n "${DOCKER_HOST:-}" ] && [ "$DOCKER_HOST" != "unix://$socket" ]; then
+    log "WARNING: DOCKER_HOST is $DOCKER_HOST, so Docker clients in this container use that daemon, not this one. Unset DOCKER_HOST to use this one."
+fi
+
 # cgroup v2: move every process out of the root group so its controllers can be delegated to
 # the containers dockerd creates. Retried, because a `docker exec` can add a process to the root
-# group between the move and the write.
+# group between the move and the write; a write that keeps failing is an error.
 if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
     if ! [ -w /sys/fs/cgroup/cgroup.subtree_control ]; then
         fail "/sys/fs/cgroup is read-only; Docker-in-Docker needs --privileged."
     fi
     mkdir -p /sys/fs/cgroup/init
-    until {
+    attempt=0
+    until cgroup_error="$(
         xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2> /dev/null || :
-        sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers \
-            > /sys/fs/cgroup/cgroup.subtree_control 2> /dev/null
-    }; do :; done
+        sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers 2>&1 \
+            > /sys/fs/cgroup/cgroup.subtree_control
+    )"; do
+        attempt=$((attempt + 1))
+        if ((attempt >= 50)); then
+            fail "could not delegate the cgroup controllers after $attempt attempts: $cgroup_error"
+        fi
+        sleep 0.1
+    done
 fi
 
 # Let dockerd detect AppArmor, and make mounts propagate as they do under systemd.
@@ -104,14 +134,15 @@ if [ -d /sys/kernel/security ] && ! mountpoint -q /sys/kernel/security; then
 fi
 mount --make-rshared /
 
-# Use legacy iptables when this network namespace already holds legacy tables, else nft when
-# the kernel supports it, else legacy.
-iptables_mode=
-for tables in /proc/net/ip_tables_names /proc/net/ip6_tables_names /proc/net/arp_tables_names; do
-    if [ -r "$tables" ] && [ -n "$(cat "$tables" 2> /dev/null)" ]; then
-        iptables_mode=legacy
-    fi
-done
+# Unless BUILD_AGENT_DOCKERD_IPTABLES chose, use legacy iptables when this network namespace
+# already holds legacy tables, else nft when the kernel supports it, else legacy.
+if [ -z "$iptables_mode" ]; then
+    for tables in /proc/net/ip_tables_names /proc/net/ip6_tables_names /proc/net/arp_tables_names; do
+        if [ -r "$tables" ] && [ -n "$(cat "$tables" 2> /dev/null)" ]; then
+            iptables_mode=legacy
+        fi
+    done
+fi
 if [ -z "$iptables_mode" ]; then
     if iptables-nft -nL > /dev/null 2>&1; then
         iptables_mode=nft

@@ -36,7 +36,9 @@ docker run --rm --privileged \
 
 The daemon listens on `/var/run/docker.sock`, the CLI's default, so `DOCKER_HOST` stays unset and
 every Docker client in the container finds it without configuration. Do not also mount the host's
-socket at that path.
+socket at that path: `start-dockerd` then refuses to start, because the daemon could not listen
+there and every Docker command would reach the host instead. A `DOCKER_HOST` set to another daemon
+gets a warning, since Docker clients would use that daemon rather than this one.
 
 ## The contract
 
@@ -53,7 +55,8 @@ socket at that path.
 `start-dockerd` does nothing and exits 0 unless `BUILD_AGENT_DOCKERD` is `1` or `true`. Otherwise
 it checks that the container is privileged and runs as root, prepares nested cgroups, picks the
 `nft` or `legacy` iptables backend the kernel supports, starts `dockerd`, and exits 0 once the
-daemon answers. When the daemon does not answer in time, it stops it, prints the end of the log
+daemon answers. It exits 1 without starting anything when `/var/run/docker.sock` is a mount or
+another daemon already answers there. When the daemon does not answer in time, it stops it, prints the end of the log
 and exits 1. Calling it again while the daemon runs waits for that daemon and starts no second
 one.
 
@@ -64,6 +67,7 @@ It does nothing when no daemon runs, and exits 1 if the daemon is still running 
 |----------|---------|---------|
 | `BUILD_AGENT_DOCKERD_TIMEOUT` | `60` | Seconds `start-dockerd` waits for the daemon to answer |
 | `BUILD_AGENT_DOCKERD_STOP_TIMEOUT` | `30` | Seconds `stop-dockerd` waits for the daemon to exit |
+| `BUILD_AGENT_DOCKERD_IPTABLES` | detected | `nft` or `legacy` forces that iptables backend |
 
 ## Shutdown
 
@@ -73,6 +77,11 @@ the command, and once the command exits it runs `stop-dockerd` and exits with th
 status. When the daemon is off, the entrypoint replaces itself with the command, as the image did
 before it had an entrypoint.
 
+A container that `build-agent update` replaced from an image older than Docker-in-Docker keeps
+that image's entrypoint, `docker-entrypoint.sh`, because the update carries the container's
+entrypoint over. `BUILD_AGENT_DOCKERD` does nothing there; create the container again with
+`docker run` to get `build-agent-entrypoint`.
+
 ## Images built on this one
 
 An image that sets its own `ENTRYPOINT` replaces `build-agent-entrypoint`, so it starts and stops
@@ -80,8 +89,11 @@ the daemon itself. The simplest way is to run its own entrypoint through the ima
 
 ```dockerfile
 FROM ghcr.io/the-running-dev/build-agent@sha256:<digest>
-ENTRYPOINT ["build-agent-entrypoint", "/opt/entrypoint.sh"]
+ENTRYPOINT ["build-agent-entrypoint", "/bin/bash", "/opt/entrypoint.sh"]
 ```
+
+Name the interpreter as above. The command runs through the base image's `docker-entrypoint.sh`,
+which runs a file that is not executable with `node`.
 
 Otherwise, call `start-dockerd` before the main process and `stop-dockerd` after it exits. Both
 are safe to call when `BUILD_AGENT_DOCKERD` is unset. A script that ends in `exec` hands the
@@ -94,7 +106,9 @@ start-dockerd || exit 1
 child=$!
 trap 'kill -TERM "$child" 2> /dev/null' TERM INT
 # wait returns early when a signal arrives; keep waiting until the process has exited.
-while wait "$child"; status=$?; kill -0 "$child" 2> /dev/null; do :; done
+while kill -0 "$child" 2> /dev/null; do wait "$child"; done
+wait "$child"
+status=$?
 stop-dockerd
 exit "$status"
 ```
@@ -102,7 +116,8 @@ exit "$status"
 ## In GitHub Actions
 
 A job container is not privileged unless the workflow asks for it, and GitHub overrides the
-entrypoint, so start the daemon in a step:
+entrypoint, so start the daemon in a step. GitHub also mounts the runner's Docker socket at
+`/var/run/docker.sock` in every job container; unmount it first, so the daemon can listen there:
 
 ```yaml
 container:
@@ -111,7 +126,7 @@ container:
   env:
     BUILD_AGENT_DOCKERD: '1'
 steps:
-  - run: start-dockerd
+  - run: umount /var/run/docker.sock && start-dockerd
     shell: bash
 ```
 

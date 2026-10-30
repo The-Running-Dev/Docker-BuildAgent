@@ -337,7 +337,8 @@ Semantics the declaration cannot carry:
   `/usr/local/bin/`. The manifest records the effective invocation.
 - Docker-in-Docker is opt-in through `BUILD_AGENT_DOCKERD=1` (or `true`); unset, no daemon
   runs. Opted in, the container must be `--privileged`, `start-dockerd` fails with a non-zero
-  exit otherwise, and the daemon listens on `/var/run/docker.sock` with `DOCKER_HOST` unset.
+  exit otherwise or when `/var/run/docker.sock` is already a mount or answers, and the daemon
+  listens on `/var/run/docker.sock` with `DOCKER_HOST` unset.
   Its data is `/var/lib/docker`, a volume the caller mounts. `/usr/local/bin/start-dockerd`
   and `/usr/local/bin/stop-dockerd` are protected names: images that set their own
   `ENTRYPOINT` call them. The entrypoint runs `stop-dockerd` after the command exits.

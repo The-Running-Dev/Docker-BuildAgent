@@ -26,6 +26,7 @@ failures=0
 cleanup() {
     docker rm -f "$outer" "$docs" > /dev/null 2>&1
     docker volume rm -f "$volume" > /dev/null 2>&1
+    docker image rm -f "$prefix-derived" > /dev/null 2>&1
     rm -rf "$work"
 }
 trap cleanup EXIT
@@ -128,6 +129,60 @@ no_volume() {
         grep -q 'dockerd stopped' <<< "$output"
 }
 check "warns about the missing volume, and the command's exit status is the container's" no_volume
+
+bad_iptables() {
+    local output status
+    output="$(docker run --rm --privileged -e BUILD_AGENT_DOCKERD=1 \
+        -e BUILD_AGENT_DOCKERD_IPTABLES=bogus "$image" true 2>&1)"
+    status=$?
+    echo "$output"
+    [ "$status" != 0 ] && grep -q 'BUILD_AGENT_DOCKERD_IPTABLES must be nft or legacy' <<< "$output"
+}
+check "rejects an unknown BUILD_AGENT_DOCKERD_IPTABLES" bad_iptables
+
+echo
+echo "== BUILD_AGENT_DOCKERD=1 with the host's Docker socket mounted"
+
+# MSYS_NO_PATHCONV keeps Git Bash on Windows from rewriting the socket path.
+host_socket() {
+    local output status
+    output="$(MSYS_NO_PATHCONV=1 docker run --rm --privileged -e BUILD_AGENT_DOCKERD=1 \
+        -v /var/run/docker.sock:/var/run/docker.sock "$image" true 2>&1)"
+    status=$?
+    echo "$output"
+    [ "$status" != 0 ] && grep -q 'already in use' <<< "$output" &&
+        ! grep -q 'dockerd is ready' <<< "$output"
+}
+check "refuses to start instead of reporting the host's daemon as ready" host_socket
+
+# GitHub Actions overrides the entrypoint and mounts the host's socket; the documented step
+# unmounts it and starts the daemon.
+actions_step() {
+    MSYS_NO_PATHCONV=1 docker run --rm --privileged -e BUILD_AGENT_DOCKERD=1 --entrypoint bash \
+        -v /var/run/docker.sock:/var/run/docker.sock "$image" -euo pipefail -c '
+            umount /var/run/docker.sock && start-dockerd
+            test "$(pgrep -cx dockerd)" = 1
+            docker info -f "{{.Name}}" | grep -qx "$(hostname)"
+            stop-dockerd'
+}
+check "the GitHub Actions step starts the container's own daemon" actions_step
+
+echo
+echo "== An image built on this one, with its own entrypoint script"
+
+# The script is not executable, so the documented ENTRYPOINT must name its interpreter.
+derived() {
+    local context="$work/derived"
+    mkdir -p "$context"
+    printf '#!/usr/bin/env bash\necho "derived-$1"\n' > "$context/entrypoint.sh"
+    printf '%s\n' "FROM $image" "COPY --chmod=644 entrypoint.sh /opt/entrypoint.sh" \
+        'ENTRYPOINT ["build-agent-entrypoint", "/bin/bash", "/opt/entrypoint.sh"]' \
+        > "$context/Dockerfile"
+    docker build -q -t "$prefix-derived" "$context" > /dev/null &&
+        docker run --rm "$prefix-derived" ok | grep -qx derived-ok
+}
+check "ENTRYPOINT [build-agent-entrypoint, /bin/bash, script] runs the script" derived
+docker image rm -f "$prefix-derived" > /dev/null 2>&1
 
 echo
 echo "== BUILD_AGENT_DOCKERD=1 with --privileged and a data volume"
