@@ -72,16 +72,21 @@ table of what is set and what is missing.
    file `release.yml` (then `release-tag.yml`), environment `release`.
 2. On the PowerShell Gallery, create an API key with the glob pattern `Docker-BuildAgent` and the
    scope **Push new packages and package versions**.
-3. Run the script with your nuget.org profile name (not your email address) and the key:
+3. Run `scripts/Start-ReleaseSetup.ps1`, which asks for your nuget.org profile name (not your
+   email address) and the key, then runs `Initialize-ReleasePublishing.ps1` with them:
 
    ```powershell
-   pwsh scripts/Initialize-ReleasePublishing.ps1 -NuGetUser <profile> -PSGalleryApiKey (Read-Host -AsSecureString 'PowerShell Gallery API key')
+   ./scripts/Start-ReleaseSetup.ps1
    ```
+
+   Run it in your PowerShell session, not through `pwsh`: the key is a `SecureString`, and passed
+   to a new `pwsh` process it arrives as the text `System.Security.SecureString`.
 
    It creates the `release` environment, deployable from `main` and from `v*` tags, with you as
    the required reviewer (`-NoReviewer` drops the approval), stores `NUGET_USER` and
    `PSGALLERY_API_KEY` there, and checks that `REGISTRY_TOKEN` exists. `-OpenBrowser` opens the
-   nuget.org and PowerShell Gallery pages for steps 1 and 2; `-WhatIf` shows what it would change.
+   nuget.org and PowerShell Gallery pages for steps 1 and 2. `Initialize-ReleasePublishing.ps1`
+   takes the values as parameters for scripted use, and its `-WhatIf` shows what it would change.
 4. Start the first release from the same script, as a pre-release first:
 
    ```powershell
