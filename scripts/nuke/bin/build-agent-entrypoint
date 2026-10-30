@@ -26,8 +26,10 @@ esac
 set +e
 
 # Background jobs read /dev/null unless told otherwise; keep the container's stdin for an
-# interactive shell.
-"${run[@]}" <&0 &
+# interactive shell. They also start with SIGINT and SIGQUIT ignored, which every process below
+# inherits, so a command that stops on SIGINT (such as the Actions runner) would never stop; env
+# gives them back their default handling.
+env --default-signal=INT,QUIT "${run[@]}" <&0 &
 child=$!
 
 # On a terminal the kernel already sends Ctrl+C and Ctrl+\ to the command, which shares this
