@@ -156,7 +156,8 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
         var updated = claim.WithIdentity(sink, identity);
         var releaseId = await FindDraftIdAsync(claim, "record an artifact identity in").ConfigureAwait(false);
 
-        var update = new ReleaseUpdate { Body = FormatBody(updated.Notes, updated.CandidateManifest, updated.ArtifactIdentities) };
+        var update = TaggedUpdate(claim);
+        update.Body = FormatBody(updated.Notes, updated.CandidateManifest, updated.ArtifactIdentities);
         await _client.Repository.Release.Edit(_owner, _repo, releaseId, update).ConfigureAwait(false);
         return updated;
     }
@@ -166,9 +167,21 @@ public sealed class GitHubReleaseClaimStore : IReleaseClaimStore
         var releaseId = await FindDraftIdAsync(claim, "publish").ConfigureAwait(false);
         await EnsureManifestAssetAsync(claim, releaseId).ConfigureAwait(false);
 
-        var update = new ReleaseUpdate { Draft = false };
+        var update = TaggedUpdate(claim);
+        update.Draft = false;
         await _client.Repository.Release.Edit(_owner, _repo, releaseId, update).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// An edit that restates the claim's tag and commit. A draft does not reserve its tag, and an
+    /// edit without tag_name leaves it untagged, so publishing it would create no version tag and
+    /// lookups by tag name would no longer find the release.
+    /// </summary>
+    private static ReleaseUpdate TaggedUpdate(ReleaseClaim claim) => new()
+    {
+        TagName = claim.Version.ToTagString(),
+        TargetCommitish = claim.CommitSha,
+    };
 
     /// <summary>
     /// Uploads the claim's candidate manifest as <see cref="ManifestAssetName"/> unless the draft
