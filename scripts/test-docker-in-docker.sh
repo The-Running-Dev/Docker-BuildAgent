@@ -230,6 +230,11 @@ else
                test -z "$(docker ps -q)"'
     check "start-dockerd is idempotent" \
         inner 'start-dockerd && test "$(pgrep -cx dockerd)" = 1'
+    # A command that ignored SIGINT and SIGQUIT (bits 2 and 3 of SigIgn) could not be stopped by
+    # those signals, nor could anything it starts.
+    check "the command does not ignore SIGINT or SIGQUIT" \
+        inner 'mask="$(awk "/^SigIgn/ { print \$2 }" "/proc/$(pgrep -x sleep)/status")"; echo "SigIgn $mask"
+               test $((0x$mask & 6)) = 0'
 
     clean_stop() {
         docker stop -t 30 "$outer" > /dev/null || return 1

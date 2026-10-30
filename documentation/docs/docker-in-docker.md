@@ -97,12 +97,14 @@ which runs a file that is not executable with `node`.
 
 Otherwise, call `start-dockerd` before the main process and `stop-dockerd` after it exits. Both
 are safe to call when `BUILD_AGENT_DOCKERD` is unset. A script that ends in `exec` hands the
-container to that process and never runs `stop-dockerd`, so run the process as a child instead:
+container to that process and never runs `stop-dockerd`, so run the process as a child instead.
+A child started with `&` ignores SIGINT and SIGQUIT, and so does everything it starts; `env
+--default-signal` undoes that for processes that stop on SIGINT:
 
 ```bash
 #!/usr/bin/env bash
 start-dockerd || exit 1
-/runner/run.sh "$@" &
+env --default-signal=INT,QUIT /runner/run.sh "$@" &
 child=$!
 trap 'kill -TERM "$child" 2> /dev/null' TERM INT
 # wait returns early when a signal arrives; keep waiting until the process has exited.
