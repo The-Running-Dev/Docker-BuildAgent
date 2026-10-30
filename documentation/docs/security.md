@@ -22,6 +22,11 @@ report a vulnerability, follow the
   build control of the host's Docker daemon, which is control of the host. Mount the socket only
   on a host you trust, for code you trust. A host compromised through a mounted socket is not a
   defect in the product.
+- **Privileged mode, when you opt into Docker-in-Docker.** Running the image's own Docker daemon
+  (`BUILD_AGENT_DOCKERD=1`) needs `--privileged`, which gives the code in the container root on
+  the host. With Docker Desktop, the host is its virtual machine, which holds every other
+  container and image on that machine. Use it only for code you trust; see
+  [Docker-in-Docker](./docker-in-docker.md). The image never starts the daemon unless asked.
 - **The workspace.** Mount only the project directory as `/workspace`. Anything else you mount is
   readable and writable by the build.
 
