@@ -10,7 +10,7 @@ This file explains the architecture and the development workflow; the contract o
 
 Docker-BuildAgent is a build-agent container image. It carries a set of NUKE-based build types (compiled from the `forge/` projects), a `build` command that runs them, and the tooling they need. Callers run it with `docker run <image> build <type> [args]`, through the PowerShell module, or through the `update` global tool for container updates.
 
-The image declares no `ENTRYPOINT`. `build` is a script on `PATH` that forwards to `scripts/nuke/build.ps1`, which runs the compiled build type.
+The image's `ENTRYPOINT` is `build-agent-entrypoint`, which runs `start-dockerd` (a no-op unless `BUILD_AGENT_DOCKERD=1`) and then the command through the base image's `docker-entrypoint.sh`; with the daemon on it stays the parent and runs `stop-dockerd` after the command. These scripts are in `scripts/nuke/bin/` and are tested by `scripts/test-docker-in-docker.sh`. `build` is a script on `PATH` that forwards to `scripts/nuke/build.ps1`, which runs the compiled build type.
 
 ## Build types
 
@@ -254,6 +254,7 @@ Two files are generated; edit their sources, not them:
 - Keep tokens in environment variables. Build output hides GitHub tokens and URLs through the `StripForDisplay` patterns in `BuildConfig`, and the parameter display leaves out `RegistryToken`.
 - The project configuration file may not carry secrets.
 - The image does not set a `USER`, so builds run as the image's default user (root). Treat the image as a trusted build environment, and mount only the workspace and, when needed, the Docker socket.
+- Docker-in-Docker needs `--privileged`, which is root on the host; `start-dockerd` must never start a daemon unless `BUILD_AGENT_DOCKERD` asks for it.
 - The module prints "arguments hidden for security" instead of the argument list.
 
 ## Conventions

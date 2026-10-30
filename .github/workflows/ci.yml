@@ -137,6 +137,13 @@ jobs:
           fi
           echo "ref=$image" >> "$GITHUB_OUTPUT"
 
+      # Runs dockerd inside the image (privileged, opted in, with a data volume), checks the
+      # unprivileged and not-opted-in cases, and prints the image size.
+      - name: Test Docker-in-Docker
+        env:
+          IMAGE: ${{ steps.image.outputs.ref }}
+        run: bash scripts/test-docker-in-docker.sh "$IMAGE"
+
       # Reports the vulnerabilities that have a fix available; the table is in the log. Not a gate
       # yet: the image currently carries fixable critical findings (base-image perl, node packages),
       # so fail-build would block every pull request until they are remediated.

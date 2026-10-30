@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+#
+# Stops the dockerd that start-dockerd started, and waits for it to exit, so containerd and the
+# storage under /var/lib/docker are left consistent. dockerd first stops its own containers.
+#
+# Does nothing and exits 0 when no dockerd runs. Exits 1 when dockerd is still running after the
+# timeout. The image's entrypoint calls this when the container stops; an image with its own
+# entrypoint calls it from its own trap.
+#
+# Environment:
+#   BUILD_AGENT_DOCKERD_STOP_TIMEOUT  seconds to wait for dockerd to exit (default 30)
+
+set -euo pipefail
+
+pid_file=/var/run/docker.pid
+timeout="${BUILD_AGENT_DOCKERD_STOP_TIMEOUT:-30}"
+
+log() { echo "stop-dockerd: $*" >&2; }
+
+[ -s "$pid_file" ] || exit 0
+pid="$(cat "$pid_file")"
+[ -r "/proc/$pid/comm" ] && [ "$(cat "/proc/$pid/comm")" = dockerd ] || exit 0
+
+# Gone, or a zombie its parent has not reaped yet.
+exited() {
+    local state
+    state="$(awk '{ print $3 }' "/proc/$pid/stat" 2> /dev/null)" || return 0
+    [ -z "$state" ] || [ "$state" = Z ]
+}
+
+log "stopping dockerd (PID $pid)"
+kill -TERM "$pid" 2> /dev/null || exit 0
+
+deadline=$((SECONDS + timeout))
+until exited; do
+    if ((SECONDS >= deadline)); then
+        log "ERROR: dockerd is still running after ${timeout}s."
+        exit 1
+    fi
+    sleep 0.2
+done
+log "dockerd stopped"

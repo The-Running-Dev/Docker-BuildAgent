@@ -329,11 +329,18 @@ Declared at [`Dockerfile`](../Dockerfile).
 
 Semantics the declaration cannot carry:
 
-- The image declares **no `ENTRYPOINT`**. The invocation surface is
-  `docker run <image> build <type> [args]`, resting on `CMD ["pwsh"]` being overridden
-  by the command the caller supplies and on `build` being on `PATH` from
-  `/usr/local/bin/`. The manifest records the effective invocation, not an
-  `ENTRYPOINT` instruction that does not exist.
+- The image's `ENTRYPOINT` is `build-agent-entrypoint`, which runs `start-dockerd` and then
+  the command through the base image's `docker-entrypoint.sh`, so a command runs as it did
+  when the image inherited that entrypoint (2026-10-30 decision on Docker-in-Docker). The
+  invocation surface is `docker run <image> build <type> [args]`, resting on `CMD ["pwsh"]`
+  being overridden by the command the caller supplies and on `build` being on `PATH` from
+  `/usr/local/bin/`. The manifest records the effective invocation.
+- Docker-in-Docker is opt-in through `BUILD_AGENT_DOCKERD=1` (or `true`); unset, no daemon
+  runs. Opted in, the container must be `--privileged`, `start-dockerd` fails with a non-zero
+  exit otherwise, and the daemon listens on `/var/run/docker.sock` with `DOCKER_HOST` unset.
+  Its data is `/var/lib/docker`, a volume the caller mounts. `/usr/local/bin/start-dockerd`
+  and `/usr/local/bin/stop-dockerd` are protected names: images that set their own
+  `ENTRYPOINT` call them. The entrypoint runs `stop-dockerd` after the command exits.
 - `/workspace` is the mount point and the working directory. It is a manifest item.
 - `EXPOSE 3000` and the `HEALTHCHECK` belong to the documentation server this image
   can run. They are not the health check the Updater waits on — that is the *target*

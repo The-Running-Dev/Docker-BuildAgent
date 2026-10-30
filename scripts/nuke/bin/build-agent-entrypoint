@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#
+# Entrypoint of the build-agent image.
+#
+# Without BUILD_AGENT_DOCKERD it hands straight to the base image's docker-entrypoint.sh, so a
+# command runs exactly as it did before the image had an entrypoint of its own.
+#
+# With BUILD_AGENT_DOCKERD=1 it starts dockerd (start-dockerd) and stays as PID 1 around the
+# command: a stop signal goes to the command first, and once the command exits, stop-dockerd
+# stops dockerd cleanly. The container's exit status is the command's.
+
+set -e
+
+start-dockerd
+
+run=("$@")
+if command -v docker-entrypoint.sh > /dev/null; then
+    run=(docker-entrypoint.sh "$@")
+fi
+
+case "${BUILD_AGENT_DOCKERD:-}" in
+    1 | true) ;;
+    *) exec "${run[@]}" ;;
+esac
+
+set +e
+
+# Background jobs read /dev/null unless told otherwise; keep the container's stdin for an
+# interactive shell.
+"${run[@]}" <&0 &
+child=$!
+
+# On a terminal the kernel already sends Ctrl+C and Ctrl+\ to the command, which shares this
+# script's process group, so only signals sent to this process alone are forwarded.
+forwarded=(TERM INT HUP QUIT)
+if [ -t 0 ]; then
+    forwarded=(TERM)
+    trap : INT HUP QUIT
+fi
+for signal in "${forwarded[@]}"; do
+    trap 'kill -'"$signal"' "$child" 2> /dev/null' "$signal"
+done
+
+# wait returns early when a trapped signal arrives; keep waiting until the command has exited.
+while :; do
+    wait "$child"
+    status=$?
+    kill -0 "$child" 2> /dev/null || break
+done
+
+stop-dockerd || :
+exit "$status"

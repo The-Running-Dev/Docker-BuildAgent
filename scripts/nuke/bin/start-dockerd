@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+#
+# Starts a Docker daemon inside this container, for Docker-in-Docker.
+#
+# Does nothing and exits 0 unless BUILD_AGENT_DOCKERD is 1 or true. Otherwise it needs a
+# privileged container running as root, prepares nested cgroup v2, picks an iptables backend
+# the kernel supports, starts dockerd on unix:///var/run/docker.sock with its log in
+# /var/log/dockerd.log, and exits 0 once `docker info` answers. On failure it exits 1 and prints
+# the end of the log. Safe to call more than once: a running daemon is waited for, not restarted.
+#
+# The cgroup and mount preparation follows moby's hack/dind
+# (https://github.com/moby/moby/blob/8d9e3502aba39127e4d12196dae16d306f76993d/hack/dind), without
+# its tmpfs over /tmp, which would hide anything a caller keeps there. The iptables choice follows
+# docker:dind's dockerd-entrypoint.sh. Stop the daemon with stop-dockerd.
+#
+# Environment:
+#   BUILD_AGENT_DOCKERD          1 or true to start the daemon; anything else does nothing
+#   BUILD_AGENT_DOCKERD_TIMEOUT  seconds to wait for the daemon to answer (default 60)
+
+set -euo pipefail
+
+case "${BUILD_AGENT_DOCKERD:-}" in
+    1 | true) ;;
+    *) exit 0 ;;
+esac
+
+socket=/var/run/docker.sock
+pid_file=/var/run/docker.pid
+log_file=/var/log/dockerd.log
+data_root=/var/lib/docker
+timeout="${BUILD_AGENT_DOCKERD_TIMEOUT:-60}"
+
+log() { echo "start-dockerd: $*" >&2; }
+
+fail() {
+    log "ERROR: $*"
+    if [ -s "$log_file" ]; then
+        log "last lines of $log_file:"
+        tail -n 40 "$log_file" >&2
+    fi
+    exit 1
+}
+
+# The PID of the running dockerd, from its PID file, or nothing when none runs.
+running_dockerd() {
+    local pid
+    [ -s "$pid_file" ] || return 1
+    pid="$(cat "$pid_file")"
+    [ -r "/proc/$pid/comm" ] && [ "$(cat "/proc/$pid/comm")" = dockerd ] || return 1
+    echo "$pid"
+}
+
+daemon_answers() { DOCKER_HOST="unix://$socket" docker info > /dev/null 2>&1; }
+
+wait_for_daemon() {
+    local pid="$1" deadline=$((SECONDS + timeout))
+    until daemon_answers; do
+        if ! kill -0 "$pid" 2> /dev/null; then
+            fail "dockerd exited before it answered."
+        fi
+        if ((SECONDS >= deadline)); then
+            kill -TERM "$pid" 2> /dev/null || :
+            fail "dockerd did not answer within ${timeout}s; it was stopped."
+        fi
+        sleep 1
+    done
+    log "dockerd is ready on unix://$socket"
+}
+
+if pid="$(running_dockerd)"; then
+    wait_for_daemon "$pid"
+    exit 0
+fi
+
+if [ "$(id -u)" != 0 ]; then
+    fail "dockerd must run as root; this is user $(id -un)."
+fi
+
+# CAP_SYS_ADMIN is capability 21. A container started without --privileged does not have it.
+cap_eff="$(awk '/^CapEff:/ { print $2 }' /proc/self/status)"
+if (((16#$cap_eff >> 21 & 1) == 0)); then
+    fail "BUILD_AGENT_DOCKERD is set but the container is not privileged (CAP_SYS_ADMIN is missing). Start it with --privileged, or unset BUILD_AGENT_DOCKERD."
+fi
+
+# cgroup v2: move every process out of the root group so its controllers can be delegated to
+# the containers dockerd creates. Retried, because a `docker exec` can add a process to the root
+# group between the move and the write.
+if [ -f /sys/fs/cgroup/cgroup.controllers ]; then
+    if ! [ -w /sys/fs/cgroup/cgroup.subtree_control ]; then
+        fail "/sys/fs/cgroup is read-only; Docker-in-Docker needs --privileged."
+    fi
+    mkdir -p /sys/fs/cgroup/init
+    until {
+        xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs 2> /dev/null || :
+        sed -e 's/ / +/g' -e 's/^/+/' < /sys/fs/cgroup/cgroup.controllers \
+            > /sys/fs/cgroup/cgroup.subtree_control 2> /dev/null
+    }; do :; done
+fi
+
+# Let dockerd detect AppArmor, and make mounts propagate as they do under systemd.
+if [ -d /sys/kernel/security ] && ! mountpoint -q /sys/kernel/security; then
+    mount -t securityfs none /sys/kernel/security 2> /dev/null ||
+        log "could not mount /sys/kernel/security; AppArmor detection may not work."
+fi
+mount --make-rshared /
+
+# Use legacy iptables when this network namespace already holds legacy tables, else nft when
+# the kernel supports it, else legacy.
+iptables_mode=
+for tables in /proc/net/ip_tables_names /proc/net/ip6_tables_names /proc/net/arp_tables_names; do
+    if [ -r "$tables" ] && [ -n "$(cat "$tables" 2> /dev/null)" ]; then
+        iptables_mode=legacy
+    fi
+done
+if [ -z "$iptables_mode" ]; then
+    if iptables-nft -nL > /dev/null 2>&1; then
+        iptables_mode=nft
+    elif iptables-legacy -nL > /dev/null 2>&1; then
+        iptables_mode=legacy
+    else
+        fail "neither nft nor legacy iptables works on this kernel."
+    fi
+fi
+update-alternatives --set iptables "/usr/sbin/iptables-$iptables_mode" > /dev/null
+update-alternatives --set ip6tables "/usr/sbin/ip6tables-$iptables_mode" > /dev/null
+log "using iptables-$iptables_mode"
+
+mkdir -p "$data_root" "$(dirname "$log_file")"
+if ! mountpoint -q "$data_root"; then
+    log "WARNING: $data_root is not a volume. dockerd falls back to the slow vfs driver on the container's own filesystem, and its data is lost with the container. Mount one with -v <volume>:$data_root."
+fi
+
+# A PID file left by an earlier run of this container names no dockerd (checked above).
+rm -f "$pid_file"
+
+# setsid gives dockerd its own session, so a Ctrl+C at an interactive shell in this container
+# does not reach it. A script has no job control, so the background job is not a process-group
+# leader and setsid runs dockerd in place: $! is dockerd's PID.
+container=docker setsid dockerd --host="unix://$socket" >> "$log_file" 2>&1 < /dev/null &
+wait_for_daemon "$!"
