@@ -58,7 +58,7 @@ jobs:
     steps:
       # Checkout the repository with full git history for GitVersion and changelog generation
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           submodules: recursive
@@ -105,7 +105,7 @@ jobs:
       # Trigger documentation site rebuild if docs were updated
       - name: Trigger Documentation Build
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.docs-changed.outputs.changed == 'true'
-        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3.0.0
+        uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697 # v4.0.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           event-type: Update-Documentation
