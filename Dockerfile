@@ -13,6 +13,11 @@ ARG PNPM_VERSION=10.16.0
 ARG QDK_VERSION=2.5.3
 ARG IMAGE_VERSION=2.0.0
 
+# Docker Engine and containerd for opt-in Docker-in-Docker (see start-dockerd).
+# The Docker CLI is pinned to the same version as the daemon.
+ARG DOCKER_VERSION=29.9.2
+ARG CONTAINERD_VERSION=2.4.2-3
+
 LABEL maintainer="ben@subzerodev.com" \
     version="${IMAGE_VERSION}" \
       description="Build Agent with Node.js, Angular CLI, TypeScript, Docker, PowerShell, and GitVersion"
@@ -53,8 +58,14 @@ RUN set -eux; \
     # sanity check: if the repo is wrong, this will show "Candidate: (none)" in logs
     apt-cache policy powershell | sed -n '1,20p'; \
         apt-get install -y --no-install-recommends \
-            git powershell docker-ce-cli docker-buildx-plugin docker-compose-plugin dotnet-sdk-8.0 \
+            git powershell docker-buildx-plugin docker-compose-plugin dotnet-sdk-8.0 \
             dotnet-sdk-9.0 dotnet-sdk-10.0; \
+    # Docker Engine for opt-in Docker-in-Docker, plus what dockerd needs inside a container
+    docker_pkg="5:${DOCKER_VERSION}-1~debian.12~bookworm"; \
+    apt-get install -y --no-install-recommends \
+        "docker-ce=${docker_pkg}" "docker-ce-cli=${docker_pkg}" \
+        "containerd.io=${CONTAINERD_VERSION}~debian.12~bookworm" \
+        iptables iproute2 pigz xz-utils procps e2fsprogs kmod; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
@@ -107,4 +118,7 @@ WORKDIR /workspace
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:3000 || exit 1
 
+# Starts dockerd when BUILD_AGENT_DOCKERD=1, then runs the command through the base image's
+# docker-entrypoint.sh. ENTRYPOINT resets the inherited CMD, so CMD must follow it.
+ENTRYPOINT ["build-agent-entrypoint"]
 CMD ["pwsh"]

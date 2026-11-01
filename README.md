@@ -30,7 +30,7 @@ The documentation site at [build-agent.subzerodev.com](https://build-agent.subze
 - Base image `mcr.microsoft.com/devcontainers/javascript-node:22-bookworm` (Node.js 22 and npm), overridable with the `BASE_IMAGE` build argument
 - TypeScript, tsx, the Angular CLI and `angular-cli-ghpages`
 - PowerShell, which is the default shell
-- The Docker CLI with the Buildx and Compose plugins
+- The Docker CLI with the Buildx and Compose plugins, and the Docker Engine for opt-in [Docker-in-Docker](https://build-agent.subzerodev.com/docs/docker-in-docker) (`--privileged -e BUILD_AGENT_DOCKERD=1 -v <volume>:/var/lib/docker`)
 - .NET SDKs 8, 9 and 10, Git, GitVersion and the NUKE global tool
 - The QNAP QDK (`qbuild`), for building QNAP packages
 - The `build` command, which takes one of five build types: `docker`, `node`, `node-in-docker`, `node-template` and `forge`

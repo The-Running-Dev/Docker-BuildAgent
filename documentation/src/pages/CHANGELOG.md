@@ -10,6 +10,7 @@ Entries from 2025.05.26 to 2025.08.06 are the commit messages of that period, un
 - A health-checked update of a running container, with rollback.
 - `build-agent build` runs a build from the host in the image of the tool's own version, and the repository is a GitHub Action (`uses: The-Running-Dev/Docker-BuildAgent@v2.0.0`) that runs it in a workflow.
 - `BuildAgent.Tool` is published to nuget.org through Trusted Publishing, with no stored API key.
+- The image can run its own Docker daemon (Docker-in-Docker) when started `--privileged` with `BUILD_AGENT_DOCKERD=1`; without the opt-in nothing changes.
 - The PowerShell module's default image is pinned to the module's own version; launcher failures carry a stable error code and exit status; map-derived environment no longer overwrites a variable that is already set.
 - Build exit statuses are documented on the [exit codes](https://build-agent.subzerodev.com/docs/exit-codes) page.
 - The documentation is checked in CI against the code: names, paths and links in the docs must exist.

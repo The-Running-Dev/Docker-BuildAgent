@@ -48,6 +48,12 @@ inputs:
 runs:
   using: composite
   steps:
+    # The Dockerfile copies the compiled forge from artifacts/ into /nuke/forge. The Build workflow
+    # gets it from build.sh (through nuke); compile it the same way here.
+    - name: Build Forge
+      shell: bash
+      run: dotnet build forge/Forge.sln -o artifacts -c Release /nodeReuse:false /p:UseSharedCompilation=false -nologo -clp:NoSummary --verbosity quiet
+
     - name: Log in to the Registry
       shell: bash
       env:

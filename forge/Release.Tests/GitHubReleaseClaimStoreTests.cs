@@ -190,18 +190,22 @@ public sealed class GitHubReleaseClaimStoreTests
                 GitHubRelease(6, OtherCommitSha, draft: true, "stale"),
                 GitHubRelease(7, CommitSha, draft: true, "Notes"),
             });
-        string? editedBody = null;
+        ReleaseUpdate? edit = null;
         releases
             .Setup(r => r.Edit(Owner, Repo, 7, It.IsAny<ReleaseUpdate>()))
-            .Callback<string, string, long, ReleaseUpdate>((_, _, _, update) => editedBody = update.Body)
+            .Callback<string, string, long, ReleaseUpdate>((_, _, _, update) => edit = update)
             .ReturnsAsync(GitHubRelease(7, CommitSha, draft: true, "Notes"));
 
         var claim = DraftClaim().WithIdentity(ReleaseSink.ImageVersionedTag, "sha256:image");
         var updated = await store.RecordIdentityAsync(claim, ReleaseSink.GlobalTool, "sha256:tool");
 
         Assert.Equal("sha256:tool", updated.IdentityOf(ReleaseSink.GlobalTool));
+        var editedBody = edit?.Body;
         Assert.NotNull(editedBody);
         Assert.Contains("release-claim:artifact-identities", editedBody);
+        // A draft does not reserve its tag: an edit without it would leave the draft untagged.
+        Assert.Equal(Version.ToTagString(), edit!.TagName);
+        Assert.Equal(CommitSha, edit.TargetCommitish);
 
         releases
             .Setup(r => r.GetAll(Owner, Repo))
@@ -260,8 +264,10 @@ public sealed class GitHubReleaseClaimStoreTests
                 uploaded = new System.IO.StreamReader(upload.RawData).ReadToEnd();
             })
             .ReturnsAsync((ReleaseAsset)null!);
+        // Published with its tag and commit restated, so the release gets its version tag.
         releases
-            .Setup(r => r.Edit(Owner, Repo, 7, It.Is<ReleaseUpdate>(u => u.Draft == false)))
+            .Setup(r => r.Edit(Owner, Repo, 7, It.Is<ReleaseUpdate>(u =>
+                u.Draft == false && u.TagName == Version.ToTagString() && u.TargetCommitish == CommitSha)))
             .Callback(() => steps.Add("publish"))
             .ReturnsAsync(draft);
 

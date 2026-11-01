@@ -18,7 +18,7 @@ overview.
 | **Release-from-Tag** | `release-tag.yml` | Pushes of a `v*` tag | Versioned image, `latest` and a GitHub release |
 | **Docs** | `docs.yml` | Pushes to `main` that change `documentation/**`, `docs-template` or `scripts/setup-docs-submodule.ps1`; a repository dispatch of type `Update-Documentation`; manual runs | The documentation site, to GitHub Pages |
 | **Module Tests** | `module-tests.yml` | Called by CI, Release and Release-from-Tag; it has no trigger of its own | Nothing |
-| **Claude Code Review** | `claude-code-review.yml` | Pull requests when opened, updated, marked ready for review or reopened | Nothing; posts review comments on the pull request |
+| **Claude Code Review** | `claude-code-review.yml` | Pull requests when opened, updated, marked ready for review or reopened, except Dependabot's | Nothing; posts review comments on the pull request |
 
 CI does not run on pushes to feature branches: open a pull request, or run it manually.
 
@@ -95,6 +95,10 @@ Every action a workflow or composite action uses is pinned to a full commit SHA,
 it was taken from in a trailing comment. Dependabot (`.github/dependabot.yml`) proposes updates
 to those pins and to the forge NuGet packages once a week, grouped into one pull request per
 ecosystem.
+
+Dependabot pull requests run without repository secrets. CI's dry run gets placeholders for
+`RegistryToken` and `NotificationsWebHookUrl` and sends no notification; it never pushes, so the
+token is not used. Claude Code Review skips them, which satisfies its required check.
 
 Each workflow grants its token only the permissions it needs: CI reads contents and writes check
 runs and the coverage comment; only the publishing workflows (Build, Release, Release-from-Tag)

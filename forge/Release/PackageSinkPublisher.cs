@@ -2,9 +2,12 @@
 
 using System;
 using System.IO;
+using System.IO.Compression;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace Release;
 
@@ -103,7 +106,9 @@ public sealed class PackageSinkPublisher : IVersionedSinkPublisher
 
     /// <summary>
     /// Downloads the feed's copy of the version and hashes it. A feed answering 404 does not hold
-    /// the version; any other failure throws (I5).
+    /// the version, and neither does one that serves another version in its place: the PowerShell
+    /// Gallery answers a version it does not have with the module's latest. Any other failure
+    /// throws (I5).
     /// </summary>
     public async Task<string?> FindPublishedIdentityAsync(ReleaseVersion version)
     {
@@ -123,6 +128,30 @@ public sealed class PackageSinkPublisher : IVersionedSinkPublisher
         using var package = new MemoryStream();
         await response.Content.CopyToAsync(package).ConfigureAwait(false);
         package.Position = 0;
+        if (!string.Equals(NuspecVersion(package), version.ToPackageString(), StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        package.Position = 0;
         return PackageContentHash.Compute(package);
+    }
+
+    /// <summary>The version in the package's nuspec, which names the version the feed actually served.</summary>
+    private string NuspecVersion(Stream package)
+    {
+        using var archive = new ZipArchive(package, ZipArchiveMode.Read, leaveOpen: true);
+        var nuspec = archive.Entries.FirstOrDefault(entry =>
+            !entry.FullName.Contains('/') && entry.FullName.EndsWith(".nuspec", StringComparison.OrdinalIgnoreCase));
+        if (nuspec is null)
+        {
+            throw new InvalidOperationException($"The package {_feed.Name} served for {_packageId} has no nuspec.");
+        }
+
+        using var content = nuspec.Open();
+        var version = XDocument.Load(content).Descendants()
+            .FirstOrDefault(element => element.Name.LocalName == "version" && element.Parent?.Name.LocalName == "metadata");
+        return version?.Value.Trim()
+            ?? throw new InvalidOperationException($"The nuspec {_feed.Name} served for {_packageId} has no version.");
     }
 }
