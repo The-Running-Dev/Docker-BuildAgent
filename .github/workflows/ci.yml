@@ -121,6 +121,7 @@ jobs:
             > "$RUNNER_TEMP/forge-setup.txt"
           cat "$RUNNER_TEMP/forge-setup.txt"
           grep -q '\[CONFIG\] DryRun: True' "$RUNNER_TEMP/forge-setup.txt"
+          grep -q '\[CONFIG\] Source: All' "$RUNNER_TEMP/forge-setup.txt"
 
       # Execute tests steps
       - name: Tests & Coverage
