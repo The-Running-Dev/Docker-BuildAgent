@@ -264,6 +264,52 @@ public sealed class CliDockerRuntimeTests
         Assert.Equal(new[] { "docker" }, inspection.NetworkAliases!["bridge"]);
     }
 
+    // A user alias is the user's however it looks: "0", "012" and "0123456789ab" are all starts of this container's id.
+    // Only the exact aliases the daemon adds of its own (the container's name, the 12-character short id, the id itself)
+    // are dropped, and each alias stays on the network it was set on.
+    [Fact]
+    public async Task InspectAsync_AliasesThatStartLikeTheId_AreKeptOnTheirNetworksThroughReplacement()
+    {
+        var (runtime, runner, _) = Create();
+        var inspect = DefaultInspect();
+        inspect["NetworkSettings"]!["Networks"] = new JsonObject
+        {
+            ["runner-net"] = new JsonObject
+            {
+                ["IPAMConfig"] = null,
+                ["DriverOpts"] = null,
+                ["Aliases"] = new JsonArray("web", "0", "012", "api", ContainerId[..12], ContainerId),
+            },
+            ["backend"] = new JsonObject
+            {
+                ["IPAMConfig"] = null,
+                ["DriverOpts"] = null,
+                ["Aliases"] = new JsonArray(ContainerId[..12], "0123456789abc", "db", "web"),
+            },
+        };
+        runner.Respond = Daemon(inspect, ImageConfig());
+
+        var inspection = await runtime.InspectAsync("web");
+
+        Assert.Empty(inspection!.UnreproducedSettings!);
+        Assert.Equal(new[] { "0", "012", "api" }, inspection.NetworkAliases!["runner-net"]);
+        Assert.Equal(new[] { "0123456789abc", "db" }, inspection.NetworkAliases["backend"]);
+
+        // What the replacement is then created with: the same aliases, each on its own network.
+        runner.Calls.Clear();
+        await runtime.CreateReplacementAsync(Spec(
+            networks: inspection.Networks,
+            aliases: inspection.NetworkAliases));
+
+        Assert.Equal(
+            new[]
+            {
+                $"create --name web --restart unless-stopped --network runner-net --network-alias 0 --network-alias 012 --network-alias api {ImageId} serve",
+                "network connect --alias 0123456789abc --alias db backend web",
+            },
+            runner.Calls);
+    }
+
     [Theory]
     [InlineData(true, "[\"label=disable\",\"seccomp=unconfined\"]", true)]
     [InlineData(false, "[\"label=disable\"]", true)]

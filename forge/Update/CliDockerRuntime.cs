@@ -419,8 +419,10 @@ public sealed class CliDockerRuntime : IDockerRuntime
             NanoCpus: Number("NanoCpus"));
     }
 
-    /// <summary>The aliases set on each network for this container, without the ones the daemon adds of its own
-    /// accord (the container's name and the start of its id), which the replacement gets again from its own.</summary>
+    /// <summary>The aliases set on each network for this container, without the exact ones the daemon adds of its own
+    /// accord (the container's name, its 12-character short id, and its id), which the replacement gets again from its
+    /// own. Matching is exact: an alias that merely starts like the id (<c>0</c>, <c>012</c>) is the caller's and is kept.
+    /// Newer daemons list none of these in <c>Aliases</c> (they are in <c>DNSNames</c>); older ones list the short id.</summary>
     private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadNetworkAliases(JsonElement element, string name, string id)
     {
         var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
@@ -433,7 +435,7 @@ public sealed class CliDockerRuntime : IDockerRuntime
                 {
                     var user = aliases.EnumerateArray()
                         .Select(a => a.GetString() ?? string.Empty)
-                        .Where(a => a.Length > 0 && a != name && !id.StartsWith(a, StringComparison.Ordinal))
+                        .Where(a => a.Length > 0 && !IsDaemonAlias(a, name, id))
                         .ToList();
                     if (user.Count > 0)
                     {
@@ -445,6 +447,11 @@ public sealed class CliDockerRuntime : IDockerRuntime
 
         return result;
     }
+
+    private static bool IsDaemonAlias(string alias, string name, string id) =>
+        string.Equals(alias, name, StringComparison.Ordinal) ||
+        string.Equals(alias, id, StringComparison.Ordinal) ||
+        (id.Length >= 12 && string.Equals(alias, id[..12], StringComparison.Ordinal));
 
     private static LogSpec? ReadLog(JsonElement hostConfig)
     {

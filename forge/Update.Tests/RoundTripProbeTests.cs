@@ -59,6 +59,7 @@ public sealed class RoundTripProbeTests : IAsyncLifetime
         await Run("rm", "--force", $"{_prefix}-dst");
         await Run("volume", "rm", "--force", $"{_prefix}-vol");
         await Run("network", "rm", $"{_prefix}-net");
+        await Run("network", "rm", $"{_prefix}-net2");
     }
 
     [Fact]
@@ -276,6 +277,28 @@ public sealed class RoundTripProbeTests : IAsyncLifetime
         var replacement = await RoundTrip();
 
         Assert.Equal(new[] { "second-alias" }, replacement.NetworkAliases![networkName]);
+    }
+
+    // Aliases that start like the container's id are the user's: they must survive, each on its own network.
+    [Fact]
+    public async Task AliasesThatStartLikeTheId_RoundTripOnTheirNetworks()
+    {
+        if (!DaemonAvailable) return;
+
+        var first = $"{_prefix}-net";
+        var second = $"{_prefix}-net2";
+        await Run("network", "create", first);
+        await Run("network", "create", second);
+        await CreateSource("--network", first, "--network-alias", "0", "--network-alias", "api");
+        var id = (await Run("inspect", "--format", "{{.Id}}", $"{_prefix}-src")).Stdout.Trim();
+        await Run("network", "connect", "--alias", id[..6], "--alias", id[..12] + "x", second, $"{_prefix}-src");
+
+        var replacement = await RoundTrip();
+
+        Assert.Equal(new[] { "0", "api" }, replacement.NetworkAliases![first].OrderBy(a => a, StringComparer.Ordinal));
+        Assert.Equal(
+            new[] { id[..6], id[..12] + "x" }.OrderBy(a => a, StringComparer.Ordinal),
+            replacement.NetworkAliases[second].OrderBy(a => a, StringComparer.Ordinal));
     }
 
     [Fact]
