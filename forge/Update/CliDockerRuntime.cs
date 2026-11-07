@@ -194,6 +194,20 @@ public sealed class CliDockerRuntime : IDockerRuntime
         args.Add("--restart");
         args.Add(spec.RestartPolicy);
 
+        AddLimitArguments(args, spec.Limits);
+
+        foreach (var (path, options) in spec.Tmpfs ?? new Dictionary<string, string>())
+        {
+            args.Add("--tmpfs");
+            args.Add(options.Length > 0 ? $"{path}:{options}" : path);
+        }
+
+        if (spec.StopTimeoutSeconds is { } stopTimeout)
+        {
+            args.Add("--stop-timeout");
+            args.Add(stopTimeout.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         if (spec.Log != null)
         {
             args.Add("--log-driver");
@@ -209,6 +223,11 @@ public sealed class CliDockerRuntime : IDockerRuntime
         {
             args.Add("--network");
             args.Add(spec.Networks[0]);
+            foreach (var alias in AliasesOn(spec, spec.Networks[0]))
+            {
+                args.Add("--network-alias");
+                args.Add(alias);
+            }
         }
 
         args.Add(spec.ImageId);
@@ -230,7 +249,16 @@ public sealed class CliDockerRuntime : IDockerRuntime
 
         foreach (var network in spec.Networks.Skip(1))
         {
-            var (connectExitCode, _, connectStderr) = await RunAsync("network", "connect", network, spec.Name);
+            var connect = new List<string> { "network", "connect" };
+            foreach (var alias in AliasesOn(spec, network))
+            {
+                connect.Add("--alias");
+                connect.Add(alias);
+            }
+
+            connect.Add(network);
+            connect.Add(spec.Name);
+            var (connectExitCode, _, connectStderr) = await RunAsync(connect.ToArray());
             if (connectExitCode != 0)
             {
                 throw new DockerRuntimeException($"docker network connect {network} {spec.Name} failed: {connectStderr}");
@@ -238,6 +266,51 @@ public sealed class CliDockerRuntime : IDockerRuntime
         }
 
         return id;
+    }
+
+    private static IReadOnlyList<string> AliasesOn(ContainerCreateSpec spec, string network) =>
+        spec.NetworkAliases != null && spec.NetworkAliases.TryGetValue(network, out var aliases)
+            ? aliases
+            : Array.Empty<string>();
+
+    private static void AddLimitArguments(List<string> args, RuntimeLimits? limits)
+    {
+        if (limits == null)
+        {
+            return;
+        }
+
+        var invariant = System.Globalization.CultureInfo.InvariantCulture;
+        if (limits.Privileged)
+        {
+            args.Add("--privileged");
+        }
+
+        if (limits.Memory > 0)
+        {
+            args.Add("--memory");
+            args.Add(limits.Memory.ToString(invariant));
+            // The daemon reports the swap limit it derived from --memory (twice the memory) the same way as one set
+            // explicitly, so passing it back yields the same container either way.
+            if (limits.MemorySwap != 0)
+            {
+                args.Add("--memory-swap");
+                args.Add(limits.MemorySwap.ToString(invariant));
+            }
+        }
+
+        if (limits.MemoryReservation > 0)
+        {
+            args.Add("--memory-reservation");
+            args.Add(limits.MemoryReservation.ToString(invariant));
+        }
+
+        if (limits.NanoCpus > 0)
+        {
+            // --cpus is a decimal CPU count; nano-CPUs is that count times 1e9, so the division is exact.
+            args.Add("--cpus");
+            args.Add((limits.NanoCpus / 1_000_000_000m).ToString(invariant));
+        }
     }
 
     public async Task StartAsync(string name) => await RunChecked("docker start", "start", name);
@@ -324,8 +397,61 @@ public sealed class CliDockerRuntime : IDockerRuntime
             Links: ReadStringArray(hostConfig, "Links"),
             HealthStatus: ReadHealthStatus(state),
             Log: ReadLog(hostConfig),
-            UnreproducedSettings: FindUnreproducedSettings(element, id));
+            UnreproducedSettings: FindUnreproducedSettings(element, id),
+            Limits: ReadLimits(hostConfig),
+            Tmpfs: ReadStringMap(hostConfig, "Tmpfs"),
+            NetworkAliases: ReadNetworkAliases(element, name, id),
+            StopTimeoutSeconds: config.TryGetProperty("StopTimeout", out var stopTimeout) && stopTimeout.ValueKind == JsonValueKind.Number
+                ? stopTimeout.GetInt32()
+                : null);
     }
+
+    private static RuntimeLimits ReadLimits(JsonElement hostConfig)
+    {
+        long Number(string field) =>
+            hostConfig.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.Number ? value.GetInt64() : 0;
+
+        return new RuntimeLimits(
+            Privileged: hostConfig.TryGetProperty("Privileged", out var privileged) && privileged.ValueKind == JsonValueKind.True,
+            Memory: Number("Memory"),
+            MemorySwap: Number("MemorySwap"),
+            MemoryReservation: Number("MemoryReservation"),
+            NanoCpus: Number("NanoCpus"));
+    }
+
+    /// <summary>The aliases set on each network for this container, without the exact ones the daemon adds of its own
+    /// accord (the container's name, its 12-character short id, and its id), which the replacement gets again from its
+    /// own. Matching is exact: an alias that merely starts like the id (<c>0</c>, <c>012</c>) is the caller's and is kept.
+    /// Newer daemons list none of these in <c>Aliases</c> (they are in <c>DNSNames</c>); older ones list the short id.</summary>
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> ReadNetworkAliases(JsonElement element, string name, string id)
+    {
+        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+        if (element.TryGetProperty("NetworkSettings", out var networkSettings) &&
+            networkSettings.TryGetProperty("Networks", out var networks) && networks.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var network in networks.EnumerateObject())
+            {
+                if (network.Value.TryGetProperty("Aliases", out var aliases) && aliases.ValueKind == JsonValueKind.Array)
+                {
+                    var user = aliases.EnumerateArray()
+                        .Select(a => a.GetString() ?? string.Empty)
+                        .Where(a => a.Length > 0 && !IsDaemonAlias(a, name, id))
+                        .ToList();
+                    if (user.Count > 0)
+                    {
+                        result[network.Name] = user;
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static bool IsDaemonAlias(string alias, string name, string id) =>
+        string.Equals(alias, name, StringComparison.Ordinal) ||
+        string.Equals(alias, id, StringComparison.Ordinal) ||
+        (id.Length >= 12 && string.Equals(alias, id[..12], StringComparison.Ordinal));
 
     private static LogSpec? ReadLog(JsonElement hostConfig)
     {
@@ -343,7 +469,7 @@ public sealed class CliDockerRuntime : IDockerRuntime
     // rather than replaced by one that silently lacks it.
     private static readonly string[] UnreproducedFlags =
     {
-        "Privileged", "PublishAllPorts", "ReadonlyRootfs", "OomKillDisable", "Init",
+        "PublishAllPorts", "ReadonlyRootfs", "OomKillDisable", "Init",
     };
 
     private static readonly string[] UnreproducedLists =
@@ -353,11 +479,11 @@ public sealed class CliDockerRuntime : IDockerRuntime
         "BlkioDeviceWriteBps", "BlkioDeviceReadIOps", "BlkioDeviceWriteIOps",
     };
 
-    private static readonly string[] UnreproducedMaps = { "Sysctls", "Tmpfs", "StorageOpt", "Annotations" };
+    private static readonly string[] UnreproducedMaps = { "Sysctls", "StorageOpt", "Annotations" };
 
     private static readonly string[] UnreproducedNumbers =
     {
-        "Memory", "MemoryReservation", "MemorySwap", "NanoCpus", "CpuShares", "CpuPeriod", "CpuQuota",
+        "CpuShares", "CpuPeriod", "CpuQuota",
         "CpuRealtimePeriod", "CpuRealtimeRuntime", "CpuCount", "CpuPercent", "BlkioWeight", "OomScoreAdj",
         "IOMaximumIOps", "IOMaximumBandwidth",
     };
@@ -386,9 +512,13 @@ public sealed class CliDockerRuntime : IDockerRuntime
             }
         }
 
+        // A privileged container carries "label=disable" because the daemon adds it for --privileged; the
+        // replacement, created with --privileged, gets it again. Any other security option was asked for.
+        var privileged = hostConfig.TryGetProperty("Privileged", out var privilegedValue) && privilegedValue.ValueKind == JsonValueKind.True;
         foreach (var field in UnreproducedLists)
         {
-            if (hostConfig.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.Array && value.GetArrayLength() > 0)
+            if (hostConfig.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.Array &&
+                value.EnumerateArray().Any(entry => !(field == "SecurityOpt" && privileged && entry.GetString() is "label=disable" or "label:disable")))
             {
                 found.Add($"HostConfig.{field}");
             }
@@ -472,9 +602,13 @@ public sealed class CliDockerRuntime : IDockerRuntime
             }
         }
 
-        if (config.TryGetProperty("StopTimeout", out var stopTimeout) && stopTimeout.ValueKind == JsonValueKind.Number)
+        // A swap limit means something only next to a memory limit, which is how it is passed back; one set alone
+        // (--memory-swap -1 with no --memory) cannot be reproduced.
+        if (hostConfig.TryGetProperty("MemorySwap", out var memorySwap) && memorySwap.ValueKind == JsonValueKind.Number &&
+            memorySwap.GetInt64() != 0 &&
+            !(hostConfig.TryGetProperty("Memory", out var memory) && memory.ValueKind == JsonValueKind.Number && memory.GetInt64() > 0))
         {
-            found.Add("Config.StopTimeout");
+            found.Add("HostConfig.MemorySwap");
         }
 
         if (element.TryGetProperty("Mounts", out var mounts) && mounts.ValueKind == JsonValueKind.Array)
@@ -491,7 +625,6 @@ public sealed class CliDockerRuntime : IDockerRuntime
         if (element.TryGetProperty("NetworkSettings", out var networkSettings) &&
             networkSettings.TryGetProperty("Networks", out var networks) && networks.ValueKind == JsonValueKind.Object)
         {
-            var name = element.GetProperty("Name").GetString()!.TrimStart('/');
             foreach (var network in networks.EnumerateObject())
             {
                 var endpoint = network.Value;
@@ -504,14 +637,6 @@ public sealed class CliDockerRuntime : IDockerRuntime
                     }))
                 {
                     found.Add($"NetworkSettings.Networks.{network.Name}.IPAMConfig");
-                }
-
-                // Some daemons list the container's own short id and name as aliases of their own accord.
-                if (endpoint.TryGetProperty("Aliases", out var aliases) && aliases.ValueKind == JsonValueKind.Array &&
-                    aliases.EnumerateArray().Select(a => a.GetString() ?? string.Empty)
-                        .Any(a => a.Length > 0 && a != name && !id.StartsWith(a, StringComparison.Ordinal)))
-                {
-                    found.Add($"NetworkSettings.Networks.{network.Name}.Aliases");
                 }
 
                 if (endpoint.TryGetProperty("DriverOpts", out var driverOpts) && driverOpts.ValueKind == JsonValueKind.Object &&

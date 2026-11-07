@@ -1037,4 +1037,50 @@ public sealed class UpdaterTests : IDisposable
         Assert.Equal("json-file", replacement.Log!.Driver);
         Assert.Equal("1m", replacement.Log.Options["max-size"]);
     }
+
+    // A runner's privilege, limits, tmpfs, network aliases and stop timeout are not lost to the replacement.
+    [Fact]
+    public async Task RunnerSettings_AreCarriedToTheReplacement()
+    {
+        var limits = new RuntimeLimits(true, 8589934592, 17179869184, 4294967296, 2500000000);
+        var tmpfs = new Dictionary<string, string> { ["/tmp"] = "" };
+        var aliases = new Dictionary<string, IReadOnlyList<string>> { ["runner-net"] = new[] { "docker" } };
+        var target = Target("web", "sha256:old", "web:1.0") with
+        {
+            Networks = new[] { "runner-net" },
+            Limits = limits,
+            Tmpfs = tmpfs,
+            NetworkAliases = aliases,
+            StopTimeoutSeconds = 60,
+        };
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.Equal(UpdateOutcome.Succeeded, outcome);
+        var replacement = _runtime.Get("web")!;
+        Assert.Equal("sha256:new", replacement.ImageId);
+        Assert.Equal(limits, replacement.Limits);
+        Assert.Equal(tmpfs, replacement.Tmpfs);
+        Assert.Equal(aliases, replacement.NetworkAliases);
+        Assert.Equal(60, replacement.StopTimeoutSeconds);
+    }
+
+    // The prior container is what restoration brings back, with every setting it had.
+    [Fact]
+    public async Task RunnerSettings_SurviveARestoredFailedReplacement()
+    {
+        var limits = new RuntimeLimits(true, 8589934592, 17179869184, 0, 2500000000);
+        var target = Target("web", "sha256:old", "web:1.0") with { Limits = limits, StopTimeoutSeconds = 60 };
+        SeedTargetAndImages(target, "sha256:new", "web:2.0");
+        _runtime.FailStart = name => name == "web" && _runtime.Get("web")!.ImageId == "sha256:new";
+
+        var outcome = await _updater.RunAsync("web", "web:2.0", new UpdateOptions(TimeSpan.FromSeconds(30), true));
+
+        Assert.NotEqual(UpdateOutcome.Succeeded, outcome);
+        var restored = _runtime.Get("web")!;
+        Assert.Equal("sha256:old", restored.ImageId);
+        Assert.Equal(limits, restored.Limits);
+        Assert.Equal(60, restored.StopTimeoutSeconds);
+    }
 }

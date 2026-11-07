@@ -193,6 +193,10 @@ public sealed class FakeDockerRuntime : IDockerRuntime
                 Networks: spec.Networks,
                 Links: Array.Empty<string>(),
                 Log: spec.Log,
+                Limits: spec.Limits,
+                Tmpfs: spec.Tmpfs,
+                NetworkAliases: spec.NetworkAliases,
+                StopTimeoutSeconds: spec.StopTimeoutSeconds,
                 // A replacement is healthy from the moment it exists unless a test's HealthProbe says
                 // otherwise (S4) — so every pre-S4 success test keeps passing without simulating health at all.
                 HealthStatus: "healthy");

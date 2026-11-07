@@ -11,11 +11,11 @@ writing the `docker run` command. It supports Windows PowerShell 5.1 and PowerSh
 
 ## Installing
 
-:::caution Not yet published
-The module is published to the PowerShell Gallery as `Docker-BuildAgent`, and the first release
-that publishes it is 2.0.0, which is not released yet. Until then there is no `Install-Module`
-command to run.
-:::
+The module is published to the PowerShell Gallery as `Docker-BuildAgent`, from 2.0.0 on:
+
+```powershell
+Install-Module Docker-BuildAgent
+```
 
 To use it from a checkout of this repository:
 
@@ -23,9 +23,9 @@ To use it from a checkout of this repository:
 Import-Module ./scripts/powershell-module/Docker-BuildAgent.psd1
 ```
 
-The module's default image is `ghcr.io/the-running-dev/build-agent:<module version>`, and 2.0.0 is
-not released yet. Until it is, pass `-DockerImage` to `Set-BuildAgentConfig` with an image that
-exists. See [Release Management](./releases.md).
+The module's default image is `ghcr.io/the-running-dev/build-agent:<module version>`. A checkout
+between releases names a version that may not be published; pass `-DockerImage` to
+`Set-BuildAgentConfig` with an image that exists. See [Release Management](./releases.md).
 
 ## What it exports
 

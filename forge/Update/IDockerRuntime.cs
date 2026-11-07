@@ -34,12 +34,27 @@ public sealed record LogSpec(
     string Driver,
     IReadOnlyDictionary<string, string> Options);
 
+/// <summary>Resource limits and privilege as <c>docker create</c> takes them: bytes for the memory fields, billionths
+/// of a CPU for <see cref="NanoCpus"/> (<c>--cpus 1.5</c> is 1500000000). Zero is "no limit". A container created
+/// without them reports all zeros and false, which is <see cref="None"/>.</summary>
+public sealed record RuntimeLimits(
+    bool Privileged = false,
+    long Memory = 0,
+    long MemorySwap = 0,
+    long MemoryReservation = 0,
+    long NanoCpus = 0)
+{
+    public static RuntimeLimits None { get; } = new();
+}
+
 /// <summary>The state of a container as inspect reports it, restricted to the fields the Updater needs to
 /// refuse safely (I34) or reproduce exactly. <see cref="HealthStatus"/> is Docker's own status string
 /// ("starting", "healthy", "unhealthy") from <c>State.Health.Status</c>, or null when the container declares
 /// no health check at all (S4's concern; not read anywhere before S4). <see cref="UnreproducedSettings"/> names
 /// every setting the container carries that a replacement would not reproduce (I34); the Updater refuses a target
-/// that has any. Null and empty both mean none.</summary>
+/// that has any. Null and empty both mean none. <see cref="Tmpfs"/> maps a <c>--tmpfs</c> path to its options (empty
+/// for none); <see cref="NetworkAliases"/> maps a network to the aliases set for this container on it, leaving out
+/// the ones the daemon adds itself; <see cref="StopTimeoutSeconds"/> is <c>--stop-timeout</c>, null when unset.</summary>
 public sealed record ContainerInspection(
     string Id,
     string Name,
@@ -58,7 +73,11 @@ public sealed record ContainerInspection(
     IReadOnlyList<string> Links,
     string? HealthStatus = null,
     LogSpec? Log = null,
-    IReadOnlyList<string>? UnreproducedSettings = null);
+    IReadOnlyList<string>? UnreproducedSettings = null,
+    RuntimeLimits? Limits = null,
+    IReadOnlyDictionary<string, string>? Tmpfs = null,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? NetworkAliases = null,
+    int? StopTimeoutSeconds = null);
 
 /// <summary>Everything needed to create a container that reproduces another's configuration except its image
 /// (I34). Built from a <see cref="ContainerInspection"/> by the Updater, not by the runtime.</summary>
@@ -73,7 +92,11 @@ public sealed record ContainerCreateSpec(
     IReadOnlyList<PortSpec> Ports,
     string RestartPolicy,
     IReadOnlyList<string> Networks,
-    LogSpec? Log = null);
+    LogSpec? Log = null,
+    RuntimeLimits? Limits = null,
+    IReadOnlyDictionary<string, string>? Tmpfs = null,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? NetworkAliases = null,
+    int? StopTimeoutSeconds = null);
 
 /// <summary>Thrown by an <see cref="IDockerRuntime"/> member for a daemon- or registry-level failure. The
 /// Updater maps this to the appropriate <see cref="UpdateErrorCode"/> for the step that was in progress.</summary>
