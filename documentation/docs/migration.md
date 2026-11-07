@@ -7,8 +7,8 @@ sidebar_position: 12
 # Migration Guide
 
 This guide covers every breaking change in 2.0.0 and the move from a floating tag to a pinned
-version. 2.0.0 is not published yet, so the version-pinned image and module described below
-do not exist until it is released. What is protected from now on is stated in [Compatibility and Support](./compatibility.md).
+version. 2.0.0 and 2.1.0 are published, so the version-pinned image and module described below
+exist. What is protected from now on is stated in [Compatibility and Support](./compatibility.md).
 
 ## Breaking changes in 2.0.0
 

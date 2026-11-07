@@ -20,9 +20,7 @@ The tool is the .NET global tool `BuildAgent.Tool`, and its command is `build-ag
 dotnet tool install --global BuildAgent.Tool
 ```
 
-:::caution Not yet published
-The first release that publishes the tool is 2.0.0, which is not released yet. Until then there is
-nothing on nuget.org to install; pack it from a checkout instead:
+The tool is on nuget.org from 2.0.0 on. To run a checkout's own build instead, pack it:
 
 ```bash
 dotnet pack forge/Tool -c Release -p:ReleaseVersion=0.0.0-local -o artifacts/tool
@@ -123,13 +121,38 @@ A container is refused (exit 20) when it:
 - uses a legacy container link
 - has an anonymous volume
 - has a setting the replacement would not carry over. The refusal names each one. They include
-  privileged mode, added or dropped capabilities, devices, security options, resource limits
-  (memory, CPU, PIDs, ulimits), DNS and extra hosts, tmpfs mounts, a custom hostname or domain
-  name, network aliases or fixed addresses, a non-default runtime, IPC or PID mode, a TTY or open
-  stdin, a stop timeout, mount propagation, and a user, working directory, stop signal or health
-  check that differs from the image's own.
+  added or dropped capabilities, devices, security options other than the one privileged mode
+  implies, other resource limits (PIDs, ulimits, CPU shares or quota, a swap limit without a
+  memory limit), DNS and extra hosts, a custom hostname or domain name, fixed network addresses,
+  a non-default runtime, IPC or PID mode, a TTY or open stdin, a read-only root file system,
+  mount propagation, and a user, working directory, stop signal or health check that differs
+  from the image's own.
 
-The logging driver and its options are carried over to the replacement.
+These settings are carried over to the replacement, so a self-hosted runner or Docker-in-Docker
+sidecar started with them can be updated:
+
+- the logging driver and its options
+- privileged mode
+- memory limit, memory reservation and swap limit, and a CPU limit (`--cpus`)
+- tmpfs mounts, with their options
+- the stop timeout
+- network aliases on each network the container is connected to
+
+### What a failed update restores
+
+A failed update restores the **container**: the original is renamed back, so every setting above
+returns exactly as it was, and the prior image stays under its `buildagent-prior` tag until the
+update ends.
+
+It does not restore **state the container wrote**. A volume or bind mount is shared between the
+original and the replacement, so anything the replacement wrote to it before it failed stays
+written. A new image that migrates a mounted data directory can therefore leave it in a form the
+original cannot read, and the tool cannot detect or undo that. Back up mounted state you cannot
+afford to lose before updating.
+
+How a runner's own binary is upgraded, and rolled back, inside the container is not defined by
+this tool. An update replaces the image; a runner that upgrades itself in place at start-up is
+outside what the tool restores.
 
 ### Health checks
 

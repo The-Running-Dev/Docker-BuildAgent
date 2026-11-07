@@ -10,8 +10,8 @@ A project can keep its build settings in a file at its root instead of repeating
 arguments on every build. The build reads the file before it runs, checks it, and uses its values
 for every parameter you did not set some other way.
 
-:::note Not yet released
-The project configuration file is part of 2.0.0, which has not been released. See the
+:::note Since 2.0.0
+The project configuration file is part of 2.0.0. See the
 [2.0.0 release notes](./release-notes/2.0.0.md).
 :::
 

@@ -191,6 +191,18 @@ Semantics a declaration cannot carry:
 - `Deadline` is written for the operator's benefit only (I32).
 - `AlreadyCurrent` is a success, not a refusal: the target already runs the target
   image and the update takes no lock and writes no record.
+- The settings the replacement reproduces are: the logging configuration, privileged
+  mode, the memory limit with its reservation and swap limit, the CPU limit, tmpfs
+  mounts with their options, the stop timeout, and network aliases per network. Every
+  other setting that differs from the daemon's default or the image's own refuses with
+  `TargetShapeUnsupported`, naming it (I34). The one security option the daemon adds for
+  a privileged container, `label=disable`, is not a setting of its own and is not
+  refused; with privileged mode off, it and every other security option still refuse.
+  A swap limit without a memory limit refuses.
+- Restoring returns the **container** (I39). It does not return state a mount holds: a
+  volume or bind mount is shared with the replacement, so what the replacement wrote
+  before it failed stays. Rolling back mounted state, and upgrading or rolling back a
+  runner's own binary inside the container, are not defined by this contract.
 
 ### Prior image pin and prior container
 

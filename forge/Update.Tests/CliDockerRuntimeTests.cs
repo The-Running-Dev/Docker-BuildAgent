@@ -208,8 +208,9 @@ public sealed class CliDockerRuntimeTests
     }
 
     [Theory]
-    [InlineData("HostConfig", "Privileged", "true", "HostConfig.Privileged")]
-    [InlineData("HostConfig", "Memory", "536870912", "HostConfig.Memory")]
+    [InlineData("HostConfig", "ReadonlyRootfs", "true", "HostConfig.ReadonlyRootfs")]
+    [InlineData("HostConfig", "CpuShares", "512", "HostConfig.CpuShares")]
+    [InlineData("HostConfig", "CpuQuota", "50000", "HostConfig.CpuQuota")]
     [InlineData("HostConfig", "CapAdd", "[\"NET_ADMIN\"]", "HostConfig.CapAdd")]
     [InlineData("HostConfig", "Sysctls", "{\"net.core.somaxconn\":\"1024\"}", "HostConfig.Sysctls")]
     [InlineData("HostConfig", "PidsLimit", "100", "HostConfig.PidsLimit")]
@@ -218,7 +219,6 @@ public sealed class CliDockerRuntimeTests
     [InlineData("HostConfig", "Init", "true", "HostConfig.Init")]
     [InlineData("Config", "Hostname", "\"custom-host\"", "Config.Hostname")]
     [InlineData("Config", "Tty", "true", "Config.Tty")]
-    [InlineData("Config", "StopTimeout", "30", "Config.StopTimeout")]
     public async Task InspectAsync_RunOnlySetting_IsNamed(string section, string field, string json, string expected)
     {
         var (runtime, runner, _) = Create();
@@ -231,17 +231,191 @@ public sealed class CliDockerRuntimeTests
         Assert.Equal(new[] { expected }, inspection!.UnreproducedSettings);
     }
 
+    // A runner container's shape: privileged, CPU and memory limits, a /tmp tmpfs, a stop timeout, and an alias on its network.
+    private static JsonObject RunnerInspect()
+    {
+        var inspect = DefaultInspect();
+        var host = inspect["HostConfig"]!;
+        host["Privileged"] = true;
+        host["SecurityOpt"] = new JsonArray("label=disable"); // what the daemon adds for --privileged
+        host["Memory"] = 8589934592;
+        host["MemorySwap"] = 17179869184;
+        host["MemoryReservation"] = 4294967296;
+        host["NanoCpus"] = 2500000000;
+        host["Tmpfs"] = new JsonObject { ["/tmp"] = "", ["/run"] = "rw,size=64m" };
+        inspect["Config"]!["StopTimeout"] = 60;
+        inspect["NetworkSettings"]!["Networks"]!["bridge"]!["Aliases"] = new JsonArray("web", ContainerId[..12], "docker");
+        return inspect;
+    }
+
     [Fact]
-    public async Task InspectAsync_NetworkAlias_IsNamed()
+    public async Task InspectAsync_RunnerSettings_AreReadAndNotRefused()
+    {
+        var (runtime, runner, _) = Create();
+        runner.Respond = Daemon(RunnerInspect(), ImageConfig());
+
+        var inspection = await runtime.InspectAsync("web");
+
+        Assert.Empty(inspection!.UnreproducedSettings!);
+        Assert.Equal(new RuntimeLimits(true, 8589934592, 17179869184, 4294967296, 2500000000), inspection.Limits);
+        Assert.Equal(new Dictionary<string, string> { ["/tmp"] = "", ["/run"] = "rw,size=64m" }, inspection.Tmpfs);
+        Assert.Equal(60, inspection.StopTimeoutSeconds);
+        // The daemon's own aliases (the container's name and the start of its id) are not the caller's.
+        Assert.Equal(new[] { "docker" }, inspection.NetworkAliases!["bridge"]);
+    }
+
+    [Theory]
+    [InlineData(true, "[\"label=disable\",\"seccomp=unconfined\"]", true)]
+    [InlineData(false, "[\"label=disable\"]", true)]
+    [InlineData(true, "[\"apparmor=custom\"]", true)]
+    [InlineData(true, "[\"label=disable\"]", false)]
+    public async Task InspectAsync_SecurityOptions_OnlyTheOnesPrivilegedImpliesAreForgiven(bool privileged, string securityOpt, bool named)
     {
         var (runtime, runner, _) = Create();
         var inspect = DefaultInspect();
-        inspect["NetworkSettings"]!["Networks"]!["bridge"]!["Aliases"] = new JsonArray("web", ContainerId[..12], "api");
+        inspect["HostConfig"]!["Privileged"] = privileged;
+        inspect["HostConfig"]!["SecurityOpt"] = JsonNode.Parse(securityOpt);
         runner.Respond = Daemon(inspect, ImageConfig());
 
         var inspection = await runtime.InspectAsync("web");
 
-        Assert.Equal(new[] { "NetworkSettings.Networks.bridge.Aliases" }, inspection!.UnreproducedSettings);
+        Assert.Equal(named ? new[] { "HostConfig.SecurityOpt" } : Array.Empty<string>(), inspection!.UnreproducedSettings);
+    }
+
+    [Fact]
+    public async Task InspectAsync_DefaultContainer_CarriesNoRunnerSettings()
+    {
+        var (runtime, runner, _) = Create();
+        runner.Respond = Daemon(DefaultInspect(), ImageConfig());
+
+        var inspection = await runtime.InspectAsync("web");
+
+        Assert.Equal(RuntimeLimits.None, inspection!.Limits);
+        Assert.Empty(inspection.Tmpfs!);
+        Assert.Empty(inspection.NetworkAliases!);
+        Assert.Null(inspection.StopTimeoutSeconds);
+    }
+
+    // A swap limit with no memory limit (--memory-swap -1) is not something --memory-swap can state on its own.
+    [Fact]
+    public async Task InspectAsync_SwapLimitWithoutMemoryLimit_IsNamed()
+    {
+        var (runtime, runner, _) = Create();
+        var inspect = DefaultInspect();
+        inspect["HostConfig"]!["MemorySwap"] = -1;
+        runner.Respond = Daemon(inspect, ImageConfig());
+
+        var inspection = await runtime.InspectAsync("web");
+
+        Assert.Equal(new[] { "HostConfig.MemorySwap" }, inspection!.UnreproducedSettings);
+    }
+
+    private static ContainerCreateSpec Spec(
+        IReadOnlyList<string>? networks = null,
+        RuntimeLimits? limits = null,
+        IReadOnlyDictionary<string, string>? tmpfs = null,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? aliases = null,
+        int? stopTimeout = null) =>
+        new(
+            Name: "web",
+            ImageId: ImageId,
+            Labels: new Dictionary<string, string>(),
+            Env: Array.Empty<string>(),
+            Command: new[] { "serve" },
+            Entrypoint: Array.Empty<string>(),
+            Mounts: Array.Empty<MountSpec>(),
+            Ports: Array.Empty<PortSpec>(),
+            RestartPolicy: "unless-stopped",
+            Networks: networks ?? Array.Empty<string>(),
+            Limits: limits,
+            Tmpfs: tmpfs,
+            NetworkAliases: aliases,
+            StopTimeoutSeconds: stopTimeout);
+
+    [Fact]
+    public async Task CreateReplacementAsync_PassesRunnerSettings()
+    {
+        var (runtime, runner, _) = Create();
+        var spec = Spec(
+            networks: new[] { "runner-net" },
+            limits: new RuntimeLimits(true, 8589934592, 17179869184, 4294967296, 2500000000),
+            tmpfs: new Dictionary<string, string> { ["/tmp"] = "", ["/run"] = "rw,size=64m" },
+            aliases: new Dictionary<string, IReadOnlyList<string>> { ["runner-net"] = new[] { "docker" } },
+            stopTimeout: 60);
+
+        await runtime.CreateReplacementAsync(spec);
+
+        Assert.Equal(
+            "create --name web --restart unless-stopped --privileged --memory 8589934592 --memory-swap 17179869184 " +
+            "--memory-reservation 4294967296 --cpus 2.5 --tmpfs /tmp --tmpfs /run:rw,size=64m --stop-timeout 60 " +
+            $"--network runner-net --network-alias docker {ImageId} serve",
+            runner.Calls.Single());
+    }
+
+    [Fact]
+    public async Task CreateReplacementAsync_NoRunnerSettings_AddsNoneOfTheirFlags()
+    {
+        var (runtime, runner, _) = Create();
+
+        await runtime.CreateReplacementAsync(Spec(limits: RuntimeLimits.None));
+
+        Assert.Equal($"create --name web --restart unless-stopped {ImageId} serve", runner.Calls.Single());
+    }
+
+    // Aliases are per network: the first network takes them with --network-alias, later ones with `network connect --alias`.
+    [Fact]
+    public async Task CreateReplacementAsync_AliasesOnLaterNetworks_AreSetWhenConnecting()
+    {
+        var (runtime, runner, _) = Create();
+        var spec = Spec(
+            networks: new[] { "first", "second", "third" },
+            aliases: new Dictionary<string, IReadOnlyList<string>>
+            {
+                ["first"] = new[] { "a" },
+                ["second"] = new[] { "b", "c" },
+            });
+
+        await runtime.CreateReplacementAsync(spec);
+
+        Assert.Equal(
+            new[]
+            {
+                $"create --name web --restart unless-stopped --network first --network-alias a {ImageId} serve",
+                "network connect --alias b --alias c second web",
+                "network connect third web",
+            },
+            runner.Calls);
+    }
+
+    // The container that the daemon derived swap for (twice the memory) is passed back as it reports it.
+    [Fact]
+    public async Task CreateReplacementAsync_MemoryWithoutSwap_OmitsMemorySwap()
+    {
+        var (runtime, runner, _) = Create();
+
+        await runtime.CreateReplacementAsync(Spec(limits: new RuntimeLimits(Memory: 536870912)));
+
+        Assert.Equal($"create --name web --restart unless-stopped --memory 536870912 {ImageId} serve", runner.Calls.Single());
+    }
+
+    [Fact]
+    public async Task CreateReplacementAsync_FractionalCpus_AreFormattedWithoutCultureOrRounding()
+    {
+        var (runtime, runner, _) = Create();
+        var current = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("de-DE");
+        try
+        {
+            await runtime.CreateReplacementAsync(Spec(limits: new RuntimeLimits(NanoCpus: 1500000000)));
+            await runtime.CreateReplacementAsync(Spec(limits: new RuntimeLimits(NanoCpus: 100000000)));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = current;
+        }
+
+        Assert.Contains("--cpus 1.5 ", runner.Calls[0]);
+        Assert.Contains("--cpus 0.1 ", runner.Calls[1]);
     }
 
     // The working directory and user can come from the image or from `docker run`. Equal to the image's own is
