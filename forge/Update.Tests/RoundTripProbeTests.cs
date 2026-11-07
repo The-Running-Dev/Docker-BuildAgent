@@ -59,6 +59,7 @@ public sealed class RoundTripProbeTests : IAsyncLifetime
         await Run("rm", "--force", $"{_prefix}-dst");
         await Run("volume", "rm", "--force", $"{_prefix}-vol");
         await Run("network", "rm", $"{_prefix}-net");
+        await Run("network", "rm", $"{_prefix}-net2");
     }
 
     [Fact]
@@ -207,13 +208,97 @@ public sealed class RoundTripProbeTests : IAsyncLifetime
     {
         if (!DaemonAvailable) return;
 
-        await CreateSource("--privileged", "--user", "1000", "--memory", "64m", "--hostname", "probe-host");
+        await CreateSource("--cpu-shares", "512", "--read-only", "--user", "1000", "--hostname", "probe-host");
 
         var source = await _runtime.InspectAsync($"{_prefix}-src");
-        Assert.Contains("HostConfig.Privileged", source!.UnreproducedSettings!);
-        Assert.Contains("HostConfig.Memory", source.UnreproducedSettings!);
+        Assert.Contains("HostConfig.CpuShares", source!.UnreproducedSettings!);
+        Assert.Contains("HostConfig.ReadonlyRootfs", source.UnreproducedSettings!);
         Assert.Contains("Config.Hostname", source.UnreproducedSettings!);
         Assert.Contains("Config.User", source.UnreproducedSettings!);
+    }
+
+    // The shape a runner's Docker sidecar is created with: privileged, CPU and memory limits, a user-defined
+    // network with the alias the runner reaches it by, and a tmpfs /tmp.
+    [Fact]
+    public async Task SidecarShape_RoundTrips()
+    {
+        if (!DaemonAvailable) return;
+
+        var networkName = $"{_prefix}-net";
+        await Run("network", "create", networkName);
+        await CreateSource(
+            "--restart", "unless-stopped", "--privileged", "--cpus", "1.5", "--memory", "256m",
+            "--network", networkName, "--network-alias", "docker", "--tmpfs", "/tmp", "--stop-timeout", "60");
+
+        var source = await _runtime.InspectAsync($"{_prefix}-src");
+        var replacement = await RoundTrip();
+
+        Assert.True(replacement.Limits!.Privileged);
+        Assert.Equal(1_500_000_000, replacement.Limits.NanoCpus);
+        Assert.Equal(256L * 1024 * 1024, replacement.Limits.Memory);
+        Assert.Equal(source!.Limits!.MemorySwap, replacement.Limits.MemorySwap);
+        Assert.Equal("", Assert.Single(replacement.Tmpfs!, t => t.Key == "/tmp").Value);
+        Assert.Equal(new[] { "docker" }, replacement.NetworkAliases![networkName]);
+        Assert.Equal(60, replacement.StopTimeoutSeconds);
+        Assert.Equal("unless-stopped", replacement.RestartPolicy);
+        Assert.Equal(new[] { networkName }, replacement.Networks);
+        // --tmpfs must come back as a tmpfs, not as an extra mount alongside it.
+        Assert.Equal(source.Mounts.Count, replacement.Mounts.Count);
+    }
+
+    // The shape a Docker-in-Docker runner is created with: privileged, with a stop timeout long enough for the
+    // daemon inside to shut down.
+    [Fact]
+    public async Task DindShape_RoundTrips()
+    {
+        if (!DaemonAvailable) return;
+
+        await CreateSource("--privileged", "--stop-timeout", "60");
+
+        var replacement = await RoundTrip();
+
+        Assert.True(replacement.Limits!.Privileged);
+        Assert.Equal(60, replacement.StopTimeoutSeconds);
+        Assert.Equal(0, replacement.Limits.Memory);
+        Assert.Equal(0, replacement.Limits.NanoCpus);
+    }
+
+    // Aliases are kept per network: one set on a second network survives the `network connect` that joins it.
+    [Fact]
+    public async Task AliasOnSecondNetwork_RoundTrips()
+    {
+        if (!DaemonAvailable) return;
+
+        var networkName = $"{_prefix}-net";
+        await Run("network", "create", networkName);
+        await CreateSource();
+        await Run("network", "connect", "--alias", "second-alias", networkName, $"{_prefix}-src");
+
+        var replacement = await RoundTrip();
+
+        Assert.Equal(new[] { "second-alias" }, replacement.NetworkAliases![networkName]);
+    }
+
+    // Aliases that start like the container's id are the user's: they must survive, each on its own network.
+    [Fact]
+    public async Task AliasesThatStartLikeTheId_RoundTripOnTheirNetworks()
+    {
+        if (!DaemonAvailable) return;
+
+        var first = $"{_prefix}-net";
+        var second = $"{_prefix}-net2";
+        await Run("network", "create", first);
+        await Run("network", "create", second);
+        await CreateSource("--network", first, "--network-alias", "0", "--network-alias", "api");
+        var id = (await Run("inspect", "--format", "{{.Id}}", $"{_prefix}-src")).Stdout.Trim();
+        await Run("network", "connect", "--alias", id[..6], "--alias", id[..12] + "x", second, $"{_prefix}-src");
+
+        var replacement = await RoundTrip();
+
+        Assert.Equal(new[] { "0", "api" }, replacement.NetworkAliases![first].OrderBy(a => a, StringComparer.Ordinal));
+        Assert.Equal(
+            new[] { id[..6], id[..12] + "x" }.OrderBy(a => a, StringComparer.Ordinal),
+            replacement.NetworkAliases[second].OrderBy(a => a, StringComparer.Ordinal));
     }
 
     [Fact]

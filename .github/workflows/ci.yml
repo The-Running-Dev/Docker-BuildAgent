@@ -101,6 +101,28 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/common
 
+      # Forge uses NUKE's parser. Exercise the published CLI and the in-image wrapper,
+      # and record the restored package graph when reviewing dependency changes.
+      - name: Validate Forge CLI and Dependencies
+        env:
+          NUKE_TELEMETRY_OPTOUT: '1'
+        run: |
+          dotnet publish forge/Forge/Forge.csproj -c Release -o "$RUNNER_TEMP/forge-cli"
+          dotnet list forge/Forge/Forge.csproj package --include-transitive
+          dotnet nuget why forge/Forge/Forge.csproj System.CommandLine
+          root="$RUNNER_TEMP/forge cli workspace"
+          mkdir -p "$root/.build"
+          dotnet "$RUNNER_TEMP/forge-cli/Forge.dll" --root "$root" --help > "$RUNNER_TEMP/forge-help.txt"
+          cat "$RUNNER_TEMP/forge-help.txt"
+          grep -qi 'change-log-source' "$RUNNER_TEMP/forge-help.txt"
+          pwsh -NoProfile -NonInteractive -File scripts/nuke/build.ps1 forge \
+            -workingDir "$root" -artifactsDir "$RUNNER_TEMP/forge-cli" \
+            --target Setup --change-log-source all --dry-run true --notifications false \
+            > "$RUNNER_TEMP/forge-setup.txt"
+          cat "$RUNNER_TEMP/forge-setup.txt"
+          grep -q '\[CONFIG\] DryRun: True' "$RUNNER_TEMP/forge-setup.txt"
+          grep -q '\[CONFIG\] Source: All' "$RUNNER_TEMP/forge-setup.txt"
+
       # Execute tests steps
       - name: Tests & Coverage
         uses: ./.github/actions/tests

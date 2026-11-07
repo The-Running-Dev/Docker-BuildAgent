@@ -714,7 +714,11 @@ public sealed class Updater
             Ports: target.Ports,
             RestartPolicy: target.RestartPolicy,
             Networks: target.Networks,
-            Log: target.Log);
+            Log: target.Log,
+            Limits: target.Limits,
+            Tmpfs: target.Tmpfs,
+            NetworkAliases: target.NetworkAliases,
+            StopTimeoutSeconds: target.StopTimeoutSeconds);
     }
 
     // Best-effort cleanup on the way out of a failure: a second failure here must not replace the first.

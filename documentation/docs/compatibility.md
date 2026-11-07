@@ -42,7 +42,7 @@ release.
   reproduce.
 
 To select a versioned image, put the version in the tag. 2.0.0 is the first version this
-promise covers and it is not published yet, so until it is, replace `<version>` with a version
+promise covers. Replace `<version>` with a version
 listed on the [releases page](https://github.com/The-Running-Dev/Docker-BuildAgent/releases):
 
 ```bash
