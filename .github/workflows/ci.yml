@@ -101,6 +101,24 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/common
 
+      # Exercise the release export mode without publishing or building the full image.
+      - name: Validate Release Image Metadata
+        run: |
+          probe="$RUNNER_TEMP/release-image-probe"
+          mkdir -p "$probe"
+          printf 'FROM scratch\nLABEL version="0.0.0-ci"\n' > "$probe/Dockerfile"
+          docker buildx version
+          docker buildx build --load --provenance=false --sbom=false \
+            --metadata-file "$probe/metadata.json" \
+            --tag buildagent-release-probe:ci "$probe"
+          cat "$probe/metadata.json"
+          docker image inspect buildagent-release-probe:ci --format '{{json .}}'
+          python - "$probe/metadata.json" <<'PY'
+          import json, sys
+          metadata = json.load(open(sys.argv[1]))
+          assert metadata.get('containerimage.config.digest'), 'Release export omitted its configuration digest'
+          PY
+
       # Forge uses NUKE's parser. Exercise the published CLI and the in-image wrapper,
       # and record the restored package graph when reviewing dependency changes.
       - name: Validate Forge CLI and Dependencies
