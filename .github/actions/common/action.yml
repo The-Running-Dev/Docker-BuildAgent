@@ -20,6 +20,22 @@ description: Common steps for Docker/Nuke builds
 runs:
   using: "composite"
   steps:
+    # Buildx switches --load to the OCI exporter with the containerd image store. That
+    # exporter omits containerimage.config.digest, which the release claim requires.
+    # Keep this explicit on disposable hosted Linux runners rather than substituting
+    # a manifest digest for the configuration digest.
+    - name: Select Classic Docker Image Store
+      shell: bash
+      run: |
+        daemon_config=/etc/docker/daemon.json
+        if [ -f "$daemon_config" ]; then
+          jq '.features["containerd-snapshotter"] = false' "$daemon_config" > "$RUNNER_TEMP/docker-daemon.json"
+        else
+          printf '{"features":{"containerd-snapshotter":false}}\n' > "$RUNNER_TEMP/docker-daemon.json"
+        fi
+        sudo install -m 0644 "$RUNNER_TEMP/docker-daemon.json" "$daemon_config"
+        sudo systemctl restart docker
+
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
