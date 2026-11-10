@@ -426,7 +426,8 @@ public class GitService : IGitService
         
         try
         {
-            ProcessTasks.StartProcess("git", $"config --global --add safe.directory \"{directoryPath}\"", logOutput: false, logInvocation: false)
+            // NUKE quotes interpolated arguments; literal quotes would quote this path twice.
+            ProcessTasks.StartProcess("git", $"config --global --add safe.directory {directoryPath}", logOutput: false, logInvocation: false)
                 .AssertZeroExitCode();
             
             _logger.Ok($"Set Git Safe Directory: {directoryPath}");

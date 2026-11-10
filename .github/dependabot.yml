@@ -22,6 +22,10 @@ updates:
 
   - package-ecosystem: nuget
     directory: /forge
+    # Microsoft.Extensions 11 drops net8.0 support; keep servicing the compatible line.
+    ignore:
+      - dependency-name: "Microsoft.Extensions.*"
+        versions: [">=11.0.0"]
     schedule:
       interval: weekly
     commit-message:
