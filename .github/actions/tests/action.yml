@@ -28,7 +28,7 @@ runs:
 
     # Generate and display coverage report inline
     - name: Generate Coverage Report
-      uses: danielpalme/ReportGenerator-GitHub-Action@861674232075b2c6bd1405a04c4bb9b150653e81 # 5.5.12
+      uses: danielpalme/ReportGenerator-GitHub-Action@5f3701a41d14548c9b8e575a5c235230e515cbc0 # 5.6.0
       with:
         reports: './test-results/**/coverage.cobertura.xml'
         targetdir: './coverage-report'
